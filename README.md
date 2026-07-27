@@ -1,12 +1,13 @@
-# DualTrack Console
+# Meridian
 
-Production Next.js app for the DualTrack learning console: a **365-day full-stack & systems campaign** plus a **45-day AI/LLM engineering sprint**, with progress tracking, spaced repetition, notes, themes, and optional Claude-powered study tools.
+Multi-plan learning campaigns: progress, spaced repetition, notes, themes, custom plan builder, and bring-your-own-key AI.
 
 ## Stack
 
 - **Next.js 16** (App Router) + React 19 + TypeScript
-- Client-side state persisted in `localStorage`
-- Anthropic Messages API proxied through `/api/claude` (API key stays on the server)
+- Persistence via **IndexedDB** (`idb-keyval`) with **localStorage** fallback
+- BYOK providers: Anthropic, OpenAI, Gemini, OpenRouter, Ollama
+- Optional server fallback: `/api/claude` when Anthropic is selected and no browser key is set
 
 ## Setup
 
@@ -15,65 +16,53 @@ npm install
 cp .env.example .env.local
 ```
 
-Set your key in `.env.local`:
-
 ```bash
+# Optional server-side Anthropic fallback (when no BYOK key is pasted)
 ANTHROPIC_API_KEY=sk-ant-...
-# optional
-# ANTHROPIC_MODEL=claude-sonnet-4-6
 ```
 
-Notes / quiz / LinkedIn generation require the API key. Progress tracking, SRS, themes, and export/import work without it.
+Or open **AI** in the top bar and paste a provider key at runtime.
 
 ## Scripts
 
 ```bash
-npm run dev      # http://localhost:3000 (Turbopack)
-npm run build    # production build
-npm start        # serve production build
+npm run dev
+npm run build
+npm start
 npm run lint
+npm test
 ```
 
-## App structure
+## Features
 
-```
-app/
-  layout.tsx              # fonts, metadata, global CSS
-  page.tsx                # DualTrack console
-  dualtrack.css           # app styles
-  api/claude/route.ts     # Anthropic proxy
-components/dualtrack/
-  DualTrackConsole.tsx    # full console UI + state
-data/
-  days-365.json           # main campaign curriculum
-  days-45.json            # sprint curriculum
-  domains.json            # domain labels
-lib/
-  types.ts
-  storage.ts              # localStorage persistence
-  claude-client.ts        # client → /api/claude
-legacy/
-  dualtrack-console.jsx   # original single-file source
-```
+- Built-in **365-day** and **45-day** plans, plus custom plans from the builder
+- Plan generation (outline → periods), edit-before-save, cancel/resume
+- Multi-plan switcher; delete purges that plan’s progress/notes/refs/srs
+- Themes (8) via CSS custom properties — including Ledger (light) and Matte Black
+- Export: notes markdown, full backup, **plan-only share**
+- Import: plan share adds a plan; full backup asks **merge** or **replace**
+
+## AI keys (BYOK)
+
+- Default: key stays **in memory** only (cleared when the tab closes)
+- Optional: “Remember this key on this device” → `dualtrack:credentials` in localStorage
+- Exports never include credentials
+- **Forget key** clears memory + storage
 
 ## Persistence
 
-State key: `dualtrack:state:v1`
+Storage keys keep the legacy `dualtrack:` prefix so existing local data still loads.
 
-```ts
-{
-  progress, notes, refs, srs, log, themeKey, updatedAt
-}
-```
+| Key | Contents |
+|-----|----------|
+| `dualtrack:meta` | schema version, active plan, theme |
+| `dualtrack:plans` | plan definitions |
+| `dualtrack:userdata` | progress, notes, refs, srs, log |
+| `dualtrack:credentials` | opt-in remembered provider key |
 
-Export/import uses backup format `version: 2` (`app: "dualtrack"`).
+## Manual checklist
 
-## Deploy
-
-Deploy to Vercel (or any Node host):
-
-1. Set `ANTHROPIC_API_KEY` in the host environment.
-2. `npm run build` / platform build command: `next build`.
-3. Start: `next start`.
-
-Do not expose the Anthropic key to the browser.
+- Generate a 30-day plan with at least two providers
+- Cancel generation midway, then resume
+- Switch all eight themes on builder + progress screens (esp. Ledger & Matte)
+- Reload: plans, progress, and theme survive; API key is gone unless “remember” was ticked

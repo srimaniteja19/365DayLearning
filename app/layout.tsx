@@ -1,45 +1,94 @@
 import type { Metadata, Viewport } from "next";
 import {
-  Inter,
-  JetBrains_Mono,
-  Source_Serif_4,
-  Space_Grotesk,
+  Syne,
+  Fraunces,
+  Bricolage_Grotesque,
+  Instrument_Serif,
+  Recursive,
+  Fragment_Mono,
+  Young_Serif,
+  Besley,
+  Oxanium,
+  Bodoni_Moda,
 } from "next/font/google";
 import "./globals.css";
 import "./dualtrack.css";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
-const jetbrainsMono = JetBrains_Mono({
+const syne = Syne({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-jetbrains",
+  variable: "--font-syne",
   display: "swap",
 });
 
-const sourceSerif = Source_Serif_4({
-  subsets: ["latin"],
-  weight: ["400", "600", "700"],
-  variable: "--font-source-serif",
-  display: "swap",
-});
-
-const spaceGrotesk = Space_Grotesk({
+const fraunces = Fraunces({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
-  variable: "--font-space-grotesk",
+  variable: "--font-fraunces",
+  display: "swap",
+});
+
+const bricolage = Bricolage_Grotesque({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-bricolage",
+  display: "swap",
+});
+
+const instrument = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-instrument",
+  display: "swap",
+});
+
+const recursive = Recursive({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-recursive",
+  display: "swap",
+});
+
+const fragment = Fragment_Mono({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-fragment",
+  display: "swap",
+});
+
+const young = Young_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-young",
+  display: "swap",
+});
+
+const besley = Besley({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-besley",
+  display: "swap",
+});
+
+const oxanium = Oxanium({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-oxanium",
+  display: "swap",
+});
+
+const bodoni = Bodoni_Moda({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-bodoni",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "DualTrack Console | 365-Day Learning",
+  title: "Meridian | Daily Learning Campaigns",
   description:
-    "Dual-track learning console: 365-day full-stack & systems campaign plus a 45-day AI/LLM engineering sprint, with spaced repetition, notes, and progress tracking.",
-  applicationName: "DualTrack Console",
+    "Meridian — multi-plan learning campaigns with spaced repetition, notes, custom roadmaps, and bring-your-own-key AI.",
+  applicationName: "Meridian",
   keywords: [
     "learning",
     "engineering",
@@ -47,6 +96,7 @@ export const metadata: Metadata = {
     "systems",
     "spaced repetition",
     "365 day challenge",
+    "roadmap",
   ],
 };
 
@@ -56,17 +106,26 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+const fontVars = [
+  syne.variable,
+  fraunces.variable,
+  bricolage.variable,
+  instrument.variable,
+  recursive.variable,
+  fragment.variable,
+  young.variable,
+  besley.variable,
+  oxanium.variable,
+  bodoni.variable,
+].join(" ");
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${inter.variable} ${jetbrainsMono.variable} ${sourceSerif.variable} ${spaceGrotesk.variable}`}
-      suppressHydrationWarning
-    >
+    <html lang="en" className={fontVars} suppressHydrationWarning>
       <body suppressHydrationWarning>{children}</body>
     </html>
   );

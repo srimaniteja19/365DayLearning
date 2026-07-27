@@ -1,22 +1,67 @@
-export type DomainId =
-  | "ai-ml"
-  | "backend-node"
-  | "frontend"
-  | "databases"
-  | "infra-cloud"
-  | "data-eng"
-  | "distributed-sys"
-  | "security"
-  | "observability"
-  | "perf"
-  | "systems-eng";
+export type Domain = string;
 
-export type DayEntry = {
+export type PlanDay = {
   day: number;
   id: string;
   topics: string[];
-  domains: DomainId[];
+  domains: Domain[];
 };
+
+export type PlanPeriod = {
+  label: string;
+  sub: string;
+  start: number;
+  end: number;
+};
+
+/** Builder inputs that produced a plan. */
+export type DomainWeight = "small" | "medium" | "large";
+
+export type PlanDomainSpec = {
+  id: string;
+  label?: string;
+  weight: DomainWeight;
+  color?: string;
+};
+
+export type PlanGrouping = "none" | "weekly" | "monthly" | "quarterly-monthly";
+
+export type PlanRequest = {
+  name?: string;
+  subtitle?: string;
+  goal?: string;
+  level?: string;
+  exclusions?: string[];
+  domains?: PlanDomainSpec[];
+  jobDescription?: string;
+  mustInclude?: string[];
+  totalDays?: number;
+  topicsPerDay?: number;
+  grouping?: PlanGrouping;
+};
+
+export type PlanStatus = "draft" | "ready";
+
+export type Plan = {
+  id: string;
+  name: string;
+  subtitle: string;
+  builtin: boolean;
+  createdAt: number;
+  totalDays: number;
+  topicsPerDay: number;
+  accentRole: "main" | "sprint" | "auto";
+  periodScopes: Array<{ key: string; label: string; periods: PlanPeriod[] }>;
+  days: PlanDay[];
+  meta: PlanRequest;
+  status?: PlanStatus;
+  hidden?: boolean;
+};
+
+/** @deprecated Use PlanDay — kept for gradual migration of UI props. */
+export type DayEntry = PlanDay;
+/** @deprecated Prefer Domain */
+export type DomainId = Domain;
 
 export type ThemeKey =
   | "bloom"
@@ -28,7 +73,17 @@ export type ThemeKey =
   | "blueprint"
   | "matte";
 
-export type CampaignKey = "main" | "sprint";
+export type FontKey =
+  | "syne"
+  | "fraunces"
+  | "bricolage"
+  | "instrument"
+  | "recursive"
+  | "fragment"
+  | "young"
+  | "besley"
+  | "oxanium"
+  | "bodoni";
 
 export type ProgressMap = Record<string, Record<number, boolean>>;
 export type NotesMap = Record<string, string>;
@@ -43,6 +98,32 @@ export type SrsEntry = {
 export type SrsMap = Record<string, SrsEntry>;
 export type LogEntry = { d: string; i: number; at: number };
 
+export type UserDataState = {
+  progress: ProgressMap;
+  notes: NotesMap;
+  refs: RefsMap;
+  srs: SrsMap;
+  log: LogEntry[];
+};
+
+export type MetaState = {
+  schemaVersion: number;
+  activePlanId: string;
+  themeKey: ThemeKey;
+  fontKey?: FontKey;
+  hiddenPlanIds: string[];
+  updatedAt?: number;
+};
+
+export type PlansState = Record<string, Plan>;
+
+export type AppSnapshot = {
+  meta: MetaState;
+  plans: PlansState;
+  userdata: UserDataState;
+};
+
+/** Legacy single-blob shape (pre multi-plan). */
 export type PersistedState = {
   progress: ProgressMap;
   notes: NotesMap;
@@ -51,11 +132,14 @@ export type PersistedState = {
   log: LogEntry[];
   themeKey: ThemeKey;
   updatedAt?: number;
+  schemaVersion?: number;
+  activePlanId?: string;
+  plans?: PlansState;
 };
 
 export type BackupFile = {
   app: "dualtrack";
-  version: 2;
+  version: 2 | 3;
   exportedAt: number;
   progress: ProgressMap;
   notes: NotesMap;
@@ -63,9 +147,18 @@ export type BackupFile = {
   srs: SrsMap;
   log: LogEntry[];
   themeKey: ThemeKey;
+  plans?: PlansState;
+  activePlanId?: string;
+  schemaVersion?: number;
 };
 
 export type ViewKey = "console" | "grid" | "review" | "weekly" | "log";
 export type ScopeKey = "all" | "quarter" | "month" | "week";
-export type ModalState = { kind: string; day?: DayEntry } | null;
+export type ModalState = { kind: string; day?: PlanDay } | null;
 export type SaveStatus = "loading" | "idle" | "saving" | "saved" | "error" | "off";
+
+/** Current multi-plan schema. */
+export const SCHEMA_VERSION = 3;
+
+export const BUILTIN_365_ID = "builtin-365";
+export const BUILTIN_45_ID = "builtin-45";

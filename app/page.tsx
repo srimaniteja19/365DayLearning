@@ -1,5 +1,5 @@
-import DualTrackConsole from "@/components/dualtrack/DualTrackConsole";
+import DualTrackApp from "@/components/App";
 
 export default function HomePage() {
-  return <DualTrackConsole />;
+  return <DualTrackApp />;
 }

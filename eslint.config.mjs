@@ -13,7 +13,12 @@ const eslintConfig = defineConfig([
     "legacy/**",
   ]),
   {
-    files: ["components/dualtrack/DualTrackConsole.tsx"],
+    files: [
+      "components/dualtrack/DualTrackConsole.tsx",
+      "features/ui/Views.tsx",
+      "features/settings/SettingsPanel.tsx",
+      "features/planBuilder/PlanBuilder.tsx",
+    ],
     rules: {
       // Large migrated SPA; typed boundaries are in lib/ and app/api/
       "@typescript-eslint/ban-ts-comment": "off",
