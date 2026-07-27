@@ -11,12 +11,14 @@ import React, {
   useRef,
   useEffect,
 } from "react";
+import { useSession } from "next-auth/react";
 import {
   hasStorage,
   loadAppSnapshot,
   saveAppSnapshot,
   clearUserData,
 } from "@/lib/storage";
+import { pullCloudSnapshot, pushCloudSnapshot } from "@/lib/cloudSync";
 import {
   periodsForPlan,
   scopesForPlan,
@@ -89,6 +91,9 @@ export default function DualTrackConsole() {
   const saveTimer = useRef(null);
   const didLoad = useRef(false);
   const storageOk = useRef(false);
+  const { data: session } = useSession();
+  const cloudUserId = session?.user?.id || null;
+  const cloudSyncedFor = useRef(null);
 
   const theme = THEMES[themeKey] || THEMES.terminal;
   const fontPack = FONT_PACKS[fontKey] || FONT_PACKS[DEFAULT_FONT_KEY];
@@ -121,6 +126,30 @@ export default function DualTrackConsole() {
   }, [visiblePlans, theme]);
 
   const campaign = themedPlans[activePlanId] || Object.values(themedPlans)[0];
+
+  const buildSnapshot = useCallback(
+    () => ({
+      meta: {
+        schemaVersion: SCHEMA_VERSION,
+        activePlanId,
+        themeKey,
+        fontKey,
+        hiddenPlanIds: Object.values(plans)
+          .filter((p) => p.hidden)
+          .map((p) => p.id),
+        updatedAt: Date.now(),
+      },
+      plans,
+      userdata: { progress, notes, refs, srs, log, learned },
+    }),
+    [activePlanId, themeKey, fontKey, plans, progress, notes, refs, srs, log, learned],
+  );
+
+  const fireToast = useCallback((msg, kind) => {
+    setToast({ msg, kind, id: Math.random() });
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2600);
+  }, []);
 
   useEffect(() => {
     hydrateCredentialsFromStorage();
@@ -164,33 +193,57 @@ export default function DualTrackConsole() {
     };
   }, []);
 
+  // Pull the account's cloud snapshot once per sign-in. If the account has
+  // no cloud data yet (first sign-in from any device), seed it from
+  // whatever is already loaded locally.
+  useEffect(() => {
+    if (!didLoad.current) return;
+    if (!cloudUserId) return;
+    if (cloudSyncedFor.current === cloudUserId) return;
+    cloudSyncedFor.current = cloudUserId;
+    (async () => {
+      const result = await pullCloudSnapshot();
+      if (!result.ok) return;
+      if (result.snapshot) {
+        const snap = result.snapshot;
+        setPlans(snap.plans);
+        setActivePlanId(snap.meta.activePlanId);
+        setProgress(snap.userdata.progress || {});
+        setNotes(snap.userdata.notes || {});
+        setRefs(snap.userdata.refs || {});
+        setSrs(snap.userdata.srs || {});
+        setLog(snap.userdata.log || []);
+        setLearned(snap.userdata.learned || {});
+        if (snap.meta.themeKey && THEMES[snap.meta.themeKey]) setThemeKey(snap.meta.themeKey);
+        if (snap.meta.fontKey && FONT_PACKS[snap.meta.fontKey]) setFontKey(snap.meta.fontKey);
+        if (storageOk.current) await saveAppSnapshot(snap);
+        fireToast("Synced from your account");
+      } else {
+        await pushCloudSnapshot(buildSnapshot());
+      }
+    })();
+  }, [cloudUserId, fireToast, buildSnapshot]);
+
+  useEffect(() => {
+    if (!cloudUserId) cloudSyncedFor.current = null;
+  }, [cloudUserId]);
+
   useEffect(() => {
     if (!didLoad.current) return;
     if (!storageOk.current) return;
     setSaveStatus("saving");
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      const ok = await saveAppSnapshot({
-        meta: {
-          schemaVersion: SCHEMA_VERSION,
-          activePlanId,
-          themeKey,
-          fontKey,
-          hiddenPlanIds: Object.values(plans)
-            .filter((p) => p.hidden)
-            .map((p) => p.id),
-          updatedAt: Date.now(),
-        },
-        plans,
-        userdata: { progress, notes, refs, srs, log, learned },
-      });
+      const snapshot = buildSnapshot();
+      const ok = await saveAppSnapshot(snapshot);
       setSaveStatus(ok ? "saved" : "error");
       if (ok) setTimeout(() => setSaveStatus((cur) => (cur === "saved" ? "idle" : cur)), 1600);
+      if (cloudUserId) pushCloudSnapshot(snapshot);
     }, 700);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [progress, notes, refs, srs, log, learned, themeKey, fontKey, plans, activePlanId]);
+  }, [progress, notes, refs, srs, log, learned, themeKey, fontKey, plans, activePlanId, cloudUserId, buildSnapshot]);
 
   useEffect(() => {
     if (!campaign) return;
@@ -260,15 +313,25 @@ export default function DualTrackConsole() {
     setLog([]);
     setLearned({});
     await clearUserData();
+    if (cloudUserId) {
+      pushCloudSnapshot({
+        meta: {
+          schemaVersion: SCHEMA_VERSION,
+          activePlanId,
+          themeKey,
+          fontKey,
+          hiddenPlanIds: Object.values(plans)
+            .filter((p) => p.hidden)
+            .map((p) => p.id),
+          updatedAt: Date.now(),
+        },
+        plans,
+        userdata: { progress: {}, notes: {}, refs: {}, srs: {}, log: [], learned: {} },
+      });
+    }
     setConfirmReset(false);
     setSaveStatus("idle");
-  }, []);
-
-  const fireToast = useCallback((msg, kind) => {
-    setToast({ msg, kind, id: Math.random() });
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 2600);
-  }, []);
+  }, [cloudUserId, activePlanId, themeKey, fontKey, plans]);
 
   const handleDeletePlan = useCallback((planId) => {
     const plan = plans[planId];
@@ -555,6 +618,8 @@ export default function DualTrackConsole() {
           stats={globalStats}
           onOpenData={() => setModal({ kind: "export" })}
           onOpenSettings={() => setModal({ kind: "settings" })}
+          onOpenAccount={() => setModal({ kind: "account" })}
+          accountLabel={session?.user?.email || null}
           onNewPlan={() => setModal({ kind: "builder" })}
           themeKey={themeKey}
           setThemeKey={setThemeKey}

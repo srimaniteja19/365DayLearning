@@ -18,6 +18,7 @@ const eslintConfig = defineConfig([
       "features/ui/Views.tsx",
       "features/settings/SettingsPanel.tsx",
       "features/planBuilder/PlanBuilder.tsx",
+      "features/learned/LearnedView.tsx",
     ],
     rules: {
       // Large migrated SPA; typed boundaries are in lib/ and app/api/

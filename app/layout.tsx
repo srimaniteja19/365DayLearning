@@ -13,6 +13,7 @@ import {
 } from "next/font/google";
 import "./globals.css";
 import "./dualtrack.css";
+import { Providers } from "./providers";
 
 const syne = Syne({
   subsets: ["latin"],
@@ -126,7 +127,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={fontVars} suppressHydrationWarning>
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

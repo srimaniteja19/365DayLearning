@@ -19,6 +19,7 @@ import { buildMarkdown } from "@/lib/markdown";
 import { relativeDue, SRS_INTERVALS, DAY_MS, dueList } from "@/lib/srs";
 import { seedBuiltinPlans } from "@/data/builtinPlans";
 import { SettingsPanel } from "@/features/settings/SettingsPanel";
+import { AccountPanel } from "@/features/account/AccountPanel";
 import { PlanBuilder } from "@/features/planBuilder/PlanBuilder";
 import { ProviderError } from "@/lib/providers/errors";
 import {
@@ -228,6 +229,8 @@ export function TopBar({
   onReset,
   onOpenData,
   onOpenSettings,
+  onOpenAccount,
+  accountLabel,
   onNewPlan,
 }) {
   const pct = stats.need ? Math.min(100, Math.round((stats.into / stats.need) * 100)) : 0;
@@ -252,6 +255,14 @@ export function TopBar({
         <button className="stat-chip data-btn" onClick={onOpenData} title="Export or import your data">
           <Icon.Download size={13} />
           <span className="stat-chip-val">Data</span>
+        </button>
+        <button
+          className={classNames("stat-chip data-btn", accountLabel && "account-btn-active")}
+          onClick={onOpenAccount}
+          title={accountLabel ? `Signed in as ${accountLabel}` : "Sign in to sync across devices"}
+        >
+          <Icon.User size={13} />
+          <span className="stat-chip-val">{accountLabel ? "Account" : "Sign in"}</span>
         </button>
         <ThemePicker themeKey={themeKey} setThemeKey={setThemeKey} />
         <FontPicker fontKey={fontKey} setFontKey={setFontKey} />
@@ -1166,6 +1177,7 @@ export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, pro
     notes: "Generate study notes",
     settings: "AI provider",
     builder: "New plan",
+    account: "Account & sync",
   };
 
   return (
@@ -1199,6 +1211,7 @@ export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, pro
             />
           )}
           {modal.kind === "settings" && <SettingsPanel onClose={onClose} />}
+          {modal.kind === "account" && <AccountPanel onClose={onClose} />}
           {modal.kind === "notes" && (
             <NotesGenPanel
               day={modal.day}

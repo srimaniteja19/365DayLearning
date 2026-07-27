@@ -583,6 +583,7 @@
 }
 .data-btn { cursor: pointer; }
 .data-btn:hover { border-color: var(--border-hover); }
+.account-btn-active { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); color: var(--accent); }
 
 /* ---------- review view ---------- */
 .review-view { position: relative; z-index: 2; padding: 24px 28px 20px; max-width: 720px; }

@@ -143,6 +143,13 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
       .filter((g) => g.items.length > 0);
   }, [learned, query]);
 
+  // Running start-index per day so sticky-note colors rotate continuously
+  // across the whole timeline instead of resetting each day.
+  const dayColorOffsets = useMemo(
+    () => days.map((_, i) => days.slice(0, i).reduce((n, day) => n + day.items.length, 0)),
+    [days],
+  );
+
   const todayCount = (learned[today] || []).length;
   const totalCount = Object.values(learned || {}).reduce((n, items) => n + (items?.length || 0), 0);
 
@@ -318,9 +325,7 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
       )}
 
       <div className="learned-timeline">
-        {(() => {
-          let colorIdx = 0;
-          return days.map(({ date: d, items }) => (
+        {days.map(({ date: d, items }, dayIdx) => (
           <section key={d} className="learned-day">
             <div className="learned-day-head">
               <h3 className="learned-day-label">{formatLearnedDate(d)}</h3>
@@ -332,8 +337,7 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
             <div className="learned-bento">
               {items.map((item, index) => {
                 const open = expandedId === item.id;
-                const tone = STICKY_COLORS[colorIdx % STICKY_COLORS.length];
-                colorIdx += 1;
+                const tone = STICKY_COLORS[(dayColorOffsets[dayIdx] + index) % STICKY_COLORS.length];
                 const size = open ? "lg" : bentoSize(item, index);
                 const tilt = ((hashStr(item.id) % 5) - 2) * 0.28;
                 return (
@@ -423,8 +427,7 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
               })}
             </div>
           </section>
-          ));
-        })()}
+        ))}
       </div>
     </div>
   );

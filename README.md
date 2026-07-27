@@ -6,6 +6,7 @@ Multi-plan learning campaigns: progress, spaced repetition, notes, themes, custo
 
 - **Next.js 16** (App Router) + React 19 + TypeScript
 - Persistence via **IndexedDB** (`idb-keyval`) with **localStorage** fallback
+- Optional accounts + cloud sync: **Neon Postgres** (via Vercel's database integration) + **Auth.js v5** (credentials)
 - BYOK providers: Anthropic, OpenAI, Gemini, OpenRouter, Ollama
 - Optional server fallback: `/api/claude` when Anthropic is selected and no browser key is set
 
@@ -23,6 +24,31 @@ ANTHROPIC_API_KEY=sk-ant-...
 
 Or open **AI** in the top bar and paste a provider key at runtime.
 
+## Accounts + cloud sync (optional)
+
+The app is fully usable with **no account** — everything lives in IndexedDB/localStorage on that
+one device. Signing in adds sync: the entire snapshot (plans, progress, notes, SRS, and the
+Learned journal) is mirrored to Postgres per account so it follows you across devices.
+
+1. **Create the database** — in the Vercel dashboard: *Storage → Create Database → Neon (Postgres)*.
+   Connect it to this project so `DATABASE_URL` is added to your Vercel env vars automatically.
+   For local dev, copy that same pooled connection string into `.env.local`.
+2. **Generate an auth secret**:
+   ```bash
+   npx auth secret
+   ```
+   This writes `AUTH_SECRET` to `.env.local` (add it to your Vercel env vars too).
+3. **Create the tables** (Drizzle ORM manages the schema in `lib/db/schema.ts`):
+   ```bash
+   npm run db:push
+   ```
+4. Run the app — a **Sign in** button appears in the top bar. Creating an account or signing in
+   pulls any existing cloud snapshot for that account (or seeds the cloud with the current local
+   data on first sign-in), then keeps pushing on every save.
+
+Without `DATABASE_URL`/`AUTH_SECRET` set, the account button still renders but sign-in/sign-up
+calls fail gracefully (503) and the app behaves exactly as it did before — purely local.
+
 ## Scripts
 
 ```bash
@@ -31,6 +57,8 @@ npm run build
 npm start
 npm run lint
 npm test
+npm run db:push      # push schema to DATABASE_URL (accounts/cloud sync)
+npm run db:studio    # browse the database with Drizzle Studio
 ```
 
 ## Features
@@ -39,6 +67,7 @@ npm test
 - Plan generation (outline → periods), edit-before-save, cancel/resume
 - Multi-plan switcher; delete purges that plan’s progress/notes/refs/srs
 - **Other things I learned** — calendar journal with markdown notes, rich links, and AI insights
+- Optional **accounts + cloud sync** (Neon Postgres + Auth.js) — sign in to sync across devices
 - Themes (8) via CSS custom properties — including Ledger (light) and Matte Black
 - Export: notes markdown, full backup, **plan-only share**
 - Import: plan share adds a plan; full backup asks **merge** or **replace**
