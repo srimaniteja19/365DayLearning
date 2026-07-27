@@ -95,7 +95,7 @@ export function buildMarkdown(
           lines.push("");
         }
         if (item.insight?.trim()) {
-          lines.push(`> **Insight:** ${item.insight.trim()}`);
+          lines.push(`> **Summary:** ${item.insight.trim()}`);
           lines.push("");
         }
       });

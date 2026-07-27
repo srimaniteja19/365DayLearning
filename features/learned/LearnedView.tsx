@@ -14,6 +14,9 @@ import {
 } from "@/lib/learned";
 import { MiniMarkdown } from "@/features/ui/Views";
 
+const STICKY_COLORS = ["lemon", "coral", "mint", "sky", "blush", "butter", "lilac", "seafoam"];
+const BENTO_SIZES = ["sm", "md", "wide", "tall", "lg"];
+
 function formatAiError(e) {
   if (e instanceof ProviderError) {
     if (e.code === "auth") return `${e.message} Open AI settings to fix your key.`;
@@ -24,16 +27,82 @@ function formatAiError(e) {
   return e?.message || "Something went wrong";
 }
 
-async function generateInsight(title, body) {
-  const prompt = `You help a learner capture what stuck from something they learned outside their main curriculum.
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < String(s).length; i++) h = (h * 31 + String(s).charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
 
-Title: ${title || "(untitled)"}
+function bentoSize(item, index) {
+  const len = (item.body || "").length + (item.title || "").length;
+  if (item.insight && len > 220) return "lg";
+  if (len > 280) return "wide";
+  if (len > 140) return index % 3 === 0 ? "tall" : "md";
+  if (index % 5 === 2) return "tall";
+  if (index % 4 === 1) return "wide";
+  return BENTO_SIZES[hashStr(item.id) % 3]; // sm | md | wide-ish cycle via first 3
+}
 
-Notes (markdown):
-${body}
+function snippet(text, max = 140) {
+  const t = String(text || "").replace(/\s+/g, " ").trim();
+  if (t.length <= max) return t;
+  return t.slice(0, max).replace(/\s+\S*$/, "") + "…";
+}
 
-Write a short insight in 2–4 sentences. Capture the core idea, why it matters, and one practical takeaway. Plain prose only — no headings, no bullets, no preamble.`;
-  return callClaude(prompt, 400);
+async function generateEnrichment(title, body) {
+  const prompt = `You help clean up a learner's journal entry.
+
+Current title: ${title || "(untitled)"}
+Their notes (markdown):
+${body || "(no notes — infer from the title alone)"}
+
+Reply in EXACTLY this plain-text format, with no markdown fences, no extra labels, no commentary before or after:
+
+TITLE: <a clear, specific title, 4-12 words, max 80 characters>
+SUMMARY:
+<a COMPLETE summary, 90-120 words, in flowing prose paragraphs>
+
+Rules:
+- title: fix grammar, capture what was learned, do not start with "Learned about" or "I learned", do not wrap it in quotes.
+- summary: explain what this is, why it matters, and one practical takeaway. Plain prose only — no headings, no bullet lists. You may use a blank line between paragraphs if it reads better as two short paragraphs.
+- Do not invent facts beyond what the title/notes imply. If notes are thin, stay high-level and practical.
+- The summary MUST be complete — never stop mid-sentence.
+- Do not repeat the word TITLE or SUMMARY anywhere except as the two labels above.`;
+
+  const raw = await callClaude(prompt, 1400);
+  return parseEnrichment(raw, title);
+}
+
+function parseEnrichment(raw, fallbackTitle) {
+  const cleaned = String(raw || "")
+    .replace(/^```(?:\w+)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  const match = /TITLE:\s*(.+?)\s*\n+\s*SUMMARY:\s*([\s\S]+)/i.exec(cleaned);
+  if (!match) {
+    const summary = cleaned.trim();
+    if (!summary) throw new Error("Could not read AI summary");
+    return { title: (fallbackTitle || "Untitled").slice(0, 120), summary: formatSummary(summary) };
+  }
+
+  const nextTitle = match[1].trim().replace(/^["'“”]|["'“”]$/g, "");
+  const summary = formatSummary(match[2]);
+  if (!summary) throw new Error("Could not read AI summary");
+
+  return {
+    title: (nextTitle || fallbackTitle || "Untitled").slice(0, 120),
+    summary,
+  };
+}
+
+/** Collapse ragged whitespace within paragraphs while preserving paragraph breaks. */
+function formatSummary(text) {
+  return String(text || "")
+    .split(/\n\s*\n/)
+    .map((p) => p.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireToast }) {
@@ -93,9 +162,11 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
     try {
       if (autoInsight && (title.trim() || body.trim())) {
         try {
-          item.insight = (await generateInsight(item.title, item.body)).trim();
+          const enriched = await generateEnrichment(item.title, item.body);
+          item.title = enriched.title;
+          item.insight = enriched.summary;
         } catch (e) {
-          fireToast?.(`Saved without insight — ${formatAiError(e)}`, "xp");
+          fireToast?.(`Saved without summary — ${formatAiError(e)}`, "xp");
         }
       }
       onAdd(date, item);
@@ -103,7 +174,7 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
       setBody("");
       setPreview(false);
       setExpandedId(item.id);
-      fireToast?.(item.insight ? "Logged · insight ready" : "Logged what you learned", "day");
+      fireToast?.(item.insight ? "Logged · title & summary ready" : "Logged what you learned", "day");
     } finally {
       setSaving(false);
     }
@@ -112,9 +183,13 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
   const refreshInsight = async (dateKeyStr, item) => {
     setInsightBusy(item.id);
     try {
-      const insight = (await generateInsight(item.title, item.body)).trim();
-      onUpdate(dateKeyStr, { ...item, insight });
-      fireToast?.("Insight updated", "xp");
+      const enriched = await generateEnrichment(item.title, item.body);
+      onUpdate(dateKeyStr, {
+        ...item,
+        title: enriched.title,
+        insight: enriched.summary,
+      });
+      fireToast?.("Title & summary updated", "xp");
     } catch (e) {
       fireToast?.(formatAiError(e), "xp");
     } finally {
@@ -130,22 +205,22 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
           <h2 className="learned-title">Other things I learned today</h2>
           <p className="learned-lead">
             Capture articles, talks, rabbit holes, and side lessons. Markdown and links welcome —
-            generate a short insight when you log something.
+            generate a 90–120 word summary and a clearer title when you log something.
           </p>
         </div>
         <div className="learned-stats">
-          <div className="learned-stat">
+          <div className="learned-stat learned-pop">
             <span className="learned-stat-val">{todayCount}</span>
             <span className="learned-stat-label">today</span>
           </div>
-          <div className="learned-stat">
+          <div className="learned-stat learned-pop">
             <span className="learned-stat-val">{totalCount}</span>
             <span className="learned-stat-label">total</span>
           </div>
         </div>
       </div>
 
-      <div className="learned-composer">
+      <div className="learned-composer learned-pop">
         <div className="learned-composer-head">
           <span className="note-label"><Icon.Note size={12} /> New entry</span>
           <div className="learned-composer-tools">
@@ -207,7 +282,7 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
               checked={autoInsight}
               onChange={(e) => setAutoInsight(e.target.checked)}
             />
-            Generate short insight on save
+            Improve title + write summary on save
           </label>
           <div className="learned-composer-actions">
             {err && <span className="panel-error learned-inline-err">{err}</span>}
@@ -223,11 +298,11 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
       </div>
 
       <div className="learned-toolbar">
-        <div className="search-wrap learned-search">
+        <div className="search-wrap learned-search learned-pop">
           <Icon.Search size={15} />
           <input
             className="search-input"
-            placeholder="Search titles, notes, insights…"
+            placeholder="Search titles, notes, summaries…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -235,7 +310,7 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
       </div>
 
       {days.length === 0 && (
-        <div className="learned-empty">
+        <div className="learned-empty learned-pop">
           {query.trim()
             ? "No matches in your journal."
             : "Nothing logged yet. Add the first rabbit hole of the day."}
@@ -243,71 +318,102 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
       )}
 
       <div className="learned-timeline">
-        {days.map(({ date: d, items }) => (
+        {(() => {
+          let colorIdx = 0;
+          return days.map(({ date: d, items }) => (
           <section key={d} className="learned-day">
             <div className="learned-day-head">
               <h3 className="learned-day-label">{formatLearnedDate(d)}</h3>
               <span className="learned-day-count">
-                {items.length} {items.length === 1 ? "item" : "items"}
+                {items.length} {items.length === 1 ? "note" : "notes"}
                 {d === today && <span className="learned-today-pill">Today</span>}
               </span>
             </div>
-            <div className="learned-items">
-              {items.map((item) => {
+            <div className="learned-bento">
+              {items.map((item, index) => {
                 const open = expandedId === item.id;
+                const tone = STICKY_COLORS[colorIdx % STICKY_COLORS.length];
+                colorIdx += 1;
+                const size = open ? "lg" : bentoSize(item, index);
+                const tilt = ((hashStr(item.id) % 5) - 2) * 0.28;
                 return (
                   <article
                     key={item.id}
-                    className={classNames("learned-card", open && "learned-card-open")}
+                    className={classNames(
+                      "sticky-note",
+                      `sticky-${tone}`,
+                      `bento-${size}`,
+                      open && "sticky-note-open",
+                    )}
+                    style={{ "--sticky-tilt": `${tilt}deg` }}
                   >
                     <button
                       type="button"
-                      className="learned-card-head"
+                      className={classNames("sticky-note-face", open && "sticky-note-face-open")}
                       onClick={() => setExpandedId(open ? null : item.id)}
+                      aria-expanded={open}
                     >
-                      <span className="learned-card-title">{item.title}</span>
-                      <span className="learned-card-meta">
-                        {item.insight && <span className="learned-insight-flag">insight</span>}
-                        <Icon.Chevron size={14} className={classNames("chev", open && "chev-open")} />
-                      </span>
+                      <span className="sticky-tape" aria-hidden="true" />
+                      <span className="sticky-note-title">{item.title}</span>
+                      {!open && (
+                        <span className="sticky-note-snip">
+                          {snippet(item.body) || (item.insight ? snippet(item.insight, 100) : "Tap to open")}
+                        </span>
+                      )}
+                      {!open && item.insight && (
+                        <span className="sticky-insight-chip">summary</span>
+                      )}
                     </button>
+
                     {open && (
-                      <div className="learned-card-body">
+                      <div className="sticky-note-body">
                         {item.body.trim() ? (
-                          <MiniMarkdown text={item.body} />
-                        ) : (
-                          <p className="weekly-empty">No notes — title only.</p>
-                        )}
-                        {item.insight && (
-                          <div className="learned-insight">
-                            <div className="learned-insight-label">
-                              <Icon.Bolt size={12} /> Insight
-                            </div>
-                            <p>{item.insight}</p>
+                          <div className="sticky-notes-block">
+                            <MiniMarkdown text={item.body} />
                           </div>
+                        ) : null}
+                        {item.insight ? (
+                          <div className="sticky-insight">
+                            <div className="learned-insight-label">Summary</div>
+                            {item.insight.split(/\n\s*\n/).map((para, pi) => (
+                              <p key={pi} className="sticky-insight-text">
+                                {para}
+                              </p>
+                            ))}
+                          </div>
+                        ) : (
+                          !item.body.trim() && (
+                            <p className="sticky-empty">No notes yet — add a summary to flesh this out.</p>
+                          )
                         )}
-                        <div className="learned-card-actions">
+                        <div className="sticky-actions">
                           <button
-                            className="tool-btn"
+                            type="button"
+                            className="sticky-action"
                             disabled={insightBusy === item.id}
-                            onClick={() => refreshInsight(d, item)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              refreshInsight(d, item);
+                            }}
                           >
-                            <Icon.Bolt size={12} />
+                            <Icon.Bolt size={11} />
                             {insightBusy === item.id
-                              ? "Generating…"
+                              ? "Writing…"
                               : item.insight
-                                ? "Regenerate insight"
-                                : "Generate insight"}
+                                ? "Regenerate"
+                                : "Summary"}
                           </button>
                           <button
-                            className="tool-btn tool-btn-danger"
-                            onClick={() => {
+                            type="button"
+                            className="sticky-action sticky-action-mute"
+                            onClick={(e) => {
+                              e.stopPropagation();
                               onRemove(d, item.id);
                               if (expandedId === item.id) setExpandedId(null);
                               fireToast?.("Removed", "xp");
                             }}
                           >
-                            <Icon.X size={12} /> Remove
+                            <Icon.X size={11} /> Remove
                           </button>
                         </div>
                       </div>
@@ -317,7 +423,8 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
               })}
             </div>
           </section>
-        ))}
+          ));
+        })()}
       </div>
     </div>
   );
