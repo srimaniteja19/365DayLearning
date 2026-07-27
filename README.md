@@ -63,8 +63,9 @@ npm run db:studio    # browse the database with Drizzle Studio
 
 ## Features
 
-- Built-in **365-day** and **45-day** plans, plus custom plans from the builder
-- Plan generation (outline → periods), edit-before-save, cancel/resume
+- New accounts start empty; **"OPERATION LONGHAUL"** (365-day) and **"OPERATION FASTBURN"** (45-day)
+  are offered as opt-in example plans (added as-is, no AI needed) rather than auto-assigned
+- Custom plans from the builder; plan generation (outline → periods), edit-before-save, cancel/resume
 - Multi-plan switcher; delete purges that plan’s progress/notes/refs/srs
 - **Other things I learned** — calendar journal with markdown notes, rich links, and AI insights
 - Optional **accounts + cloud sync** (Neon Postgres + Auth.js) — sign in to sync across devices
@@ -92,6 +93,7 @@ Storage keys keep the legacy `dualtrack:` prefix so existing local data still lo
 
 ## Manual checklist
 
+- Fresh browser/storage: app opens to the "Start your first campaign" example picker, not a plan
 - Generate a 30-day plan with at least two providers
 - Cancel generation midway, then resume
 - Switch all eight themes on builder + progress screens (esp. Ledger & Matte)

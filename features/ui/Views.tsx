@@ -402,6 +402,41 @@ export function CampaignSwitcher(props) {
 }
 
 /* ============================== CAMPAIGN HERO ============================== */
+export function EmptyPlansView({ examples, onAddExample, onOpenBuilder }) {
+  return (
+    <div className="empty-plans">
+      <div className="empty-plans-brand">
+        <span className="brand-mark">◈</span>
+        <span className="brand-text">MERI<span className="brand-accent">DIAN</span></span>
+      </div>
+      <div className="empty-plans-head">
+        <h1 className="empty-plans-title">Start your first campaign</h1>
+        <p className="empty-plans-lead">
+          Add one of these example plans to get going right away, or build a custom roadmap
+          around exactly what you want to learn.
+        </p>
+      </div>
+      <div className="empty-plans-grid">
+        {examples.map((p) => (
+          <div key={p.id} className="empty-plan-card">
+            <div className="empty-plan-days">{p.totalDays} days · example</div>
+            <h3 className="empty-plan-name">{p.name}</h3>
+            <p className="empty-plan-sub">{p.subtitle}</p>
+            {p.blurb && <p className="empty-plan-blurb">{p.blurb}</p>}
+            <button type="button" className="primary-btn" onClick={() => onAddExample(p.id)}>
+              <Icon.Check size={13} /> Add this plan
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="empty-plans-or"><span>or</span></div>
+      <button type="button" className="secondary-btn empty-plans-builder-btn" onClick={onOpenBuilder}>
+        <Icon.Target size={13} /> Build your own custom plan
+      </button>
+    </div>
+  );
+}
+
 export function CampaignHero({ campaign, stats }) {
   const activeDay = stats.activeDay;
   return (

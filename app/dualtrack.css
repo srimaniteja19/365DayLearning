@@ -700,6 +700,39 @@
   opacity: 0.45; cursor: not-allowed;
 }
 
+/* ---------- empty-plans onboarding ---------- */
+.empty-plans {
+  position: relative; z-index: 2; max-width: 760px; margin: 0 auto;
+  padding: 56px 24px 60px; display: flex; flex-direction: column; align-items: center; text-align: center;
+}
+.empty-plans-brand {
+  display: flex; align-items: center; gap: 7px; font-family: var(--display); font-weight: 700;
+  font-size: 18px; letter-spacing: 0.3px; margin-bottom: 28px;
+}
+.empty-plans-head { max-width: 520px; margin-bottom: 32px; }
+.empty-plans-title { font-family: var(--display); font-size: 28px; font-weight: 700; color: var(--text); margin: 0 0 10px; }
+.empty-plans-lead { font-size: 14px; line-height: 1.65; color: var(--text-dim); margin: 0; }
+.empty-plans-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; width: 100%; margin-bottom: 26px;
+}
+.empty-plan-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px; text-align: left;
+  padding: 20px 20px 18px; border-radius: 16px; background: var(--bg-panel); border: 1px solid var(--border);
+}
+.empty-plan-days {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--accent);
+}
+.empty-plan-name { font-family: var(--display); font-size: 17px; font-weight: 700; color: var(--text); margin: 0; }
+.empty-plan-sub { font-size: 12px; color: var(--text-faint); margin: 0; }
+.empty-plan-blurb { font-size: 12.5px; line-height: 1.6; color: var(--text-dim); margin: 2px 0 10px; }
+.empty-plan-card .primary-btn { align-self: stretch; text-align: center; }
+.empty-plans-or {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--text-faint); margin-bottom: 14px;
+}
+.empty-plans-builder-btn { padding: 10px 22px; }
+
 .quiz-list { display: flex; flex-direction: column; gap: 14px; }
 .quiz-item { border-bottom: 1px solid var(--border-soft); padding-bottom: 13px; }
 .quiz-q { display: flex; gap: 9px; font-size: 14px; line-height: 1.6; color: var(--text); margin-bottom: 9px; }

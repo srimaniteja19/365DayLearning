@@ -35,9 +35,17 @@ function defaultMeta(overrides?: Partial<MetaState>): MetaState {
   };
 }
 
+/**
+ * Refreshes builtin day content for any builtin plan IDs already present in
+ * `stored`, and passes custom plans through untouched. Deliberately does
+ * *not* inject "OPERATION LONGHAUL"/"OPERATION FASTBURN" for accounts that
+ * have never had them (i.e. `stored` is null — brand new, nothing saved
+ * yet) — those are offered as opt-in examples in the UI instead. Existing
+ * accounts that already reference these IDs keep them exactly as before.
+ */
 function mergeBuiltinPlans(stored: PlansState | null | undefined): PlansState {
   const seeded = seedBuiltinPlans();
-  const merged: PlansState = { ...seeded };
+  const merged: PlansState = {};
   if (stored) {
     for (const [id, plan] of Object.entries(stored)) {
       if (!plan || typeof plan !== "object") continue;

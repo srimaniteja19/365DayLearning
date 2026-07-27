@@ -22,7 +22,8 @@ import { pullCloudSnapshot, pushCloudSnapshot } from "@/lib/cloudSync";
 import {
   periodsForPlan,
   scopesForPlan,
-  seedBuiltinPlans,
+  createBuiltin365,
+  createBuiltin45,
 } from "@/data/builtinPlans";
 import { DOMAIN_PALETTES, THEMES, hexToRgba, themeVars } from "@/theme/themes";
 import {
@@ -40,6 +41,7 @@ import { accentForPlan } from "@/lib/accents";
 import { purgePlanUserData } from "@/lib/migration";
 import {
   BUILTIN_365_ID,
+  BUILTIN_45_ID,
   SCHEMA_VERSION,
 } from "@/lib/types";
 import { hydrateCredentialsFromStorage } from "@/lib/providers/credentials";
@@ -61,11 +63,12 @@ import {
   ToastLayer,
   ConfettiBurst,
   Footer,
+  EmptyPlansView,
 } from "@/features/ui/Views";
 import { LearnedView } from "@/features/learned/LearnedView";
 
 export default function DualTrackConsole() {
-  const [plans, setPlans] = useState(() => seedBuiltinPlans());
+  const [plans, setPlans] = useState({});
   const [activePlanId, setActivePlanId] = useState(BUILTIN_365_ID);
   const [progress, setProgress] = useState({});
   const [notes, setNotes] = useState({});
@@ -372,6 +375,34 @@ export default function DualTrackConsole() {
     fireToast("Plan deleted", "xp");
   }, [plans, activePlanId, progress, notes, refs, srs, log, learned, fireToast]);
 
+  // "OPERATION LONGHAUL"/"OPERATION FASTBURN" are curated example curricula,
+  // not auto-assigned to every account — offered as opt-in starting points.
+  const examplePlans = useMemo(
+    () => [
+      {
+        ...createBuiltin365(),
+        blurb: "A full year of backend, infra, and systems depth — quarters, months, and weeks mapped out for you.",
+      },
+      {
+        ...createBuiltin45(),
+        blurb: "A 45-day sprint through modern AI/LLM engineering — model internals to a multimodal capstone.",
+      },
+    ],
+    [],
+  );
+
+  const addExamplePlan = useCallback((planId) => {
+    setPlans((prev) => {
+      if (prev[planId]) return { ...prev, [planId]: { ...prev[planId], hidden: false } };
+      const plan = planId === BUILTIN_45_ID ? createBuiltin45() : createBuiltin365();
+      return { ...prev, [plan.id]: plan };
+    });
+    setActivePlanId(planId);
+    setScope("all");
+    setView("console");
+    fireToast("Plan added", "day");
+  }, [fireToast]);
+
   const setTopicDone = useCallback((dayId, topicIdx, done) => {
     setProgress((prev) => {
       const cur = prev[dayId] || {};
@@ -594,9 +625,48 @@ export default function DualTrackConsole() {
   );
 
   if (!campaign) {
+    if (saveStatus === "loading") {
+      return (
+        <div className="app-root" style={rootStyle}>
+          <div className="panel-loading">Loading…</div>
+        </div>
+      );
+    }
     return (
       <div className="app-root" style={rootStyle}>
-        <div className="panel-loading">No plans available.</div>
+        <BackgroundFX accent={theme.accents.main} effects={theme.effects} />
+        <EmptyPlansView
+          examples={examplePlans}
+          onAddExample={addExamplePlan}
+          onOpenBuilder={() => setModal({ kind: "builder" })}
+        />
+        {modal && (
+          <ModalHost
+            modal={modal}
+            onClose={() => setModal(null)}
+            notes={notes}
+            refs={refs}
+            setRef={setRef}
+            appendNote={appendNote}
+            progress={progress}
+            srs={srs}
+            log={log}
+            learned={learned}
+            themeKey={themeKey}
+            onImport={applyImport}
+            fireToast={fireToast}
+            plans={plans}
+            activePlanId={activePlanId}
+            onPlanCreated={(plan) => {
+              setPlans((prev) => ({ ...prev, [plan.id]: plan }));
+              setActivePlanId(plan.id);
+              setScope("all");
+              setView("console");
+              fireToast(`Plan ready · ${plan.totalDays} days`, "day");
+            }}
+          />
+        )}
+        <ToastLayer toast={toast} />
       </div>
     );
   }
