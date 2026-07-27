@@ -22,7 +22,7 @@ export const KEYS = {
 } as const;
 
 function emptyUserData(): UserDataState {
-  return { progress: {}, notes: {}, refs: {}, srs: {}, log: [] };
+  return { progress: {}, notes: {}, refs: {}, srs: {}, log: [], learned: {} };
 }
 
 function defaultMeta(overrides?: Partial<MetaState>): MetaState {
@@ -105,6 +105,7 @@ export async function loadAppSnapshot(): Promise<AppSnapshot | null> {
       refs: { ...migrated.refs, ...userdata.refs },
       srs: { ...migrated.srs, ...userdata.srs },
       log: [...migrated.log, ...userdata.log],
+      learned: { ...migrated.learned, ...userdata.learned },
     };
     if (legacy.themeKey && THEMES[legacy.themeKey as ThemeKey]) {
       meta.themeKey = legacy.themeKey as ThemeKey;
@@ -191,6 +192,7 @@ export async function loadState(): Promise<PersistedState | null> {
     refs: snap.userdata.refs,
     srs: snap.userdata.srs,
     log: snap.userdata.log,
+    learned: snap.userdata.learned,
     themeKey: snap.meta.themeKey,
     updatedAt: snap.meta.updatedAt,
     schemaVersion: snap.meta.schemaVersion,
@@ -221,6 +223,7 @@ export async function saveState(state: PersistedState & { plans?: PlansState; ac
       refs: state.refs || {},
       srs: state.srs || {},
       log: Array.isArray(state.log) ? state.log : [],
+      learned: state.learned || {},
     },
   });
 }

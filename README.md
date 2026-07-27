@@ -38,6 +38,7 @@ npm test
 - Built-in **365-day** and **45-day** plans, plus custom plans from the builder
 - Plan generation (outline → periods), edit-before-save, cancel/resume
 - Multi-plan switcher; delete purges that plan’s progress/notes/refs/srs
+- **Other things I learned** — calendar journal with markdown notes, rich links, and AI insights
 - Themes (8) via CSS custom properties — including Ledger (light) and Matte Black
 - Export: notes markdown, full backup, **plan-only share**
 - Import: plan share adds a plan; full backup asks **merge** or **replace**
@@ -57,7 +58,7 @@ Storage keys keep the legacy `dualtrack:` prefix so existing local data still lo
 |-----|----------|
 | `dualtrack:meta` | schema version, active plan, theme |
 | `dualtrack:plans` | plan definitions |
-| `dualtrack:userdata` | progress, notes, refs, srs, log |
+| `dualtrack:userdata` | progress, notes, refs, srs, log, learned |
 | `dualtrack:credentials` | opt-in remembered provider key |
 
 ## Manual checklist

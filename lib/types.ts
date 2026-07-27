@@ -98,12 +98,23 @@ export type SrsEntry = {
 export type SrsMap = Record<string, SrsEntry>;
 export type LogEntry = { d: string; i: number; at: number };
 
+/** Free-form “other things I learned” — keyed by calendar date `YYYY-MM-DD`. */
+export type LearnedItem = {
+  id: string;
+  title: string;
+  body: string;
+  insight?: string;
+  createdAt: number;
+};
+export type LearnedMap = Record<string, LearnedItem[]>;
+
 export type UserDataState = {
   progress: ProgressMap;
   notes: NotesMap;
   refs: RefsMap;
   srs: SrsMap;
   log: LogEntry[];
+  learned: LearnedMap;
 };
 
 export type MetaState = {
@@ -130,6 +141,7 @@ export type PersistedState = {
   refs: RefsMap;
   srs: SrsMap;
   log: LogEntry[];
+  learned?: LearnedMap;
   themeKey: ThemeKey;
   updatedAt?: number;
   schemaVersion?: number;
@@ -146,13 +158,14 @@ export type BackupFile = {
   refs: RefsMap;
   srs: SrsMap;
   log: LogEntry[];
+  learned?: LearnedMap;
   themeKey: ThemeKey;
   plans?: PlansState;
   activePlanId?: string;
   schemaVersion?: number;
 };
 
-export type ViewKey = "console" | "grid" | "review" | "weekly" | "log";
+export type ViewKey = "console" | "grid" | "review" | "weekly" | "log" | "learned";
 export type ScopeKey = "all" | "quarter" | "month" | "week";
 export type ModalState = { kind: string; day?: PlanDay } | null;
 export type SaveStatus = "loading" | "idle" | "saving" | "saved" | "error" | "off";

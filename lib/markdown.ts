@@ -1,6 +1,14 @@
 import { seedBuiltinPlans } from "@/data/builtinPlans";
 import { relativeDue } from "@/lib/srs";
-import type { NotesMap, PlansState, ProgressMap, RefsMap, SrsMap } from "@/lib/types";
+import { formatLearnedDate, sortedLearnedDays } from "@/lib/learned";
+import type {
+  LearnedMap,
+  NotesMap,
+  PlansState,
+  ProgressMap,
+  RefsMap,
+  SrsMap,
+} from "@/lib/types";
 
 export function buildMarkdown(
   progress: ProgressMap,
@@ -8,6 +16,7 @@ export function buildMarkdown(
   srs: SrsMap,
   refs: RefsMap,
   plans?: PlansState,
+  learned?: LearnedMap,
 ): string {
   const now = new Date();
   const lines: string[] = [];
@@ -70,5 +79,28 @@ export function buildMarkdown(
       lines.push("");
     });
   });
+
+  const learnedDays = sortedLearnedDays(learned);
+  if (learnedDays.length) {
+    lines.push("## Other things I learned");
+    lines.push("");
+    learnedDays.forEach(({ date, items }) => {
+      lines.push(`### ${formatLearnedDate(date)}`);
+      lines.push("");
+      items.forEach((item) => {
+        lines.push(`#### ${item.title}`);
+        lines.push("");
+        if (item.body.trim()) {
+          lines.push(item.body.trim());
+          lines.push("");
+        }
+        if (item.insight?.trim()) {
+          lines.push(`> **Insight:** ${item.insight.trim()}`);
+          lines.push("");
+        }
+      });
+    });
+  }
+
   return lines.join("\n");
 }

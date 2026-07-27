@@ -463,6 +463,7 @@ export function ViewTabs({ view, setView, dueCount }) {
     { key: "grid", label: "Grid", icon: Icon.Grid },
     { key: "review", label: "Review", icon: Icon.Rotate, badge: dueCount },
     { key: "weekly", label: "Weekly", icon: Icon.Calendar },
+    { key: "learned", label: "Learned", icon: Icon.Note },
     { key: "log", label: "Analytics", icon: Icon.List },
   ];
   return (
@@ -1151,7 +1152,7 @@ export function SummaryCard({ label, value, sub, accent }) {
 }
 
 /* ============================== MODALS ============================== */
-export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, progress, srs, log, themeKey, onImport, fireToast, plans, activePlanId, onPlanCreated }) {
+export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, progress, srs, log, learned, themeKey, onImport, fireToast, plans, activePlanId, onPlanCreated }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKey);
@@ -1216,6 +1217,7 @@ export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, pro
               refs={refs}
               srs={srs}
               log={log}
+              learned={learned}
               themeKey={themeKey}
               onImport={onImport}
               fireToast={fireToast}
@@ -1230,20 +1232,75 @@ export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, pro
   );
 }
 
-/* ---------- minimal markdown renderer (headings, lists, code, inline) ---------- */
-export function inlineFormat(text, keyBase) {
+/* ---------- minimal markdown renderer (headings, lists, code, inline, links) ---------- */
+const MD_INLINE_RE = /(\[[^\]]+\]\([^)\s]+\)|`[^`]+`|\*\*[^*]+\*\*|https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"])/g;
+
+function linkifyPlain(text, keyBase, startKey) {
   const parts = [];
-  const re = /(`[^`]+`|\*\*[^*]+\*\*)/g;
-  let last = 0, m, i = 0;
+  const re = /(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"])/g;
+  let last = 0;
+  let m;
+  let i = startKey;
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) parts.push(text.slice(last, m.index));
-    const tok = m[0];
-    if (tok.startsWith("`")) parts.push(<code key={keyBase + "-c" + i}>{tok.slice(1, -1)}</code>);
-    else parts.push(<strong key={keyBase + "-b" + i}>{tok.slice(2, -2)}</strong>);
-    last = m.index + tok.length;
+    const href = m[0];
+    parts.push(
+      <a key={keyBase + "-u" + i} href={href} className="md-a" target="_blank" rel="noopener noreferrer">
+        {href}
+      </a>,
+    );
+    last = m.index + href.length;
     i += 1;
   }
   if (last < text.length) parts.push(text.slice(last));
+  return parts.length ? parts : [text];
+}
+
+export function inlineFormat(text, keyBase) {
+  const parts = [];
+  let last = 0;
+  let m;
+  let i = 0;
+  MD_INLINE_RE.lastIndex = 0;
+  while ((m = MD_INLINE_RE.exec(text)) !== null) {
+    if (m.index > last) {
+      parts.push(...linkifyPlain(text.slice(last, m.index), keyBase, i * 10));
+    }
+    const tok = m[0];
+    if (tok.startsWith("[")) {
+      const link = tok.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
+      if (link) {
+        parts.push(
+          <a
+            key={keyBase + "-a" + i}
+            href={link[2]}
+            className="md-a"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {link[1]}
+          </a>,
+        );
+      } else {
+        parts.push(tok);
+      }
+    } else if (tok.startsWith("`")) {
+      parts.push(<code key={keyBase + "-c" + i}>{tok.slice(1, -1)}</code>);
+    } else if (tok.startsWith("**")) {
+      parts.push(<strong key={keyBase + "-b" + i}>{tok.slice(2, -2)}</strong>);
+    } else if (tok.startsWith("http")) {
+      parts.push(
+        <a key={keyBase + "-u" + i} href={tok} className="md-a" target="_blank" rel="noopener noreferrer">
+          {tok}
+        </a>,
+      );
+    } else {
+      parts.push(tok);
+    }
+    last = m.index + tok.length;
+    i += 1;
+  }
+  if (last < text.length) parts.push(...linkifyPlain(text.slice(last), keyBase, i * 10));
   return parts;
 }
 
@@ -1588,6 +1645,7 @@ export function DataPanel({
   refs,
   srs,
   log,
+  learned,
   themeKey,
   onImport,
   fireToast,
@@ -1609,7 +1667,7 @@ export function DataPanel({
   );
 
   const saveMd = async () => {
-    const md = buildMarkdown(progress, notes, srs, refs, plans);
+    const md = buildMarkdown(progress, notes, srs, refs, plans, learned);
     if (!downloadText("meridian-notes.md", md, "text/markdown")) {
       const ok = await copyText(md);
       fireToast(ok ? "Markdown copied to clipboard" : "Export failed", "xp");
@@ -1620,7 +1678,7 @@ export function DataPanel({
     try {
       const payload = exportAll({
         plans: plans || seedBuiltinPlans(),
-        userdata: { progress, notes, refs, srs, log },
+        userdata: { progress, notes, refs, srs, log, learned: learned || {} },
         themeKey,
         activePlanId,
       });
@@ -1691,6 +1749,7 @@ export function DataPanel({
           refs,
           srs,
           log,
+          learned: learned || {},
           themeKey,
           activePlanId,
         },

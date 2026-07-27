@@ -60,12 +60,14 @@ import {
   ConfettiBurst,
   Footer,
 } from "@/features/ui/Views";
+import { LearnedView } from "@/features/learned/LearnedView";
 
 export default function DualTrackConsole() {
   const [plans, setPlans] = useState(() => seedBuiltinPlans());
   const [activePlanId, setActivePlanId] = useState(BUILTIN_365_ID);
   const [progress, setProgress] = useState({});
   const [notes, setNotes] = useState({});
+  const [learned, setLearned] = useState({});
   const [view, setView] = useState("console");
   const [query, setQuery] = useState("");
   const [domainFilter, setDomainFilter] = useState(null);
@@ -146,6 +148,7 @@ export default function DualTrackConsole() {
         setRefs(snap.userdata.refs);
         setSrs(snap.userdata.srs);
         setLog(snap.userdata.log);
+        setLearned(snap.userdata.learned || {});
         if (snap.meta.themeKey && THEMES[snap.meta.themeKey]) {
           setThemeKey(snap.meta.themeKey);
         }
@@ -179,7 +182,7 @@ export default function DualTrackConsole() {
           updatedAt: Date.now(),
         },
         plans,
-        userdata: { progress, notes, refs, srs, log },
+        userdata: { progress, notes, refs, srs, log, learned },
       });
       setSaveStatus(ok ? "saved" : "error");
       if (ok) setTimeout(() => setSaveStatus((cur) => (cur === "saved" ? "idle" : cur)), 1600);
@@ -187,7 +190,7 @@ export default function DualTrackConsole() {
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [progress, notes, refs, srs, log, themeKey, fontKey, plans, activePlanId]);
+  }, [progress, notes, refs, srs, log, learned, themeKey, fontKey, plans, activePlanId]);
 
   useEffect(() => {
     if (!campaign) return;
@@ -222,12 +225,40 @@ export default function DualTrackConsole() {
     });
   }, []);
 
+  const addLearned = useCallback((date, item) => {
+    setLearned((prev) => {
+      const list = prev[date] || [];
+      return { ...prev, [date]: [item, ...list] };
+    });
+  }, []);
+
+  const updateLearned = useCallback((date, item) => {
+    setLearned((prev) => {
+      const list = prev[date] || [];
+      return {
+        ...prev,
+        [date]: list.map((x) => (x.id === item.id ? item : x)),
+      };
+    });
+  }, []);
+
+  const removeLearned = useCallback((date, id) => {
+    setLearned((prev) => {
+      const list = (prev[date] || []).filter((x) => x.id !== id);
+      const next = { ...prev };
+      if (list.length) next[date] = list;
+      else delete next[date];
+      return next;
+    });
+  }, []);
+
   const handleReset = useCallback(async () => {
     setProgress({});
     setNotes({});
     setRefs({});
     setSrs({});
     setLog([]);
+    setLearned({});
     await clearUserData();
     setConfirmReset(false);
     setSaveStatus("idle");
@@ -261,7 +292,7 @@ export default function DualTrackConsole() {
       return next;
     });
     const purged = purgePlanUserData(
-      { progress, notes, refs, srs, log },
+      { progress, notes, refs, srs, log, learned },
       planId,
     );
     setProgress(purged.progress);
@@ -269,13 +300,14 @@ export default function DualTrackConsole() {
     setRefs(purged.refs);
     setSrs(purged.srs);
     setLog(purged.log);
+    setLearned(purged.learned || {});
     if (activePlanId === planId) {
       const remaining = Object.values(plans).filter((p) => p.id !== planId && !p.hidden);
       setActivePlanId(remaining[0]?.id || BUILTIN_365_ID);
     }
     setConfirmDeletePlanId(null);
     fireToast("Plan deleted", "xp");
-  }, [plans, activePlanId, progress, notes, refs, srs, log, fireToast]);
+  }, [plans, activePlanId, progress, notes, refs, srs, log, learned, fireToast]);
 
   const setTopicDone = useCallback((dayId, topicIdx, done) => {
     setProgress((prev) => {
@@ -418,6 +450,7 @@ export default function DualTrackConsole() {
       setRefs(s.refs);
       setSrs(s.srs);
       setLog(s.log);
+      setLearned(s.learned || {});
       if (s.themeKey && THEMES[s.themeKey]) setThemeKey(s.themeKey);
       if (s.activePlanId) setActivePlanId(s.activePlanId);
       return;
@@ -649,6 +682,16 @@ export default function DualTrackConsole() {
             onExport={() => setModal({ kind: "export" })}
           />
         )}
+        {view === "learned" && (
+          <LearnedView
+            learned={learned}
+            onAdd={addLearned}
+            onUpdate={updateLearned}
+            onRemove={removeLearned}
+            accent={campaign.accent}
+            fireToast={fireToast}
+          />
+        )}
         {view === "log" && (
           <LogView
             campaign={campaign}
@@ -669,6 +712,7 @@ export default function DualTrackConsole() {
             progress={progress}
             srs={srs}
             log={log}
+            learned={learned}
             themeKey={themeKey}
             onImport={applyImport}
             fireToast={fireToast}

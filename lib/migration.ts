@@ -7,6 +7,7 @@ import type {
   UserDataState,
 } from "@/lib/types";
 import { BUILTIN_365_ID, BUILTIN_45_ID } from "@/lib/types";
+import { sanitizeLearned } from "@/lib/learned";
 
 /** Rewrite legacy day ids: `365-12` → `builtin-365:12`, `45-3` → `builtin-45:3`. */
 export function migrateDayId(id: string): string {
@@ -59,6 +60,7 @@ export function migrateUserData(raw: Partial<UserDataState> | null | undefined):
     refs: migrateRefs(raw?.refs),
     srs: migrateSrs(raw?.srs),
     log: migrateLog(raw?.log),
+    learned: sanitizeLearned(raw?.learned),
   };
 }
 
@@ -78,5 +80,7 @@ export function purgePlanUserData(userdata: UserDataState, planId: string): User
     refs: strip(userdata.refs),
     srs: strip(userdata.srs),
     log: userdata.log.filter((e) => !e.d.startsWith(prefix)),
+    // Calendar journal is global — keep across plan deletes.
+    learned: userdata.learned || {},
   };
 }

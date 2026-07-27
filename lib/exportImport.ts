@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type {
+  LearnedMap,
   LogEntry,
   NotesMap,
   Plan,
@@ -12,6 +13,7 @@ import type {
 } from "@/lib/types";
 import { createPlanId } from "@/lib/planGeneration";
 import { migrateUserData } from "@/lib/migration";
+import { sanitizeLearned } from "@/lib/learned";
 import { seedBuiltinPlans } from "@/data/builtinPlans";
 import {
   assertNoCredentialsInExport,
@@ -43,6 +45,7 @@ export type FullBackupFile = {
   refs: RefsMap;
   srs: SrsMap;
   log: LogEntry[];
+  learned?: LearnedMap;
   themeKey?: ThemeKey;
   plans: PlansState;
   activePlanId?: string;
@@ -61,6 +64,7 @@ export type AppDataSlice = {
   refs: RefsMap;
   srs: SrsMap;
   log: LogEntry[];
+  learned: LearnedMap;
   themeKey: ThemeKey;
   activePlanId: string;
 };
@@ -119,6 +123,7 @@ export function exportAll(slice: {
     refs: slice.userdata.refs,
     srs: slice.userdata.srs,
     log: slice.userdata.log,
+    learned: slice.userdata.learned || {},
     themeKey: slice.themeKey,
     plans: slice.plans,
     activePlanId: slice.activePlanId,
@@ -243,7 +248,7 @@ export function detectImport(raw: unknown): DetectedImport {
   }
 
   const hasUser =
-    data.progress || data.notes || data.refs || data.srs || data.log || data.plans;
+    data.progress || data.notes || data.refs || data.srs || data.log || data.learned || data.plans;
   if (!hasUser && data.kind !== "dualtrack-full") {
     throw new Error("No progress, notes, or plans found in that file");
   }
@@ -254,6 +259,7 @@ export function detectImport(raw: unknown): DetectedImport {
     refs: sanitizeRecord(data.refs, refEntrySchema) as RefsMap,
     srs: sanitizeRecord(data.srs, srsEntrySchema) as SrsMap,
     log: sanitizeLog(data.log),
+    learned: sanitizeLearned(data.learned),
   });
 
   const plans: PlansState = sanitizePlans(data.plans);
@@ -273,6 +279,7 @@ export function detectImport(raw: unknown): DetectedImport {
       refs: userdata.refs,
       srs: userdata.srs,
       log: userdata.log,
+      learned: userdata.learned,
       themeKey: data.themeKey as ThemeKey | undefined,
       plans,
       activePlanId:
@@ -336,6 +343,7 @@ export function applyFullImport(
       refs: backup.refs || {},
       srs: backup.srs || {},
       log: Array.isArray(backup.log) ? backup.log : [],
+      learned: backup.learned || {},
       themeKey: backup.themeKey || current.themeKey,
       activePlanId,
     };
@@ -350,10 +358,28 @@ export function applyFullImport(
     refs: mergeRecords(current.refs, backup.refs || {}),
     srs: mergeRecords(current.srs, backup.srs || {}),
     log: [...current.log, ...(Array.isArray(backup.log) ? backup.log : [])],
+    learned: mergeLearned(current.learned || {}, backup.learned || {}),
     themeKey: backup.themeKey || current.themeKey,
     activePlanId:
       backup.activePlanId && plans[backup.activePlanId]
         ? backup.activePlanId
         : current.activePlanId,
   };
+}
+
+function mergeLearned(a: LearnedMap, b: LearnedMap): LearnedMap {
+  const out: LearnedMap = { ...a };
+  for (const [date, items] of Object.entries(b)) {
+    const existing = out[date] || [];
+    const seen = new Set(existing.map((x) => x.id));
+    const merged = [...existing];
+    for (const item of items) {
+      if (!seen.has(item.id)) {
+        merged.push(item);
+        seen.add(item.id);
+      }
+    }
+    out[date] = merged;
+  }
+  return out;
 }

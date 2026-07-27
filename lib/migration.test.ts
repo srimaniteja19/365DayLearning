@@ -80,6 +80,11 @@ describe("day id migration", () => {
           { d: `${BUILTIN_365_ID}:1`, i: 0, at: 1 },
           { d: `${BUILTIN_45_ID}:1`, i: 0, at: 2 },
         ],
+        learned: {
+          "2026-07-27": [
+            { id: "l1", title: "Keep me", body: "journal", createdAt: 1 },
+          ],
+        },
       },
       BUILTIN_365_ID,
     );
@@ -91,6 +96,7 @@ describe("day id migration", () => {
     expect(next.srs[`${BUILTIN_365_ID}:1`]).toBeUndefined();
     expect(next.log).toHaveLength(1);
     expect(next.log[0].d).toBe(`${BUILTIN_45_ID}:1`);
+    expect(next.learned["2026-07-27"]?.[0]?.title).toBe("Keep me");
   });
 
   it("migrateUserData is idempotent (second pass is a no-op)", () => {
