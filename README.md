@@ -1,4 +1,4 @@
-# Meridian
+# Refrainly
 
 Multi-plan learning campaigns: progress, spaced repetition, notes, themes, custom plan builder, and bring-your-own-key AI.
 

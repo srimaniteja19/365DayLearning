@@ -1,5 +1,5 @@
 /**
- * Meridian — multi-plan learning orchestrator.
+ * Refrainly — multi-plan learning orchestrator.
  */
 // @ts-nocheck
 "use client";
@@ -67,11 +67,14 @@ import {
   ToastLayer,
   ConfettiBurst,
   Footer,
-  EmptyPlansView,
+  HomeView,
   OnThisDayCard,
   DailyBriefingCard,
 } from "@/features/ui/Views";
 import { LearnedView } from "@/features/learned/LearnedView";
+
+const GUEST_MODE_KEY = "dualtrack:guest";
+const PAGE_KEY = "dualtrack:page";
 
 export default function DualTrackConsole() {
   const [plans, setPlans] = useState({});
@@ -96,6 +99,24 @@ export default function DualTrackConsole() {
   const [saveStatus, setSaveStatus] = useState("loading");
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmDeletePlanId, setConfirmDeletePlanId] = useState(null);
+  /** Top-level page (Home vs Dashboard) — remembered across reloads. */
+  const [page, setPageState] = useState(() => {
+    if (typeof window === "undefined") return "home";
+    try {
+      return window.localStorage.getItem(PAGE_KEY) || "home";
+    } catch {
+      return "home";
+    }
+  });
+  const setPage = useCallback((next) => {
+    setPageState(next);
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(PAGE_KEY, next);
+    } catch {
+      // best-effort only
+    }
+  }, []);
   const toastTimer = useRef(null);
   const saveTimer = useRef(null);
   const didLoad = useRef(false);
@@ -103,6 +124,55 @@ export default function DualTrackConsole() {
   const { data: session } = useSession();
   const cloudUserId = session?.user?.id || null;
   const cloudSyncedFor = useRef(null);
+  const [guestMode, setGuestMode] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.localStorage.getItem(GUEST_MODE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const pendingAuthAction = useRef(null);
+
+  /**
+   * Gate an action (build a custom plan, browse example plans) behind sign-in —
+   * unless the visitor already has a session or has explicitly opted into guest mode.
+   */
+  const requireAuth = useCallback(
+    (action) => {
+      if (cloudUserId || guestMode) {
+        action();
+        return;
+      }
+      pendingAuthAction.current = action;
+      setModal({ kind: "account", gated: true });
+    },
+    [cloudUserId, guestMode],
+  );
+
+  const resolvePendingAuthAction = useCallback(() => {
+    const action = pendingAuthAction.current;
+    pendingAuthAction.current = null;
+    if (action) action();
+  }, []);
+
+  const handleAccountAuthenticated = useCallback(() => {
+    setModal(null);
+    resolvePendingAuthAction();
+  }, [resolvePendingAuthAction]);
+
+  const handleContinueAsGuest = useCallback(() => {
+    setGuestMode(true);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(GUEST_MODE_KEY, "1");
+      } catch {
+        // best-effort only
+      }
+    }
+    setModal(null);
+    resolvePendingAuthAction();
+  }, [resolvePendingAuthAction]);
 
   const theme = THEMES[themeKey] || THEMES.terminal;
   const fontPack = FONT_PACKS[fontKey] || FONT_PACKS[DEFAULT_FONT_KEY];
@@ -406,8 +476,9 @@ export default function DualTrackConsole() {
     setActivePlanId(planId);
     setScope("all");
     setView("console");
+    setPage("dashboard");
     fireToast("Plan added", "day");
-  }, [fireToast]);
+  }, [fireToast, setPage]);
 
   const setTopicDone = useCallback((dayId, topicIdx, done) => {
     setProgress((prev) => {
@@ -611,7 +682,7 @@ export default function DualTrackConsole() {
   }, []);
 
   const applyImport = useCallback((result) => {
-    if (!result || typeof result !== "object") throw new Error("Not a Meridian backup file");
+    if (!result || typeof result !== "object") throw new Error("Not a Refrainly backup file");
     if (result.kind === "plan") {
       setPlans(result.plans);
       return;
@@ -735,21 +806,43 @@ export default function DualTrackConsole() {
     }
   }, [campaign, campaignStats, reviewQueue, learned, todayKey]);
 
-  if (!campaign) {
-    if (saveStatus === "loading") {
-      return (
-        <div className="app-root" style={rootStyle}>
-          <div className="panel-loading">Loading…</div>
-        </div>
-      );
-    }
+  if (saveStatus === "loading") {
+    return (
+      <div className="app-root" style={rootStyle}>
+        <div className="panel-loading">Loading…</div>
+      </div>
+    );
+  }
+
+  // Dashboard only exists once there's an active campaign to show — otherwise
+  // always fall back to Home (e.g. stale "dashboard" page from before a reset).
+  const onDashboard = page === "dashboard" && !!campaign;
+
+  if (!onDashboard) {
+    const homeSummary = campaign
+      ? {
+          name: campaign.name,
+          streak: campaignStats[campaign.id]?.streak || 0,
+          xp: globalStats.xp,
+          level: globalStats.level,
+          rank: globalStats.rank,
+          daysComplete: globalStats.daysComplete,
+          totalDays: globalStats.totalDaysAll,
+        }
+      : null;
     return (
       <div className="app-root" style={rootStyle}>
         <BackgroundFX accent={theme.accents.main} effects={theme.effects} />
-        <EmptyPlansView
+        <HomeView
+          hasCampaign={!!campaign}
+          summary={homeSummary}
           examples={examplePlans}
           onAddExample={addExamplePlan}
-          onOpenBuilder={() => setModal({ kind: "builder" })}
+          onOpenBuilder={() => requireAuth(() => setModal({ kind: "builder" }))}
+          onOpenAccount={() => setModal({ kind: "account" })}
+          accountLabel={session?.user?.email || null}
+          onRequireAuth={requireAuth}
+          onGoDashboard={() => setPage("dashboard")}
         />
         {modal && (
           <ModalHost
@@ -768,11 +861,14 @@ export default function DualTrackConsole() {
             fireToast={fireToast}
             plans={plans}
             activePlanId={activePlanId}
+            onAccountAuthenticated={handleAccountAuthenticated}
+            onAccountGuest={handleContinueAsGuest}
             onPlanCreated={(plan) => {
               setPlans((prev) => ({ ...prev, [plan.id]: plan }));
               setActivePlanId(plan.id);
               setScope("all");
               setView("console");
+              setPage("dashboard");
               fireToast(`Plan ready · ${plan.totalDays} days`, "day");
             }}
           />
@@ -814,6 +910,7 @@ export default function DualTrackConsole() {
           onOpenBadges={() => setModal({ kind: "badges" })}
           badgeCount={badgeStatuses.filter((s) => s.unlocked).length}
           badgeTotal={badgeStatuses.length}
+          onGoHome={() => setPage("home")}
         />
         <PlanSwitcher
           active={activePlanId}
@@ -986,6 +1083,7 @@ export default function DualTrackConsole() {
               setActivePlanId(plan.id);
               setScope("all");
               setView("console");
+              setPage("dashboard");
               fireToast(`Plan ready · ${plan.totalDays} days`, "day");
             }}
           />

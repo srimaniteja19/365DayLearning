@@ -147,7 +147,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             <span className="gen-hint">
               {" "}
               Anyone with this browser profile, and any script on this page, can read a stored key.
-              Prefer a key scoped to Meridian with a spend limit.
+              Prefer a key scoped to Refrainly with a spend limit.
             </span>
           </span>
         </label>

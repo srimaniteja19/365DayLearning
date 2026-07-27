@@ -235,18 +235,23 @@ export function TopBar({
   onOpenBadges,
   badgeCount,
   badgeTotal,
+  onGoHome,
 }) {
   const pct = stats.need ? Math.min(100, Math.round((stats.into / stats.need) * 100)) : 0;
   return (
     <header className="topbar">
       <div className="topbar-left">
-        <div className="brand">
+        <button className="brand brand-btn" onClick={onGoHome} title="Back to home" type="button">
           <span className="brand-mark">◈</span>
-          <span className="brand-text">MERI<span className="brand-accent">DIAN</span></span>
-        </div>
+          <span className="brand-text">REFRAIN<span className="brand-accent">LY</span></span>
+        </button>
         <span className="brand-sub">daily learning campaigns</span>
       </div>
       <div className="topbar-right">
+        <button className="stat-chip data-btn" onClick={onGoHome} title="Back to home">
+          <Icon.Home size={13} />
+          <span className="stat-chip-val">Home</span>
+        </button>
         <button className="stat-chip data-btn" onClick={onNewPlan} title="Create a custom plan">
           <Icon.Target size={13} />
           <span className="stat-chip-val">New</span>
@@ -412,38 +417,206 @@ export function CampaignSwitcher(props) {
   return <PlanSwitcher {...props} onNewPlan={props.onNewPlan || (() => {})} />;
 }
 
-/* ============================== CAMPAIGN HERO ============================== */
-export function EmptyPlansView({ examples, onAddExample, onOpenBuilder }) {
+/* ============================== LANDING PAGE ============================== */
+const LANDING_FEATURES = [
+  {
+    id: "streaks",
+    tone: "mint",
+    icon: Icon.Flame,
+    title: "Level up daily",
+    copy: "Complete topics, keep your streak alive, and climb from Recruit to Architect as you earn XP.",
+  },
+  {
+    id: "srs",
+    tone: "sky",
+    icon: Icon.Rotate,
+    title: "Never forget it",
+    copy: "Spaced-repetition reviews resurface topics right before you'd actually forget them.",
+  },
+  {
+    id: "journal",
+    tone: "lilac",
+    icon: Icon.Note,
+    title: "Capture every tangent",
+    copy: "Log the other things you learn today \u2014 markdown notes, rich links, AI-written summaries.",
+  },
+  {
+    id: "ai",
+    tone: "coral",
+    icon: Icon.Sparkle,
+    title: "AI-generated roadmaps",
+    copy: "Describe what you want to learn and get a full day-by-day plan, instantly. BYOK, your choice of provider.",
+  },
+  {
+    id: "badges",
+    tone: "lemon",
+    icon: Icon.Medal,
+    title: "Badges & milestones",
+    copy: "Achievements unlock automatically from your progress, streaks, and reviews \u2014 no extra steps.",
+  },
+];
+
+const LANDING_CHIPS = [
+  { id: "streak", tone: "mint", icon: Icon.Flame, label: "12 day streak" },
+  { id: "xp", tone: "sky", icon: Icon.Bolt, label: "+15 XP" },
+  { id: "badge", tone: "lemon", icon: Icon.Medal, label: "Badge unlocked" },
+  { id: "review", tone: "lilac", icon: Icon.Rotate, label: "Review due" },
+];
+
+export function HomeView({
+  hasCampaign,
+  summary,
+  examples,
+  onAddExample,
+  onOpenBuilder,
+  onOpenAccount,
+  accountLabel,
+  onRequireAuth,
+  onGoDashboard,
+}) {
+  const [started, setStarted] = useState(false);
+  const pickerRef = useRef(null);
+
+  useEffect(() => {
+    if (started && pickerRef.current) {
+      pickerRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [started]);
+
+  const handleGetStarted = () => onRequireAuth(() => setStarted(true));
+  const handleBuildCustom = () => onRequireAuth(onOpenBuilder);
+
+  const chips = summary
+    ? [
+        { id: "streak", tone: "mint", icon: Icon.Flame, label: `${summary.streak} day streak` },
+        { id: "xp", tone: "sky", icon: Icon.Bolt, label: `${summary.xp.toLocaleString()} XP` },
+        { id: "rank", tone: "lemon", icon: Icon.Trophy, label: `LV ${summary.level} · ${summary.rank}` },
+        { id: "days", tone: "lilac", icon: Icon.Calendar, label: `${summary.daysComplete}/${summary.totalDays} days` },
+      ]
+    : LANDING_CHIPS;
+
   return (
-    <div className="empty-plans">
-      <div className="empty-plans-brand">
-        <span className="brand-mark">◈</span>
-        <span className="brand-text">MERI<span className="brand-accent">DIAN</span></span>
-      </div>
-      <div className="empty-plans-head">
-        <h1 className="empty-plans-title">Start your first campaign</h1>
-        <p className="empty-plans-lead">
-          Add one of these example plans to get going right away, or build a custom roadmap
-          around exactly what you want to learn.
-        </p>
-      </div>
-      <div className="empty-plans-grid">
-        {examples.map((p) => (
-          <div key={p.id} className="empty-plan-card">
-            <div className="empty-plan-days">{p.totalDays} days · example</div>
-            <h3 className="empty-plan-name">{p.name}</h3>
-            <p className="empty-plan-sub">{p.subtitle}</p>
-            {p.blurb && <p className="empty-plan-blurb">{p.blurb}</p>}
-            <button type="button" className="primary-btn" onClick={() => onAddExample(p.id)}>
-              <Icon.Check size={13} /> Add this plan
-            </button>
+    <div className="landing">
+      <header className="landing-nav">
+        <div className="landing-brand">
+          <span className="brand-mark">◈</span>
+          <span className="brand-text">REFRAIN<span className="brand-accent">LY</span></span>
+        </div>
+        <button type="button" className="landing-signin-btn" onClick={onOpenAccount}>
+          <Icon.User size={13} /> {accountLabel ? "Account" : "Sign in"}
+        </button>
+      </header>
+
+      <section className="landing-hero">
+        <div className="landing-hero-copy">
+          <div className="landing-hero-kicker">
+            {hasCampaign ? "WELCOME BACK" : "SIGN IN OR TRY AS A GUEST"}
           </div>
-        ))}
-      </div>
-      <div className="empty-plans-or"><span>or</span></div>
-      <button type="button" className="secondary-btn empty-plans-builder-btn" onClick={onOpenBuilder}>
-        <Icon.Target size={13} /> Build your own custom plan
-      </button>
+          {hasCampaign ? (
+            <>
+              <h1 className="landing-hero-title">Ready for today&apos;s mission?</h1>
+              <p className="landing-hero-lead">
+                Pick up where you left off on <strong>{summary.name}</strong> &mdash;{" "}
+                {summary.daysComplete} of {summary.totalDays} days down. Your streak, reviews, and
+                journal are all waiting.
+              </p>
+              <div className="landing-hero-actions">
+                <button type="button" className="landing-cta" onClick={onGoDashboard}>
+                  Go to dashboard <Icon.LayoutDashboard size={14} />
+                </button>
+                <button type="button" className="landing-cta-secondary" onClick={handleGetStarted}>
+                  Add another plan
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h1 className="landing-hero-title">
+                Learn something new.
+                <br />
+                <span className="landing-hero-highlight">Every single day.</span>
+              </h1>
+              <p className="landing-hero-lead">
+                Build a day-by-day learning roadmap, chase streaks and XP, get quizzed with spaced
+                repetition, and journal the tangents &mdash; all in one place.
+              </p>
+              <div className="landing-hero-actions">
+                <button type="button" className="landing-cta" onClick={handleGetStarted}>
+                  Get started <Icon.Bolt size={14} />
+                </button>
+                <button type="button" className="landing-cta-secondary" onClick={handleBuildCustom}>
+                  Build a custom plan
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="landing-hero-art" aria-hidden="true">
+          <div className="landing-orb">
+            <span className="landing-orb-mark">◈</span>
+          </div>
+          {chips.map((c, i) => (
+            <div key={c.id} className={classNames("landing-chip", `landing-chip-${i + 1}`, `landing-chip-${c.tone}`)}>
+              <c.icon size={15} /> <span>{c.label}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {!hasCampaign && (
+        <section className="landing-features">
+          {LANDING_FEATURES.map((f) => (
+            <div key={f.id} className={classNames("landing-feature-card", `landing-feature-${f.tone}`)}>
+              <div className="landing-feature-icon"><f.icon size={19} /></div>
+              <h3 className="landing-feature-title">{f.title}</h3>
+              <p className="landing-feature-copy">{f.copy}</p>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {!started && !hasCampaign && (
+        <div className="landing-more">
+          <button type="button" className="landing-cta" onClick={handleGetStarted}>
+            Get started <Icon.Bolt size={14} />
+          </button>
+        </div>
+      )}
+
+      {started && (
+        <section className="landing-picker" ref={pickerRef}>
+          <div className="empty-plans-head">
+            <h2 className="empty-plans-title">
+              {hasCampaign ? "Start a new campaign" : "Start your first campaign"}
+            </h2>
+            <p className="empty-plans-lead">
+              Add one of these example plans to get going right away, or build a custom roadmap
+              around exactly what you want to learn.
+            </p>
+          </div>
+          <div className="empty-plans-grid">
+            {examples.map((p, i) => (
+              <div key={p.id} className={classNames("empty-plan-card", `empty-plan-card-${i % 2 === 0 ? "mint" : "coral"}`)}>
+                <div className="empty-plan-days">{p.totalDays} days · example</div>
+                <h3 className="empty-plan-name">{p.name}</h3>
+                <p className="empty-plan-sub">{p.subtitle}</p>
+                {p.blurb && <p className="empty-plan-blurb">{p.blurb}</p>}
+                <button type="button" className="primary-btn" onClick={() => onAddExample(p.id)}>
+                  <Icon.Check size={13} /> Add this plan
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="empty-plans-or"><span>or</span></div>
+          <button type="button" className="secondary-btn empty-plans-builder-btn" onClick={handleBuildCustom}>
+            <Icon.Target size={13} /> Build your own custom plan
+          </button>
+        </section>
+      )}
+
+      <footer className="landing-footer">
+        <span>REFRAINLY · chart the arc · progress and notes save automatically</span>
+      </footer>
     </div>
   );
 }
@@ -1328,7 +1501,7 @@ export function SummaryCard({ label, value, sub, accent }) {
 }
 
 /* ============================== MODALS ============================== */
-export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, progress, srs, log, learned, themeKey, onImport, fireToast, plans, activePlanId, onPlanCreated, badgeStatuses }) {
+export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, progress, srs, log, learned, themeKey, onImport, fireToast, plans, activePlanId, onPlanCreated, badgeStatuses, onAccountAuthenticated, onAccountGuest }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKey);
@@ -1351,7 +1524,7 @@ export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, pro
       <div className={classNames("modal", modal.kind === "builder" && "modal-wide")} role="dialog" aria-modal="true">
         <div className="modal-head">
           <span className="modal-title">
-            {titles[modal.kind]}
+            {modal.kind === "account" && modal.gated ? "Sign in to continue" : titles[modal.kind]}
             {modal.day ? ` · Day ${modal.day.day}` : ""}
           </span>
           <button className="modal-close" onClick={onClose} aria-label="Close"><Icon.X size={15} /></button>
@@ -1377,7 +1550,14 @@ export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, pro
             />
           )}
           {modal.kind === "settings" && <SettingsPanel onClose={onClose} />}
-          {modal.kind === "account" && <AccountPanel onClose={onClose} />}
+          {modal.kind === "account" && (
+            <AccountPanel
+              onClose={onClose}
+              showGuestOption={!!modal.gated}
+              onAuthenticated={modal.gated ? onAccountAuthenticated : undefined}
+              onGuest={modal.gated ? onAccountGuest : undefined}
+            />
+          )}
           {modal.kind === "badges" && <BadgesPanel statuses={badgeStatuses} onClose={onClose} />}
           {modal.kind === "notes" && (
             <NotesGenPanel
@@ -1848,7 +2028,7 @@ export function DataPanel({
 
   const saveMd = async () => {
     const md = buildMarkdown(progress, notes, srs, refs, plans, learned);
-    if (!downloadText("meridian-notes.md", md, "text/markdown")) {
+    if (!downloadText("refrainly-notes.md", md, "text/markdown")) {
       const ok = await copyText(md);
       fireToast(ok ? "Markdown copied to clipboard" : "Export failed", "xp");
     } else fireToast("Markdown exported", "xp");
@@ -1863,7 +2043,7 @@ export function DataPanel({
         activePlanId,
       });
       const js = serializeExport(payload);
-      if (!downloadText("meridian-backup.json", js, "application/json")) {
+      if (!downloadText("refrainly-backup.json", js, "application/json")) {
         const ok = await copyText(js);
         fireToast(ok ? "Backup copied to clipboard" : "Export failed", "xp");
       } else fireToast("Backup exported", "xp");
@@ -1882,7 +2062,7 @@ export function DataPanel({
       const payload = exportPlan(plan);
       const js = serializeExport(payload);
       const safeName = (plan.name || "plan").replace(/[^\w\-]+/g, "-").slice(0, 40);
-      if (!downloadText(`meridian-plan-${safeName}.json`, js, "application/json")) {
+      if (!downloadText(`refrainly-plan-${safeName}.json`, js, "application/json")) {
         const ok = await copyText(js);
         fireToast(ok ? "Plan copied to clipboard" : "Export failed", "xp");
       } else fireToast("Plan share exported", "xp");
@@ -2078,7 +2258,7 @@ export function ConfettiBurst({ color }) {
 export function Footer() {
   return (
     <footer className="app-footer">
-      <span>MERIDIAN · chart the arc · progress and notes save automatically</span>
+      <span>REFRAINLY · chart the arc · progress and notes save automatically</span>
     </footer>
   );
 }

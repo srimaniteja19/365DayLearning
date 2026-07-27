@@ -237,7 +237,7 @@ function sanitizePlans(raw: unknown): PlansState {
 /** Detect import kind from a parsed JSON blob. */
 export function detectImport(raw: unknown): DetectedImport {
   if (!raw || typeof raw !== "object") {
-    throw new Error("Not a Meridian backup file");
+    throw new Error("Not a Refrainly backup file");
   }
   const data = raw as Record<string, unknown>;
 

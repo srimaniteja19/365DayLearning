@@ -86,10 +86,10 @@ const bodoni = Bodoni_Moda({
 });
 
 export const metadata: Metadata = {
-  title: "Meridian | Daily Learning Campaigns",
+  title: "Refrainly | Daily Learning Campaigns",
   description:
-    "Meridian — multi-plan learning campaigns with spaced repetition, notes, custom roadmaps, and bring-your-own-key AI.",
-  applicationName: "Meridian",
+    "Refrainly — multi-plan learning campaigns with spaced repetition, notes, custom roadmaps, and bring-your-own-key AI.",
+  applicationName: "Refrainly",
   keywords: [
     "learning",
     "engineering",

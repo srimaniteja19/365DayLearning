@@ -22,7 +22,17 @@ function useLastSyncedLabel(active: boolean): string | null {
   return ts ? formatAgo(ts) : null;
 }
 
-export function AccountPanel({ onClose }: { onClose: () => void }) {
+export function AccountPanel({
+  onClose,
+  onAuthenticated,
+  onGuest,
+  showGuestOption,
+}: {
+  onClose: () => void;
+  onAuthenticated?: () => void;
+  onGuest?: () => void;
+  showGuestOption?: boolean;
+}) {
   const { data: session, status } = useSession();
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
@@ -96,7 +106,7 @@ export function AccountPanel({ onClose }: { onClose: () => void }) {
         setBusy(false);
         return;
       }
-      onClose();
+      (onAuthenticated || onClose)();
     } catch {
       setError("Something went wrong. Try again.");
     } finally {
@@ -107,8 +117,9 @@ export function AccountPanel({ onClose }: { onClose: () => void }) {
   return (
     <div className="settings-panel">
       <p className="panel-copy">
-        Create a free account to sync your plans, progress, notes, and journal across devices.
-        Local mode keeps working fine without one.
+        {showGuestOption
+          ? "Sign in or create a free account to build a plan and sync it everywhere \u2014 or jump in as a guest and stay fully on this device."
+          : "Create a free account to sync your plans, progress, notes, and journal across devices. Local mode keeps working fine without one."}
       </p>
 
       <div className="gen-field">
@@ -182,6 +193,15 @@ export function AccountPanel({ onClose }: { onClose: () => void }) {
           </button>
         </div>
       </form>
+
+      {showGuestOption && (
+        <>
+          <div className="empty-plans-or"><span>or</span></div>
+          <button type="button" className="secondary-btn guest-btn" onClick={onGuest}>
+            Continue as a guest
+          </button>
+        </>
+      )}
 
       {error && (
         <div className="settings-test settings-test-err">

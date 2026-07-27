@@ -20,7 +20,7 @@ export function buildMarkdown(
 ): string {
   const now = new Date();
   const lines: string[] = [];
-  lines.push("# Meridian export");
+  lines.push("# Refrainly export");
   lines.push("");
   lines.push(`Exported ${now.toISOString().slice(0, 10)}`);
   lines.push("");

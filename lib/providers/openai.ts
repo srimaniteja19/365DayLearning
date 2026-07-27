@@ -87,8 +87,8 @@ export const openrouterProvider: Provider = {
   async chat(req: ChatRequest, cfg: ProviderConfig): Promise<string> {
     const base = (cfg.baseUrl || this.defaultBaseUrl!).replace(/\/$/, "");
     return openAiCompatibleChat(`${base}/v1/chat/completions`, req, cfg, {
-      "HTTP-Referer": typeof window !== "undefined" ? window.location.origin : "https://meridian.local",
-      "X-Title": "Meridian",
+      "HTTP-Referer": typeof window !== "undefined" ? window.location.origin : "https://refrainly.local",
+      "X-Title": "Refrainly",
     });
   },
 };
