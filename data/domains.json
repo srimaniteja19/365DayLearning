@@ -1,0 +1,35 @@
+{
+  "ai-ml": {
+    "label": "AI / ML"
+  },
+  "backend-node": {
+    "label": "Node / Nest"
+  },
+  "frontend": {
+    "label": "Frontend"
+  },
+  "databases": {
+    "label": "Databases"
+  },
+  "infra-cloud": {
+    "label": "Cloud / Infra"
+  },
+  "data-eng": {
+    "label": "Data Eng"
+  },
+  "distributed-sys": {
+    "label": "Distributed Sys"
+  },
+  "security": {
+    "label": "Security"
+  },
+  "observability": {
+    "label": "Observability"
+  },
+  "perf": {
+    "label": "Performance"
+  },
+  "systems-eng": {
+    "label": "Systems Eng"
+  }
+}
