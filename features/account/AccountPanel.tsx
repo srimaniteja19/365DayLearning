@@ -1,11 +1,26 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { Icon } from "@/components/Icon";
 import { classNames } from "@/lib/classNames";
+import { formatAgo, getLastSyncedAt } from "@/lib/cloudSync";
 
 type Mode = "signin" | "signup";
+
+function useLastSyncedLabel(active: boolean): string | null {
+  const [ts, setTs] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!active) return;
+    const tick = () => setTs(getLastSyncedAt());
+    tick();
+    const id = setInterval(tick, 15_000);
+    return () => clearInterval(id);
+  }, [active]);
+
+  return ts ? formatAgo(ts) : null;
+}
 
 export function AccountPanel({ onClose }: { onClose: () => void }) {
   const { data: session, status } = useSession();
@@ -15,6 +30,7 @@ export function AccountPanel({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const lastSyncedLabel = useLastSyncedLabel(!!session?.user);
 
   if (status === "loading") {
     return (
@@ -31,6 +47,12 @@ export function AccountPanel({ onClose }: { onClose: () => void }) {
           Signed in as <strong>{session.user.email}</strong>. Your plans, progress, notes, and
           journal entries sync to this account from any device.
         </p>
+        <div className="sync-status-row">
+          <Icon.Cloud size={13} />
+          <span>
+            Last synced from this device: <strong>{lastSyncedLabel || "not yet"}</strong>
+          </span>
+        </div>
         <div className="panel-actions">
           <button
             className="secondary-btn"

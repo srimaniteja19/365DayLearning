@@ -232,6 +232,9 @@ export function TopBar({
   onOpenAccount,
   accountLabel,
   onNewPlan,
+  onOpenBadges,
+  badgeCount,
+  badgeTotal,
 }) {
   const pct = stats.need ? Math.min(100, Math.round((stats.into / stats.need) * 100)) : 0;
   return (
@@ -263,6 +266,14 @@ export function TopBar({
         >
           <Icon.User size={13} />
           <span className="stat-chip-val">{accountLabel ? "Account" : "Sign in"}</span>
+        </button>
+        <button
+          className="stat-chip data-btn"
+          onClick={onOpenBadges}
+          title={`${badgeCount} of ${badgeTotal} badges unlocked`}
+        >
+          <Icon.Medal size={13} />
+          <span className="stat-chip-val">{badgeCount}/{badgeTotal}</span>
         </button>
         <ThemePicker themeKey={themeKey} setThemeKey={setThemeKey} />
         <FontPicker fontKey={fontKey} setFontKey={setFontKey} />
@@ -498,6 +509,125 @@ export function ProgressRing({ pct, accent }) {
         />
       </svg>
       <div className="progress-ring-label">{pct}%</div>
+    </div>
+  );
+}
+
+/* ============================== TODAY WIDGETS ============================== */
+function agoLabel(daysAgo) {
+  if (daysAgo >= 365) {
+    const years = Math.round(daysAgo / 365);
+    return `${years} year${years > 1 ? "s" : ""} ago`;
+  }
+  if (daysAgo >= 30) {
+    const months = Math.round(daysAgo / 30);
+    return `${months} month${months > 1 ? "s" : ""} ago`;
+  }
+  return `${daysAgo} day${daysAgo === 1 ? "" : "s"} ago`;
+}
+
+export function OnThisDayCard({ memory, onDismiss }) {
+  if (!memory) return null;
+  return (
+    <div className="today-widget on-this-day-card">
+      <div className="today-widget-icon"><Icon.Calendar size={15} /></div>
+      <div className="today-widget-body">
+        <div className="today-widget-eyebrow">ON THIS DAY · {agoLabel(memory.daysAgo)}</div>
+        {memory.kind === "journal" ? (
+          <>
+            <div className="today-widget-title">{memory.title}</div>
+            {memory.snippet && <p className="today-widget-copy">{memory.snippet}</p>}
+          </>
+        ) : (
+          <>
+            <div className="today-widget-title">{memory.dayLabel} · {memory.planName}</div>
+            <p className="today-widget-copy">{memory.topics.join(" · ")}</p>
+          </>
+        )}
+      </div>
+      <button type="button" className="today-widget-dismiss" onClick={onDismiss} aria-label="Dismiss">
+        <Icon.X size={12} />
+      </button>
+    </div>
+  );
+}
+
+export function DailyBriefingCard({ status, text, error, onGenerate }) {
+  return (
+    <div className="today-widget daily-briefing-card">
+      <div className="today-widget-icon"><Icon.Sparkle size={15} /></div>
+      <div className="today-widget-body">
+        <div className="today-widget-eyebrow">TODAY&apos;S BRIEFING</div>
+        {status === "idle" && (
+          <div className="briefing-idle">
+            <p className="today-widget-copy">
+              Get a short AI briefing on today&rsquo;s mission, due reviews, and your streak.
+            </p>
+            <button type="button" className="secondary-btn briefing-btn" onClick={onGenerate}>
+              <Icon.Sparkle size={12} /> Get today&rsquo;s briefing
+            </button>
+          </div>
+        )}
+        {status === "loading" && <p className="today-widget-copy briefing-loading">Thinking…</p>}
+        {status === "error" && (
+          <div className="briefing-idle">
+            <p className="today-widget-copy briefing-error">{error}</p>
+            <button type="button" className="secondary-btn briefing-btn" onClick={onGenerate}>Try again</button>
+          </div>
+        )}
+        {status === "ready" && (
+          <>
+            <p className="today-widget-copy">{text}</p>
+            <button type="button" className="briefing-refresh" onClick={onGenerate} title="Regenerate briefing">
+              <Icon.Rotate size={11} />
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ============================== BADGES ============================== */
+export function BadgesPanel({ statuses, onClose }) {
+  const unlockedCount = statuses.filter((s) => s.unlocked).length;
+  return (
+    <div className="settings-panel badges-panel">
+      <p className="panel-copy">
+        {unlockedCount} of {statuses.length} unlocked — earned automatically from your progress,
+        streaks, reviews, and journal. No extra steps needed.
+      </p>
+      <div className="badges-grid">
+        {statuses.map((s) => (
+          <div
+            key={s.badge.id}
+            className={classNames(
+              "badge-card",
+              `badge-tier-${s.badge.tier}`,
+              s.unlocked && "badge-card-unlocked",
+            )}
+            title={s.badge.description}
+          >
+            <div className="badge-card-icon"><Icon.Medal size={20} /></div>
+            <div className="badge-card-label">{s.badge.label}</div>
+            <div className="badge-card-desc">{s.badge.description}</div>
+            {!s.unlocked && s.target > 1 && (
+              <>
+                <div className="badge-card-progress">
+                  <div
+                    className="badge-card-progress-fill"
+                    style={{ width: `${Math.round((s.current / s.target) * 100)}%` }}
+                  />
+                </div>
+                <div className="badge-card-progress-label">{s.current}/{s.target}</div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="panel-actions">
+        <button className="secondary-btn" type="button" onClick={onClose}>Close</button>
+      </div>
     </div>
   );
 }
@@ -1198,7 +1328,7 @@ export function SummaryCard({ label, value, sub, accent }) {
 }
 
 /* ============================== MODALS ============================== */
-export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, progress, srs, log, learned, themeKey, onImport, fireToast, plans, activePlanId, onPlanCreated }) {
+export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, progress, srs, log, learned, themeKey, onImport, fireToast, plans, activePlanId, onPlanCreated, badgeStatuses }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKey);
@@ -1213,6 +1343,7 @@ export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, pro
     settings: "AI provider",
     builder: "New plan",
     account: "Account & sync",
+    badges: "Badges",
   };
 
   return (
@@ -1247,6 +1378,7 @@ export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, pro
           )}
           {modal.kind === "settings" && <SettingsPanel onClose={onClose} />}
           {modal.kind === "account" && <AccountPanel onClose={onClose} />}
+          {modal.kind === "badges" && <BadgesPanel statuses={badgeStatuses} onClose={onClose} />}
           {modal.kind === "notes" && (
             <NotesGenPanel
               day={modal.day}

@@ -45,6 +45,10 @@ import {
   SCHEMA_VERSION,
 } from "@/lib/types";
 import { hydrateCredentialsFromStorage } from "@/lib/providers/credentials";
+import { computeBadges } from "@/lib/achievements";
+import { findOnThisDayMemory } from "@/lib/onThisDay";
+import { generateDailyBriefing, loadCachedBriefing, saveCachedBriefing } from "@/lib/dailyBriefing";
+import { dateKey } from "@/lib/learned";
 
 import {
   BackgroundFX,
@@ -64,6 +68,8 @@ import {
   ConfettiBurst,
   Footer,
   EmptyPlansView,
+  OnThisDayCard,
+  DailyBriefingCard,
 } from "@/features/ui/Views";
 import { LearnedView } from "@/features/learned/LearnedView";
 
@@ -443,6 +449,80 @@ export default function DualTrackConsole() {
     return { totalTopics, doneTopics, daysComplete, totalDaysAll, xp, level, into, need, rank: rankForLevel(level) };
   }, [progress, visiblePlans]);
 
+  const badgeStatuses = useMemo(
+    () =>
+      computeBadges({
+        visiblePlans,
+        progress,
+        srs,
+        log,
+        learned,
+        doneTopics: globalStats.doneTopics,
+        daysComplete: globalStats.daysComplete,
+      }),
+    [visiblePlans, progress, srs, log, learned, globalStats.doneTopics, globalStats.daysComplete],
+  );
+
+  // Baseline is only established once the initial load (local or cloud) has
+  // resolved, so pre-existing badges don't all fire "unlocked" toasts at once.
+  const badgeBaselineRef = useRef(null);
+  useEffect(() => {
+    if (saveStatus === "loading") return;
+    const unlockedIds = badgeStatuses.filter((s) => s.unlocked).map((s) => s.badge.id);
+    if (badgeBaselineRef.current === null) {
+      badgeBaselineRef.current = new Set(unlockedIds);
+      return;
+    }
+    const newlyUnlocked = unlockedIds.filter((id) => !badgeBaselineRef.current.has(id));
+    if (newlyUnlocked.length) {
+      newlyUnlocked.forEach((id) => badgeBaselineRef.current.add(id));
+      const badge = badgeStatuses.find((s) => s.badge.id === newlyUnlocked[0])?.badge;
+      if (badge) fireToast(`Badge unlocked · ${badge.label}`, "day");
+    }
+  }, [badgeStatuses, saveStatus, fireToast]);
+
+  const todayKey = useMemo(() => dateKey(), []);
+
+  const onThisDayMemory = useMemo(
+    () => findOnThisDayMemory({ log, learned, visiblePlans }),
+    [log, learned, visiblePlans],
+  );
+
+  const [onThisDayDismissed, setOnThisDayDismissed] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      setOnThisDayDismissed(window.sessionStorage.getItem(`dualtrack:otd-dismissed:${todayKey}`) === "1");
+    } catch {
+      /* ignore */
+    }
+  }, [todayKey]);
+  const dismissOnThisDay = useCallback(() => {
+    setOnThisDayDismissed(true);
+    if (typeof window === "undefined") return;
+    try {
+      window.sessionStorage.setItem(`dualtrack:otd-dismissed:${todayKey}`, "1");
+    } catch {
+      /* ignore */
+    }
+  }, [todayKey]);
+
+  const [briefingStatus, setBriefingStatus] = useState("idle");
+  const [briefingText, setBriefingText] = useState("");
+  const [briefingError, setBriefingError] = useState("");
+
+  useEffect(() => {
+    if (!campaign) return;
+    const cached = loadCachedBriefing(todayKey, campaign.id);
+    if (cached) {
+      setBriefingText(cached.text);
+      setBriefingStatus("ready");
+    } else {
+      setBriefingText("");
+      setBriefingStatus("idle");
+    }
+  }, [campaign?.id, todayKey]);
+
   const campaignStats = useMemo(() => {
     const stats = {};
     visiblePlans.forEach((c) => {
@@ -624,6 +704,37 @@ export default function DualTrackConsole() {
     [srs],
   );
 
+  const handleGenerateBriefing = useCallback(async () => {
+    if (!campaign) return;
+    setBriefingStatus("loading");
+    setBriefingError("");
+    try {
+      const activeDay = campaignStats[campaign.id]?.activeDay;
+      let journalHint;
+      for (const d of Object.keys(learned).sort().reverse()) {
+        const items = learned[d];
+        if (items && items.length) {
+          journalHint = items[0].title;
+          break;
+        }
+      }
+      const text = await generateDailyBriefing({
+        planName: campaign.name,
+        activeDayLabel: activeDay ? `Day ${activeDay.day}` : "your next day",
+        activeDayTopics: activeDay ? activeDay.topics : [],
+        dueReviewCount: reviewQueue.length,
+        streak: campaignStats[campaign.id]?.streak || 0,
+        journalHint,
+      });
+      setBriefingText(text);
+      setBriefingStatus("ready");
+      saveCachedBriefing(todayKey, campaign.id, text);
+    } catch (err) {
+      setBriefingError(err instanceof Error ? err.message : "Could not generate a briefing.");
+      setBriefingStatus("error");
+    }
+  }, [campaign, campaignStats, reviewQueue, learned, todayKey]);
+
   if (!campaign) {
     if (saveStatus === "loading") {
       return (
@@ -700,6 +811,9 @@ export default function DualTrackConsole() {
           confirmReset={confirmReset}
           setConfirmReset={setConfirmReset}
           onReset={handleReset}
+          onOpenBadges={() => setModal({ kind: "badges" })}
+          badgeCount={badgeStatuses.filter((s) => s.unlocked).length}
+          badgeTotal={badgeStatuses.length}
         />
         <PlanSwitcher
           active={activePlanId}
@@ -712,6 +826,19 @@ export default function DualTrackConsole() {
           onNewPlan={() => setModal({ kind: "builder" })}
         />
         <CampaignHero campaign={campaign} stats={stats} />
+
+        <div className="today-widgets-row">
+          {onThisDayMemory && !onThisDayDismissed && (
+            <OnThisDayCard memory={onThisDayMemory} onDismiss={dismissOnThisDay} />
+          )}
+          <DailyBriefingCard
+            status={briefingStatus}
+            text={briefingText}
+            error={briefingError}
+            onGenerate={handleGenerateBriefing}
+          />
+        </div>
+
         <ViewTabs view={view} setView={setView} dueCount={reviewQueue.length} />
 
         {(view === "console" || view === "grid") && (
@@ -853,6 +980,7 @@ export default function DualTrackConsole() {
             fireToast={fireToast}
             plans={plans}
             activePlanId={activePlanId}
+            badgeStatuses={badgeStatuses}
             onPlanCreated={(plan) => {
               setPlans((prev) => ({ ...prev, [plan.id]: plan }));
               setActivePlanId(plan.id);
