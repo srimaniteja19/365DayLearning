@@ -3,6 +3,55 @@ import { NextRequest, NextResponse } from "next/server";
 const DEFAULT_MODEL = "claude-sonnet-4-6";
 const MAX_PROMPT_CHARS = 40_000;
 const MAX_TOKENS_CAP = 4096;
+const UPSTREAM_TIMEOUT_MS = 60_000;
+
+// Sliding-window rate limit, per IP. In-memory: resets on redeploy and is
+// per-instance, which is acceptable for this app's single-region scale.
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_REQUESTS = 15;
+const rateBuckets = new Map<string, number[]>();
+
+function clientIp(req: NextRequest): string {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0].trim();
+  return req.headers.get("x-real-ip") || "unknown";
+}
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const cutoff = now - RATE_LIMIT_WINDOW_MS;
+  const hits = (rateBuckets.get(ip) || []).filter((t) => t > cutoff);
+  if (hits.length >= RATE_LIMIT_MAX_REQUESTS) {
+    rateBuckets.set(ip, hits);
+    return true;
+  }
+  hits.push(now);
+  rateBuckets.set(ip, hits);
+  // Opportunistic cleanup so the map can't grow unbounded.
+  if (rateBuckets.size > 10_000) {
+    for (const [key, times] of rateBuckets) {
+      if (!times.some((t) => t > cutoff)) rateBuckets.delete(key);
+    }
+  }
+  return false;
+}
+
+/**
+ * Browsers always send an Origin header on cross-site and same-site fetch
+ * POSTs. Requiring a same-origin Origin blocks other websites and plain
+ * curl/script abuse of the server-side API key.
+ */
+function isSameOrigin(req: NextRequest): boolean {
+  const origin = req.headers.get("origin");
+  if (!origin) return false;
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
+  if (!host) return false;
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
 
 type ClaudeRequestBody = {
   prompt?: unknown;
@@ -15,6 +64,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: "ANTHROPIC_API_KEY is not configured on the server." },
       { status: 503 },
+    );
+  }
+
+  if (!isSameOrigin(req)) {
+    return NextResponse.json(
+      { error: "Cross-origin requests are not allowed." },
+      { status: 403 },
+    );
+  }
+
+  const ip = clientIp(req);
+  if (isRateLimited(ip)) {
+    return NextResponse.json(
+      { error: "Too many requests. Try again in a minute." },
+      { status: 429, headers: { "Retry-After": "60" } },
     );
   }
 
@@ -43,6 +107,7 @@ export async function POST(req: NextRequest) {
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       headers: {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
@@ -61,8 +126,20 @@ export async function POST(req: NextRequest) {
     };
 
     if (!res.ok) {
-      const message = data.error?.message || `Anthropic request failed (${res.status})`;
-      return NextResponse.json({ error: message }, { status: res.status });
+      // Log detail server-side; return only a generic message to the client.
+      console.error(
+        `[api/claude] upstream ${res.status}: ${data.error?.message || "(no message)"}`,
+      );
+      const generic =
+        res.status === 429
+          ? "The AI service is rate limited right now. Try again shortly."
+          : res.status === 401 || res.status === 403
+            ? "The server's AI credentials were rejected."
+            : "The AI request failed. Try again shortly.";
+      return NextResponse.json(
+        { error: generic },
+        { status: res.status === 429 ? 429 : 502 },
+      );
     }
 
     const text = (data.content || [])
@@ -77,7 +154,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ text });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Upstream request failed.";
-    return NextResponse.json({ error: message }, { status: 502 });
+    const timedOut = err instanceof DOMException && err.name === "TimeoutError";
+    console.error(`[api/claude] ${timedOut ? "upstream timeout" : "upstream error"}`, err);
+    return NextResponse.json(
+      { error: timedOut ? "The AI request timed out." : "Upstream request failed." },
+      { status: timedOut ? 504 : 502 },
+    );
   }
 }

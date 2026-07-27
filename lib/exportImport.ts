@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type {
   LogEntry,
   NotesMap,
@@ -131,16 +132,101 @@ export function serializeExport(payload: PlanShareFile | FullBackupFile): string
   return js;
 }
 
-function isPlanLike(value: unknown): value is Plan {
-  if (!value || typeof value !== "object") return false;
-  const p = value as Partial<Plan>;
-  return (
-    typeof p.id === "string" &&
-    typeof p.name === "string" &&
-    Array.isArray(p.days) &&
-    typeof p.totalDays === "number" &&
-    typeof p.topicsPerDay === "number"
-  );
+// --- Import validation -------------------------------------------------
+// Structural fields (ids, days, counts) are validated strictly; cosmetic
+// fields fall back to safe defaults so old or hand-edited files still load.
+
+const planDaySchema = z.object({
+  day: z.number().int().positive(),
+  id: z.string().optional(),
+  topics: z.array(z.string()).catch([]),
+  domains: z.array(z.string()).catch([]),
+});
+
+const planPeriodSchema = z.object({
+  label: z.string(),
+  sub: z.string().catch(""),
+  start: z.number(),
+  end: z.number(),
+});
+
+const planSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  subtitle: z.string().catch(""),
+  builtin: z.boolean().catch(false),
+  createdAt: z.number().catch(() => Date.now()),
+  totalDays: z.number().int().positive(),
+  topicsPerDay: z.number().int().positive(),
+  accentRole: z.enum(["main", "sprint", "auto"]).catch("auto"),
+  periodScopes: z
+    .array(z.object({ key: z.string(), label: z.string(), periods: z.array(planPeriodSchema) }))
+    .catch([]),
+  days: z.array(planDaySchema),
+  meta: z.record(z.string(), z.unknown()).catch({}),
+  status: z.enum(["draft", "ready"]).optional().catch(undefined),
+  hidden: z.boolean().optional().catch(undefined),
+});
+
+const progressEntrySchema = z.record(z.string(), z.boolean());
+const noteEntrySchema = z.string();
+const refEntrySchema = z.object({
+  text: z.string(),
+  topic: z.string().catch(""),
+  style: z.string().catch(""),
+  at: z.number().catch(0),
+});
+const srsEntrySchema = z.object({
+  idx: z.number().catch(0),
+  due: z.number().nullable().catch(null),
+  graduated: z.boolean().catch(false),
+  reps: z.number().catch(0),
+  last: z.number().catch(0),
+});
+const logEntrySchema = z.object({ d: z.string(), i: z.number(), at: z.number() });
+
+/** Keep entries that parse; silently drop corrupt ones instead of rejecting the whole file. */
+function sanitizeRecord<T>(raw: unknown, schema: z.ZodType<T>): Record<string, T> {
+  const out: Record<string, T> = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    const parsed = schema.safeParse(value);
+    if (parsed.success) out[key] = parsed.data;
+  }
+  return out;
+}
+
+function sanitizeLog(raw: unknown): LogEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const out: LogEntry[] = [];
+  for (const entry of raw) {
+    const parsed = logEntrySchema.safeParse(entry);
+    if (parsed.success) out.push(parsed.data);
+  }
+  return out;
+}
+
+function parsePlan(raw: unknown): Plan | null {
+  const parsed = planSchema.safeParse(raw);
+  if (!parsed.success) return null;
+  const p = parsed.data;
+  return {
+    ...p,
+    days: p.days.map((d) => ({
+      ...d,
+      id: d.id || `${p.id}:${d.day}`,
+    })),
+  } as Plan;
+}
+
+function sanitizePlans(raw: unknown): PlansState {
+  const out: PlansState = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  for (const value of Object.values(raw as Record<string, unknown>)) {
+    const plan = parsePlan(value);
+    if (plan) out[plan.id] = plan;
+  }
+  return out;
 }
 
 /** Detect import kind from a parsed JSON blob. */
@@ -151,8 +237,9 @@ export function detectImport(raw: unknown): DetectedImport {
   const data = raw as Record<string, unknown>;
 
   if (data.kind === "dualtrack-plan" || (data.plan && !data.progress && !data.notes)) {
-    if (!isPlanLike(data.plan)) throw new Error("Plan share is missing a valid plan");
-    return { kind: "dualtrack-plan", plan: data.plan };
+    const plan = parsePlan(data.plan);
+    if (!plan) throw new Error("Plan share is missing a valid plan");
+    return { kind: "dualtrack-plan", plan };
   }
 
   const hasUser =
@@ -162,17 +249,14 @@ export function detectImport(raw: unknown): DetectedImport {
   }
 
   const userdata = migrateUserData({
-    progress: data.progress as ProgressMap,
-    notes: data.notes as NotesMap,
-    refs: data.refs as RefsMap,
-    srs: data.srs as SrsMap,
-    log: data.log as LogEntry[],
+    progress: sanitizeRecord(data.progress, progressEntrySchema) as ProgressMap,
+    notes: sanitizeRecord(data.notes, noteEntrySchema) as NotesMap,
+    refs: sanitizeRecord(data.refs, refEntrySchema) as RefsMap,
+    srs: sanitizeRecord(data.srs, srsEntrySchema) as SrsMap,
+    log: sanitizeLog(data.log),
   });
 
-  let plans: PlansState = {};
-  if (data.plans && typeof data.plans === "object") {
-    plans = data.plans as PlansState;
-  }
+  const plans: PlansState = sanitizePlans(data.plans);
 
   return {
     kind: "dualtrack-full",
