@@ -6,9 +6,8 @@ import {
   buildPeriodScopes,
   draftToPlanRequest,
   type BuilderDraft,
-  type PlanGrouping,
 } from "@/lib/planBuilder";
-import type { Plan, PlanDay, PlanRequest } from "@/lib/types";
+import type { Plan, PlanDay, PlanGrouping, PlanRequest } from "@/lib/types";
 import { ContentError } from "@/lib/providers/errors";
 
 /** How many period day-gens to run at once. Cuts wall-clock without huge prompt drift. */

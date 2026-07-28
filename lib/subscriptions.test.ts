@@ -22,17 +22,20 @@ describe("tier definitions", () => {
   it("free tier has no managed AI and no quotas", () => {
     const free = SUBSCRIPTION_TIERS.free;
     expect(free.managedAi).toBe(false);
+    expect(free.comingSoon).toBe(false);
     expect(free.planGenerationsPerPeriod).toBeNull();
     expect(free.aiActionsPerPeriod).toBeNull();
   });
 
-  it("paid tiers get more headroom as price increases", () => {
+  it("paid tiers are coming soon and keep planned quotas for later", () => {
     const operator = SUBSCRIPTION_TIERS.operator;
     const architect = SUBSCRIPTION_TIERS.architect;
-    expect(operator.managedAi).toBe(true);
-    expect(architect.managedAi).toBe(true);
-    expect(architect.planGenerationsPerPeriod).toBeGreaterThan(operator.planGenerationsPerPeriod!);
-    expect(architect.aiActionsPerPeriod).toBeGreaterThan(operator.aiActionsPerPeriod!);
+    expect(operator.managedAi).toBe(false);
+    expect(architect.managedAi).toBe(false);
+    expect(operator.comingSoon).toBe(true);
+    expect(architect.comingSoon).toBe(true);
+    expect(architect.planGenerationsPerPeriod!).toBeGreaterThan(operator.planGenerationsPerPeriod!);
+    expect(architect.aiActionsPerPeriod!).toBeGreaterThan(operator.aiActionsPerPeriod!);
     expect(architect.priceMonthlyUsd).toBeGreaterThan(operator.priceMonthlyUsd);
   });
 

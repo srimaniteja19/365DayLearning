@@ -4,6 +4,10 @@ import { SubscriptionError } from "@/lib/providers/errors";
  * Tier ids/order intentionally mirror the XP rank ladder in `lib/xp.ts`
  * (Recruit is level 1, Architect is the top rank) so pricing doubles as an
  * in-app callback rather than introducing a second, disconnected vocabulary.
+ *
+ * Live AI today is OpenRouter BYOK for every tier. Paid tiers reserve the
+ * managed-AI + quota product for when checkout ships — `managedAi` stays
+ * false so quotas are not enforced until that path is re-enabled.
  */
 export type SubscriptionTier = "free" | "operator" | "architect";
 
@@ -16,9 +20,11 @@ export type TierDefinition = {
   priceLabel: string;
   /** Whether this tier can use server-managed AI without supplying an API key. */
   managedAi: boolean;
-  /** null = not applicable (BYOK plan generation on Free is always unlimited). */
+  /** null = unlimited / not billed (BYOK). Numbers are planned quotas for managed AI. */
   planGenerationsPerPeriod: number | null;
   aiActionsPerPeriod: number | null;
+  /** Paid checkout / managed AI not live yet. */
+  comingSoon: boolean;
   tagline: string;
   features: string[];
 };
@@ -32,10 +38,11 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierDefinition> = {
     managedAi: false,
     planGenerationsPerPeriod: null,
     aiActionsPerPeriod: null,
+    comingSoon: false,
     tagline: "Bring your own OpenRouter key.",
     features: [
-      "Unlimited custom plans on your own API key",
-      "Unlimited quiz, notes, LinkedIn drafts & journal insights on your key",
+      "Unlimited custom plans on your OpenRouter key",
+      "Unlimited quiz, notes, LinkedIn drafts & journal insights",
       "Example campaigns, multi-plan switcher, XP & streaks",
       "Spaced repetition, badges, themes & type voices",
       "Accounts + cloud sync across devices",
@@ -47,17 +54,18 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierDefinition> = {
     rankLabel: "Operator",
     priceMonthlyUsd: 7,
     priceLabel: "$7/mo",
-    managedAi: true,
+    managedAi: false,
     planGenerationsPerPeriod: 3,
     aiActionsPerPeriod: 150,
-    tagline: "Managed AI — no key required.",
+    comingSoon: true,
+    tagline: "Coming soon — managed AI on us.",
     features: [
       "Everything in Recruit",
-      "3 AI-generated custom plans / month",
-      "150 AI actions / month (quiz, notes, drafts, insights)",
-      "Managed AI — no API key needed",
-      "On-this-day memories",
-      "BYOK still available anytime",
+      "Planned: 3 managed plan generations / month",
+      "Planned: 150 managed AI actions / month",
+      "Planned: no OpenRouter key required for those quotas",
+      "Checkout not connected yet",
+      "Until then, use Recruit with your own key",
     ],
   },
   architect: {
@@ -65,17 +73,18 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierDefinition> = {
     rankLabel: "Architect",
     priceMonthlyUsd: 12,
     priceLabel: "$12/mo",
-    managedAi: true,
+    managedAi: false,
     planGenerationsPerPeriod: 5,
     aiActionsPerPeriod: 400,
-    tagline: "More plans, more headroom.",
+    comingSoon: true,
+    tagline: "Coming soon — more managed headroom.",
     features: [
-      "Everything in Operator",
-      "5 AI-generated custom plans / month",
-      "400 AI actions / month",
-      "Managed AI — no API key needed",
-      "Highest monthly headroom for active campaigns",
-      "BYOK still available anytime",
+      "Everything planned for Operator",
+      "Planned: 5 managed plan generations / month",
+      "Planned: 400 managed AI actions / month",
+      "Planned: highest managed monthly allowance",
+      "Checkout not connected yet",
+      "Until then, use Recruit with your own key",
     ],
   },
 };
@@ -130,10 +139,8 @@ export async function fetchSubscriptionStatus(): Promise<
 
 /**
  * Reserves one AI-generated plan against the signed-in user's monthly
- * quota. Called once per fresh `generatePlan()` run (not on resume) — the
- * many individual chat() calls inside a single generation don't each count
- * separately. Throws a `SubscriptionError` with a user-facing message on
- * rejection (no session, free tier, or quota exhausted).
+ * quota. Only meaningful when managed AI is live (`willUseManagedAi()`).
+ * Throws a `SubscriptionError` with a user-facing message on rejection.
  */
 export async function reservePlanGeneration(signal?: AbortSignal): Promise<void> {
   let res: Response;

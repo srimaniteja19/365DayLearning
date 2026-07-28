@@ -52,7 +52,7 @@ export class ContentError extends ProviderError {
 
 /** Raised when a managed-AI (no-BYOK-key) request is blocked by sign-in state or subscription quota. */
 export class SubscriptionError extends ProviderError {
-  constructor(message = "Add your own API key, or upgrade your plan for managed AI.", status = 402) {
+  constructor(message = "Add your OpenRouter key in Settings. Managed AI upgrades are coming soon.", status = 402) {
     super(message, "subscription", status);
     this.name = "SubscriptionError";
   }

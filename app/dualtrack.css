@@ -3324,6 +3324,14 @@ select.settings-input { cursor: pointer; }
   background: var(--pricing-ink);
   color: #fff;
 }
+.pricing-card-badge-soon {
+  background: color-mix(in srgb, var(--pricing-ink) 12%, transparent);
+  color: var(--pricing-ink);
+  border: 1px solid color-mix(in srgb, var(--pricing-ink) 28%, transparent);
+}
+.pricing-card-soon {
+  opacity: 0.92;
+}
 .pricing-card-rank {
   font-weight: 800;
   font-size: 18px;

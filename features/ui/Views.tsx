@@ -599,7 +599,7 @@ const LANDING_FEATURES = [
     tone: "pink",
     icon: Icon.Trophy,
     title: "Subscription tiers",
-    copy: "Recruit is free BYOK. Operator and Architect add managed AI with monthly plan and action quotas.",
+    copy: "Recruit is free OpenRouter BYOK today. Operator and Architect managed AI is planned — checkout not live yet.",
   },
   {
     id: "export",
@@ -1019,8 +1019,8 @@ export function PricingPanel({ onClose, onOpenAccount }) {
     <div className="pricing-panel">
       <div className="pricing-intro">
         <p className="pricing-intro-lead">
-          Recruit is bring-your-own-key and always unlimited. Operator and Architect add managed
-          AI — no key needed — with a monthly plan and action allowance.
+          AI runs on your OpenRouter key today — unlimited on Recruit. Operator and Architect
+          will add managed AI with monthly quotas once checkout ships.
         </p>
       </div>
 
@@ -1035,9 +1035,13 @@ export function PricingPanel({ onClose, onOpenAccount }) {
                 "pricing-card",
                 `pricing-card-${id}`,
                 isCurrent && "pricing-card-current",
+                tier.comingSoon && "pricing-card-soon",
               )}
             >
               {isCurrent && <div className="pricing-card-badge">Current</div>}
+              {tier.comingSoon && !isCurrent && (
+                <div className="pricing-card-badge pricing-card-badge-soon">Coming soon</div>
+              )}
               <div className="pricing-card-rank">{tier.rankLabel}</div>
               <div className="pricing-card-price">
                 {tier.priceMonthlyUsd === 0 ? (
@@ -1062,6 +1066,8 @@ export function PricingPanel({ onClose, onOpenAccount }) {
                 <div className="pricing-card-static">
                   {isCurrent ? "Your plan" : "Always available"}
                 </div>
+              ) : tier.comingSoon ? (
+                <div className="pricing-card-static">Coming soon</div>
               ) : (
                 <button
                   type="button"
@@ -1102,7 +1108,9 @@ export function PricingPanel({ onClose, onOpenAccount }) {
             </div>
           )}
           {usage.planGenerationsLimit == null && usage.aiActionsLimit == null && (
-            <div className="pricing-usage-reset">Recruit · unlimited on your own key</div>
+            <div className="pricing-usage-reset">
+              Recruit · unlimited on your OpenRouter key
+            </div>
           )}
         </div>
       )}

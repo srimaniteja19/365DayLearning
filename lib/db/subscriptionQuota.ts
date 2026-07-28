@@ -34,12 +34,14 @@ async function loadUsageRow(userId: string): Promise<UsageRow | null> {
 export function toSubscriptionUsage(row: UsageRow): SubscriptionUsage {
   const tier = tierDef(row.subscriptionTier);
   const expired = isPeriodExpired(row.usagePeriodStart);
+  // Quotas only apply when managed AI is live for the tier.
+  const limitsActive = tier.managedAi;
   return {
     tier: tier.id,
     planGenerationsUsed: expired ? 0 : row.planGenerationsUsed,
-    planGenerationsLimit: tier.planGenerationsPerPeriod,
+    planGenerationsLimit: limitsActive ? tier.planGenerationsPerPeriod : null,
     aiActionsUsed: expired ? 0 : row.aiActionsUsed,
-    aiActionsLimit: tier.aiActionsPerPeriod,
+    aiActionsLimit: limitsActive ? tier.aiActionsPerPeriod : null,
     periodResetAt: (expired ? new Date() : periodResetsAt(row.usagePeriodStart)).toISOString(),
   };
 }
@@ -71,7 +73,7 @@ async function reserve(userId: string, kind: "plan" | "action"): Promise<Reserve
       reason: "tier",
       status: 402,
       message:
-        "Managed AI needs a paid plan. Add your own API key in Settings, or upgrade to Operator/Architect.",
+        "Managed AI isn't available yet. Add your OpenRouter key in Settings — Recruit is unlimited on your own credits.",
     };
   }
 
@@ -131,7 +133,7 @@ export async function requireManagedAiTier(userId: string): Promise<ReserveResul
       reason: "tier",
       status: 402,
       message:
-        "Managed AI needs a paid plan. Add your own API key in Settings, or upgrade to Operator/Architect.",
+        "Managed AI isn't available yet. Add your OpenRouter key in Settings — Recruit is unlimited on your own credits.",
     };
   }
   return { ok: true };

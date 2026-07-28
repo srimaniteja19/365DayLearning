@@ -8,7 +8,6 @@ Multi-plan learning campaigns: progress, spaced repetition, notes, themes, custo
 - Persistence via **IndexedDB** (`idb-keyval`) with **localStorage** fallback
 - Optional accounts + cloud sync: **Neon Postgres** (via Vercel's database integration) + **Auth.js v5** (credentials)
 - BYOK via OpenRouter (paste your key + model in Settings)
-- Optional server fallback: `/api/claude` when Anthropic is selected and no browser key is set
 
 ## Setup
 
@@ -17,12 +16,7 @@ npm install
 cp .env.example .env.local
 ```
 
-```bash
-# Optional server-side Anthropic fallback (when no BYOK key is pasted)
-ANTHROPIC_API_KEY=sk-ant-...
-```
-
-Or open **AI** in the top bar and paste your OpenRouter key at runtime.
+Open **Settings** in the top bar and paste your OpenRouter key at runtime.
 
 ## Accounts + cloud sync (optional)
 
@@ -53,26 +47,17 @@ calls fail gracefully (503) and the app behaves exactly as it did before — pur
 
 Three tiers, named after ranks from the XP ladder (`lib/xp.ts`) and defined in `lib/subscriptions.ts`:
 
-| Tier | Price | AI | Monthly allowance |
-|------|-------|----|--------------------|
-| **Recruit** (free) | $0 | Bring your own key | Unlimited plans + AI tools on your key |
-| **Operator** | $7/mo | Managed (no key needed) | 3 AI-generated plans, 150 AI actions |
-| **Architect** | $12/mo | Managed (no key needed) | 5 AI-generated plans, 400 AI actions |
+| Tier | Price | Status | AI |
+|------|-------|--------|----|
+| **Recruit** (free) | $0 | **Live** | Bring your own OpenRouter key — unlimited plans + AI tools on your credits |
+| **Operator** | $7/mo | Coming soon | Planned: managed AI with 3 plan generations + 150 AI actions / month |
+| **Architect** | $12/mo | Coming soon | Planned: managed AI with 5 plan generations + 400 AI actions / month |
 
-- Free is always unlimited because it runs on the user's own key/dime. Paid tiers unlock the
-  server's own Anthropic key so no BYOK setup is required, bounded by a rolling ~30-day quota
-  tracked per account (`plan_generations_used`, `ai_actions_used`, `usage_period_start` columns
-  on `users`, reset lazily on read — see `lib/db/subscriptionQuota.ts`).
-- "AI-generated plans" = full plan-builder runs (`generatePlan()` in `lib/planGeneration.ts`);
-  "AI actions" = quiz, notes, LinkedIn drafts, and journal insights. Static
-  example plans (Longhaul/Fastburn) and per-day edits/regenerates never consume either quota.
-- `/api/claude` enforces this only when `DATABASE_URL` is set — a bare `ANTHROPIC_API_KEY` deploy
-  with no accounts configured keeps behaving as a simple same-origin fallback, same as before.
-- **Checkout isn't wired up yet.** `POST /api/subscription/upgrade` is a stable placeholder that
-  currently returns 501; connect a payment processor there and flip the tier (e.g. via
-  `setSubscriptionTier` in `lib/db/subscriptionQuota.ts`) from its success webhook to go live.
-- View plans/usage from **Plans** in the top bar or landing nav, or **View plans & usage** in the
-  account panel.
+- **Today everyone uses Recruit behavior:** OpenRouter BYOK in Settings. Plan generation, quiz, notes, LinkedIn drafts, and journal insights all hit your key — no server quota.
+- Paid tiers keep the planned quotas in code (`planGenerationsPerPeriod` / `aiActionsPerPeriod`) but `managedAi` is off, so those limits are not enforced until managed AI + checkout ship.
+- Quota plumbing still lives in `lib/db/subscriptionQuota.ts` and `/api/claude` for when managed AI returns.
+- **Checkout isn't wired up yet.** Upgrade buttons show “Coming soon.” `POST /api/subscription/upgrade` remains a 501 placeholder for a future payment processor.
+- View plans from **Plans** in the top bar or landing nav, or **View plans & usage** in the account panel.
 
 ## Scripts
 
@@ -94,7 +79,7 @@ npm run db:studio    # browse the database with Drizzle Studio
 - Multi-plan switcher; delete purges that plan’s progress/notes/refs/srs
 - **Other things I learned** — calendar journal with markdown notes, rich links, and AI insights
 - Optional **accounts + cloud sync** (Neon Postgres + Auth.js) — sign in to sync across devices
-- **Subscriptions** — free BYOK tier plus two managed-AI paid tiers with monthly quotas (checkout not yet connected)
+- **Subscriptions** — Recruit (free OpenRouter BYOK) is live; Operator/Architect managed AI is planned (checkout not connected)
 - Themes (8) via CSS custom properties — including Ledger (light) and Matte Black
 - Export: notes markdown, full backup, **plan-only share**
 - Import: plan share adds a plan; full backup asks **merge** or **replace**
