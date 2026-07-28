@@ -105,6 +105,7 @@ export const viewport: Viewport = {
   themeColor: "#0C1116",
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
 };
 
 const fontVars = [

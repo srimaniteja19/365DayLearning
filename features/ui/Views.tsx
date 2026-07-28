@@ -55,7 +55,7 @@ export function BackgroundFX({ accent, effects }) {
       <div className="bg-grid" />
       <div
         className="bg-glow"
-        style={{ background: `radial-gradient(520px circle at 18% 0%, ${hexToRgba(accent, effects ? 0.08 : 0.03)}, transparent 58%)` }}
+        style={{ background: `radial-gradient(480px circle at 16% 0%, ${hexToRgba(accent, effects ? 0.05 : 0.02)}, transparent 55%)` }}
       />
       <div className="bg-scanline" />
     </div>
@@ -255,99 +255,150 @@ export function TopBar({
   onOpenPricing,
 }) {
   const pct = stats.need ? Math.min(100, Math.round((stats.into / stats.need) * 100)) : 0;
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    const onResize = () => {
+      if (window.matchMedia("(min-width: 861px)").matches) setMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onResize);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [menuOpen]);
+
+  const runAndClose = (fn) => () => {
+    setMenuOpen(false);
+    fn?.();
+  };
+
   return (
-    <header className="topbar">
-      <div className="topbar-left">
-        <button className="brand brand-btn" onClick={onGoHome} title="Back to home" type="button">
-          <span className="brand-mark">◈</span>
-          <span className="brand-text">REFRAIN<span className="brand-accent">LY</span></span>
-        </button>
-        <span className="brand-sub">daily learning campaigns</span>
-      </div>
-
-      <div className="topbar-right">
-        <nav className="topbar-cluster" aria-label="Workspace">
-          <button className="topbar-item" type="button" onClick={onNewPlan} title="Create a custom plan">
-            <Icon.Target size={13} />
-            <span>New</span>
+    <header className={classNames("topbar", menuOpen && "topbar-menu-open")}>
+      <div className="topbar-row">
+        <div className="topbar-left">
+          <button className="brand brand-btn" onClick={onGoHome} title="Back to home" type="button">
+            <span className="brand-mark">◈</span>
+            <span className="brand-text">REFRAIN<span className="brand-accent">LY</span></span>
           </button>
-          <button className="topbar-item" type="button" onClick={onOpenSettings} title="AI provider and API key">
-            <Icon.Cloud size={13} />
-            <span>AI</span>
-          </button>
-          <button className="topbar-item" type="button" onClick={onOpenPricing} title="Plans, pricing, and usage">
-            <Icon.Sparkle size={13} />
-            <span>Plans</span>
-          </button>
-          <button className="topbar-item" type="button" onClick={onOpenData} title="Export or import your data">
-            <Icon.Download size={13} />
-            <span>Data</span>
-          </button>
-          <button
-            className={classNames("topbar-item", accountLabel && "topbar-item-active")}
-            type="button"
-            onClick={onOpenAccount}
-            title={accountLabel ? `Signed in as ${accountLabel}` : "Sign in to sync across devices"}
-          >
-            <Icon.User size={13} />
-            <span>{accountLabel ? "Account" : "Sign in"}</span>
-          </button>
-          <button
-            className="topbar-item"
-            type="button"
-            onClick={onOpenBadges}
-            title={`${badgeCount} of ${badgeTotal} badges unlocked`}
-          >
-            <Icon.Medal size={13} />
-            <span>{badgeCount}/{badgeTotal}</span>
-          </button>
-        </nav>
-
-        <div className="topbar-cluster topbar-cluster-look" aria-label="Appearance">
-          <ThemePicker themeKey={themeKey} setThemeKey={setThemeKey} />
-          <FontPicker fontKey={fontKey} setFontKey={setFontKey} />
         </div>
 
-        <div className="topbar-cluster topbar-cluster-status" aria-label="Progress">
+        <div className="topbar-mobile-tray" aria-hidden={false}>
           <SaveIndicator status={saveStatus} compact />
-          {noteCount > 0 && (
-            <div
-              className="topbar-item topbar-item-static"
-              title={`${noteCount} ${noteCount === 1 ? "day has" : "days have"} notes`}
-            >
-              <Icon.Note size={13} />
-              <span>{noteCount}</span>
-            </div>
-          )}
           <div
-            className="topbar-item topbar-item-static topbar-progress"
-            title={`${stats.rank} · Level ${stats.level} · ${stats.xp.toLocaleString()} total XP`}
+            className="topbar-mobile-level"
+            title={`${stats.rank} · Level ${stats.level} · ${stats.xp.toLocaleString()} XP`}
           >
-            <Icon.Trophy size={13} />
-            <span className="topbar-rank">{stats.rank}</span>
             <span className="level-badge">LV {stats.level}</span>
             <div className="xp-bar-mini" aria-hidden="true">
               <div className="xp-bar-mini-fill" style={{ width: pct + "%" }} />
             </div>
-            <span className="topbar-xp">{stats.into}/{stats.need}</span>
-            <span className="topbar-xp-total">{stats.xp.toLocaleString()} XP</span>
           </div>
-          {confirmReset ? (
-            <div className="reset-confirm">
-              <span>Erase all?</span>
-              <button className="reset-yes" type="button" onClick={onReset}>Erase</button>
-              <button className="reset-no" type="button" onClick={() => setConfirmReset(false)}>Keep</button>
-            </div>
-          ) : (
-            <button
-              className="topbar-item topbar-item-icon reset-btn"
-              type="button"
-              onClick={() => setConfirmReset(true)}
-              title="Reset all progress and notes"
-            >
-              <Icon.Rotate size={13} />
+          <button
+            type="button"
+            className="topbar-menu-btn"
+            aria-expanded={menuOpen}
+            aria-controls="topbar-panel"
+            onClick={() => setMenuOpen((v) => !v)}
+          >
+            {menuOpen ? <Icon.X size={18} /> : <Icon.Menu size={18} />}
+            <span className="sr-only">{menuOpen ? "Close menu" : "Open menu"}</span>
+          </button>
+        </div>
+
+        <div
+          id="topbar-panel"
+          className={classNames("topbar-right", menuOpen && "topbar-right-open")}
+        >
+          <nav className="topbar-cluster" aria-label="Workspace">
+            <button className="topbar-item" type="button" onClick={runAndClose(onNewPlan)} title="Create a custom plan">
+              <Icon.Target size={13} />
+              <span className="topbar-item-label">New</span>
             </button>
-          )}
+            <button className="topbar-item" type="button" onClick={runAndClose(onOpenSettings)} title="AI provider and API key">
+              <Icon.Cloud size={13} />
+              <span className="topbar-item-label">AI</span>
+            </button>
+            <button className="topbar-item" type="button" onClick={runAndClose(onOpenPricing)} title="Plans, pricing, and usage">
+              <Icon.Sparkle size={13} />
+              <span className="topbar-item-label">Plans</span>
+            </button>
+            <button className="topbar-item" type="button" onClick={runAndClose(onOpenData)} title="Export or import your data">
+              <Icon.Download size={13} />
+              <span className="topbar-item-label">Data</span>
+            </button>
+            <button
+              className={classNames("topbar-item", accountLabel && "topbar-item-active")}
+              type="button"
+              onClick={runAndClose(onOpenAccount)}
+              title={accountLabel ? `Signed in as ${accountLabel}` : "Sign in to sync across devices"}
+            >
+              <Icon.User size={13} />
+              <span className="topbar-item-label">{accountLabel ? "Account" : "Sign in"}</span>
+            </button>
+            <button
+              className="topbar-item"
+              type="button"
+              onClick={runAndClose(onOpenBadges)}
+              title={`${badgeCount} of ${badgeTotal} badges unlocked`}
+            >
+              <Icon.Medal size={13} />
+              <span>{badgeCount}/{badgeTotal}</span>
+            </button>
+          </nav>
+
+          <div className="topbar-cluster topbar-cluster-look" aria-label="Appearance">
+            <ThemePicker themeKey={themeKey} setThemeKey={setThemeKey} />
+            <FontPicker fontKey={fontKey} setFontKey={setFontKey} />
+          </div>
+
+          <div className="topbar-cluster topbar-cluster-status" aria-label="Progress">
+            <SaveIndicator status={saveStatus} compact />
+            {noteCount > 0 && (
+              <div
+                className="topbar-item topbar-item-static"
+                title={`${noteCount} ${noteCount === 1 ? "day has" : "days have"} notes`}
+              >
+                <Icon.Note size={13} />
+                <span>{noteCount}</span>
+              </div>
+            )}
+            <div
+              className="topbar-item topbar-item-static topbar-progress"
+              title={`${stats.rank} · Level ${stats.level} · ${stats.xp.toLocaleString()} total XP`}
+            >
+              <Icon.Trophy size={13} />
+              <span className="topbar-rank">{stats.rank}</span>
+              <span className="level-badge">LV {stats.level}</span>
+              <div className="xp-bar-mini" aria-hidden="true">
+                <div className="xp-bar-mini-fill" style={{ width: pct + "%" }} />
+              </div>
+              <span className="topbar-xp">{stats.into}/{stats.need}</span>
+              <span className="topbar-xp-total">{stats.xp.toLocaleString()} XP</span>
+            </div>
+            {confirmReset ? (
+              <div className="reset-confirm">
+                <span>Erase all?</span>
+                <button className="reset-yes" type="button" onClick={runAndClose(onReset)}>Erase</button>
+                <button className="reset-no" type="button" onClick={() => setConfirmReset(false)}>Keep</button>
+              </div>
+            ) : (
+              <button
+                className="topbar-item topbar-item-icon reset-btn"
+                type="button"
+                onClick={() => setConfirmReset(true)}
+                title="Reset all progress and notes"
+              >
+                <Icon.Rotate size={13} />
+                <span className="topbar-reset-label">Reset</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </header>
@@ -598,6 +649,11 @@ export function HomeView({
           <span className="landing-brand-text">REFRAINLY</span>
         </div>
         <div className="landing-nav-actions">
+          {hasCampaign && (
+            <button type="button" className="landing-nav-link landing-nav-dash" onClick={onGoDashboard}>
+              Dashboard
+            </button>
+          )}
           <button type="button" className="landing-nav-link" onClick={onOpenPricing}>
             Plans
           </button>
@@ -813,10 +869,10 @@ export function ProgressRing({ pct, accent }) {
   const offset = c - (pct / 100) * c;
   return (
     <div className="progress-ring-wrap">
-      <svg width="104" height="104" viewBox="0 0 104 104">
-        <circle cx="52" cy="52" r={r} fill="none" stroke="var(--track)" strokeWidth="8" />
+      <svg width="96" height="96" viewBox="0 0 104 104">
+        <circle cx="52" cy="52" r={r} fill="none" stroke="var(--track)" strokeWidth="7" />
         <circle
-          cx="52" cy="52" r={r} fill="none" stroke={accent} strokeWidth="8"
+          cx="52" cy="52" r={r} fill="none" stroke={accent} strokeWidth="7"
           strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
           transform="rotate(-90 52 52)"
           style={{ transition: "stroke-dashoffset 0.6s cubic-bezier(.4,0,.2,1)" }}
@@ -1144,15 +1200,17 @@ export function PeriodNav({ scopes, scope, setScope, periods, periodIdx, setPeri
   return (
     <div className="period-nav" style={{ "--accent": accent }}>
       <div className="scope-row">
-        {scopes.map((sc) => (
-          <button
-            key={sc.key}
-            className={classNames("scope-btn", scope === sc.key && "scope-btn-active")}
-            onClick={() => setScope(sc.key)}
-          >
-            {sc.label}
-          </button>
-        ))}
+        <div className="scope-btns" role="group" aria-label="Time range">
+          {scopes.map((sc) => (
+            <button
+              key={sc.key}
+              className={classNames("scope-btn", scope === sc.key && "scope-btn-active")}
+              onClick={() => setScope(sc.key)}
+            >
+              {sc.label}
+            </button>
+          ))}
+        </div>
         {periods && (
           <div className="period-summary">
             {periods[Math.min(periodIdx, periods.length - 1)].done}/{periods[Math.min(periodIdx, periods.length - 1)].total} topics

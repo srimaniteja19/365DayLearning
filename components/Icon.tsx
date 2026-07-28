@@ -118,6 +118,11 @@ export const Icon = {
       <path d="M3 11.5 12 4l9 7.5" /><path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
     </svg>
   ),
+  Menu: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" />
+    </svg>
+  ),
   LayoutDashboard: (p: IconProps) => (
     <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
       <rect x="3" y="3" width="18" height="7" rx="1.5" /><rect x="3" y="13" width="8" height="8" rx="1.5" /><rect x="14" y="13" width="7" height="8" rx="1.5" />
