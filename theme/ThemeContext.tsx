@@ -9,8 +9,8 @@ export type ThemeContextValue = {
 };
 
 export const ThemeCtx = createContext<ThemeContextValue>({
-  theme: THEMES.terminal,
-  domainColors: DOMAIN_PALETTES.dark,
+  theme: THEMES.bloom,
+  domainColors: DOMAIN_PALETTES.light,
 });
 
 export function useTheme() {

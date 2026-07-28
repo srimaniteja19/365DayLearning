@@ -29,7 +29,7 @@ function defaultMeta(overrides?: Partial<MetaState>): MetaState {
   return {
     schemaVersion: SCHEMA_VERSION,
     activePlanId: BUILTIN_365_ID,
-    themeKey: "terminal",
+    themeKey: "bloom",
     hiddenPlanIds: [],
     ...overrides,
   };

@@ -339,7 +339,6 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
                 const open = expandedId === item.id;
                 const tone = STICKY_COLORS[(dayColorOffsets[dayIdx] + index) % STICKY_COLORS.length];
                 const size = open ? "lg" : bentoSize(item, index);
-                const tilt = ((hashStr(item.id) % 5) - 2) * 0.28;
                 return (
                   <article
                     key={item.id}
@@ -349,7 +348,6 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
                       `bento-${size}`,
                       open && "sticky-note-open",
                     )}
-                    style={{ "--sticky-tilt": `${tilt}deg` }}
                   >
                     <button
                       type="button"

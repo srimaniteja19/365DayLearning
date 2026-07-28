@@ -27,11 +27,13 @@ export function AccountPanel({
   onAuthenticated,
   onGuest,
   showGuestOption,
+  onViewPricing,
 }: {
   onClose: () => void;
   onAuthenticated?: () => void;
   onGuest?: () => void;
   showGuestOption?: boolean;
+  onViewPricing?: () => void;
 }) {
   const { data: session, status } = useSession();
   const [mode, setMode] = useState<Mode>("signin");
@@ -44,28 +46,42 @@ export function AccountPanel({
 
   if (status === "loading") {
     return (
-      <div className="settings-panel">
-        <p className="panel-copy">Checking your session…</p>
+      <div className="account-panel">
+        <p className="account-lead">Checking your session…</p>
       </div>
     );
   }
 
   if (session?.user) {
     return (
-      <div className="settings-panel">
-        <p className="panel-copy">
-          Signed in as <strong>{session.user.email}</strong>. Your plans, progress, notes, and
-          journal entries sync to this account from any device.
-        </p>
-        <div className="sync-status-row">
-          <Icon.Cloud size={13} />
+      <div className="account-panel">
+        <div className="account-signed">
+          <div className="account-signed-mark" aria-hidden="true" />
+          <div className="account-signed-body">
+            <div className="account-signed-label">Signed in</div>
+            <div className="account-signed-email">{session.user.email}</div>
+            <p className="account-signed-copy">
+              Plans, progress, notes, and journal sync to this account from any device.
+            </p>
+          </div>
+        </div>
+
+        <div className="account-sync">
+          <Icon.Cloud size={15} />
           <span>
             Last synced from this device: <strong>{lastSyncedLabel || "not yet"}</strong>
           </span>
         </div>
-        <div className="panel-actions">
+
+        {onViewPricing && (
+          <button type="button" className="account-btn account-btn-plans" onClick={onViewPricing}>
+            View plans &amp; usage
+          </button>
+        )}
+
+        <div className="account-actions">
           <button
-            className="secondary-btn"
+            className="account-btn account-btn-ghost"
             type="button"
             onClick={async () => {
               await signOut({ redirect: false });
@@ -74,7 +90,7 @@ export function AccountPanel({
           >
             Sign out
           </button>
-          <button className="secondary-btn" type="button" onClick={onClose}>
+          <button className="account-btn account-btn-solid" type="button" onClick={onClose}>
             Done
           </button>
         </div>
@@ -115,54 +131,62 @@ export function AccountPanel({
   };
 
   return (
-    <div className="settings-panel">
-      <p className="panel-copy">
+    <div className="account-panel">
+      <p className="account-lead">
         {showGuestOption
-          ? "Sign in or create a free account to build a plan and sync it everywhere \u2014 or jump in as a guest and stay fully on this device."
-          : "Create a free account to sync your plans, progress, notes, and journal across devices. Local mode keeps working fine without one."}
+          ? "Sign in or create a free account to build a plan and sync everywhere — or continue as a guest on this device."
+          : "Create a free account to sync plans, progress, notes, and journal across devices. Local mode still works without one."}
       </p>
 
-      <div className="gen-field">
-        <div className="seg-row">
-          <button
-            type="button"
-            className={classNames("seg-btn", mode === "signin" && "seg-btn-active")}
-            onClick={() => {
-              setMode("signin");
-              setError(null);
-            }}
-          >
-            Sign in
-          </button>
-          <button
-            type="button"
-            className={classNames("seg-btn", mode === "signup" && "seg-btn-active")}
-            onClick={() => {
-              setMode("signup");
-              setError(null);
-            }}
-          >
-            Create account
-          </button>
-        </div>
+      <div className="account-tabs" role="tablist" aria-label="Account mode">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "signin"}
+          className={classNames("account-tab", mode === "signin" && "account-tab-active")}
+          onClick={() => {
+            setMode("signin");
+            setError(null);
+          }}
+        >
+          Sign in
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "signup"}
+          className={classNames("account-tab", mode === "signup" && "account-tab-active")}
+          onClick={() => {
+            setMode("signup");
+            setError(null);
+          }}
+        >
+          Create account
+        </button>
       </div>
 
-      <form onSubmit={submit}>
+      <form className="account-form" onSubmit={submit}>
         {mode === "signup" && (
-          <div className="gen-field">
-            <label className="gen-label">Name (optional)</label>
+          <div className="account-field">
+            <label className="account-label" htmlFor="account-name">
+              Name <span className="account-optional">(optional)</span>
+            </label>
             <input
-              className="settings-input"
+              id="account-name"
+              className="account-input"
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoComplete="name"
             />
           </div>
         )}
-        <div className="gen-field">
-          <label className="gen-label">Email</label>
+        <div className="account-field">
+          <label className="account-label" htmlFor="account-email">
+            Email
+          </label>
           <input
-            className="settings-input"
+            id="account-email"
+            className="account-input"
             type="email"
             required
             value={email}
@@ -170,10 +194,13 @@ export function AccountPanel({
             autoComplete="email"
           />
         </div>
-        <div className="gen-field">
-          <label className="gen-label">Password</label>
+        <div className="account-field">
+          <label className="account-label" htmlFor="account-password">
+            Password
+          </label>
           <input
-            className="settings-input"
+            id="account-password"
+            className="account-input"
             type="password"
             required
             minLength={8}
@@ -181,14 +208,14 @@ export function AccountPanel({
             onChange={(e) => setPassword(e.target.value)}
             autoComplete={mode === "signup" ? "new-password" : "current-password"}
           />
-          {mode === "signup" && <div className="gen-hint">At least 8 characters.</div>}
+          {mode === "signup" && <div className="account-hint">At least 8 characters.</div>}
         </div>
 
-        <div className="panel-actions">
-          <button className="primary-btn" type="submit" disabled={busy}>
+        <div className="account-actions">
+          <button className="account-btn account-btn-primary" type="submit" disabled={busy}>
             {busy ? "Working…" : mode === "signup" ? "Create account" : "Sign in"}
           </button>
-          <button className="secondary-btn" type="button" onClick={onClose}>
+          <button className="account-btn account-btn-ghost" type="button" onClick={onClose}>
             Cancel
           </button>
         </div>
@@ -196,15 +223,17 @@ export function AccountPanel({
 
       {showGuestOption && (
         <>
-          <div className="empty-plans-or"><span>or</span></div>
-          <button type="button" className="secondary-btn guest-btn" onClick={onGuest}>
+          <div className="account-or">
+            <span>or</span>
+          </div>
+          <button type="button" className="account-btn account-btn-guest" onClick={onGuest}>
             Continue as a guest
           </button>
         </>
       )}
 
       {error && (
-        <div className="settings-test settings-test-err">
+        <div className="account-error" role="alert">
           <Icon.X size={14} /> {error}
         </div>
       )}

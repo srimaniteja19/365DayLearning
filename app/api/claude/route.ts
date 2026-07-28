@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { hasDatabase } from "@/lib/db/client";
+import { requireManagedAiTier, reserveAiActionQuota } from "@/lib/db/subscriptionQuota";
 
 const DEFAULT_MODEL = "claude-sonnet-4-6";
 const MAX_PROMPT_CHARS = 40_000;
@@ -56,6 +59,11 @@ function isSameOrigin(req: NextRequest): boolean {
 type ClaudeRequestBody = {
   prompt?: unknown;
   maxTokens?: unknown;
+  /** "plan" = one of the many calls inside a single plan-builder generation
+   *  (quota already reserved once via /api/subscription/reserve-plan);
+   *  anything else = a standalone AI action (quiz, notes, LinkedIn draft,
+   *  journal insight, daily briefing) checked/incremented right here. */
+  kind?: unknown;
 };
 
 export async function POST(req: NextRequest) {
@@ -103,6 +111,29 @@ export async function POST(req: NextRequest) {
       : 1000;
   const maxTokens = Math.min(Math.max(requested, 64), MAX_TOKENS_CAP);
   const model = process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
+
+  // This route doubles as: (a) a simple same-origin+IP-rate-limited fallback
+  // for self-hosted setups with no accounts configured at all, and (b) the
+  // managed-AI path for paid subscribers once accounts *are* configured. Only
+  // gate on subscription state in case (b) — case (a) keeps working exactly
+  // as before so a bare ANTHROPIC_API_KEY deploy doesn't need the whole
+  // accounts/billing stack.
+  if (hasDatabase()) {
+    const session = await auth();
+    const userId = session?.user?.id;
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Sign in required for managed AI. Add your own API key instead, or sign in and upgrade." },
+        { status: 401 },
+      );
+    }
+    const kind = body.kind === "plan" ? "plan" : "action";
+    const result =
+      kind === "plan" ? await requireManagedAiTier(userId) : await reserveAiActionQuota(userId);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.message }, { status: result.status });
+    }
+  }
 
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {

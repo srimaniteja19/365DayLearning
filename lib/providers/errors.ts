@@ -50,6 +50,14 @@ export class ContentError extends ProviderError {
   }
 }
 
+/** Raised when a managed-AI (no-BYOK-key) request is blocked by sign-in state or subscription quota. */
+export class SubscriptionError extends ProviderError {
+  constructor(message = "Add your own API key, or upgrade your plan for managed AI.", status = 402) {
+    super(message, "subscription", status);
+    this.name = "SubscriptionError";
+  }
+}
+
 export function mapHttpError(status: number, bodyText: string, retryAfterHeader?: string | null): ProviderError {
   const snippet = bodyText.slice(0, 240).trim();
   if (status === 401 || status === 403) {

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { stripFences } from "@/lib/stripFences";
-import { chat } from "@/lib/claude-client";
+import { chat, willUseManagedAi } from "@/lib/claude-client";
+import { reservePlanGeneration } from "@/lib/subscriptions";
 import {
   buildPeriodScopes,
   draftToPlanRequest,
@@ -240,6 +241,14 @@ export type GeneratePlanOptions = {
 
 export async function generatePlan(opts: GeneratePlanOptions): Promise<Plan> {
   const { draft, signal, onProgress } = opts;
+
+  // Only the first attempt at a plan (not a resume of an interrupted one)
+  // consumes a monthly slot, and only when this will actually use managed
+  // (server-key) AI rather than the caller's own BYOK key.
+  if (!opts.resume && willUseManagedAi()) {
+    await reservePlanGeneration(signal);
+  }
+
   const meta = draftToPlanRequest(draft);
   const domainIds = draft.domains.map((d) => d.id);
   const exclusions = meta.exclusions || [];
@@ -419,7 +428,7 @@ Rules:
 - Themes should reflect progression toward the goal.
 ${priorErrors?.length ? `\nPrevious outline failed validation:\n${priorErrors.join("\n")}\nReturn a corrected outline JSON only.` : ""}`;
 
-  const raw = await chat({ prompt, maxTokens: 2500, temperature: 0.3, signal });
+  const raw = await chat({ prompt, maxTokens: 2500, temperature: 0.3, signal, kind: "plan" });
   return parseJsonWithRepair(raw, outlineSchema, async (error, bad) => {
     return chat({
       prompt: `Fix this JSON to match {"periods":[{"label","theme","start","end","domainMix"?}]}.
@@ -430,6 +439,7 @@ Return corrected JSON only.`,
       maxTokens: 2500,
       temperature: 0,
       signal,
+      kind: "plan",
     });
   }).then((v) => v.periods);
 }
@@ -461,7 +471,7 @@ Already generated topics (avoid repeats):
 ${compactTopicList(topicsSoFar)}
 ${violations?.length ? `\nPrevious attempt failed:\n${violations.map((v) => v.message).join("\n")}\nReturn corrected JSON only for this period.` : ""}`;
 
-  const raw = await chat({ prompt, maxTokens: 3500, temperature: 0.4, signal });
+  const raw = await chat({ prompt, maxTokens: 3500, temperature: 0.4, signal, kind: "plan" });
   const parsed = await parseJsonWithRepair(raw, periodDaysSchema, async (error, bad) => {
     return chat({
       prompt: `Fix JSON to {"days":[{"day":number,"topics":string[],"domains"?:string[]}]}.
@@ -472,6 +482,7 @@ Return corrected JSON only.`,
       maxTokens: 3500,
       temperature: 0,
       signal,
+      kind: "plan",
     });
   });
   return parsed.days;

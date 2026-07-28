@@ -94,7 +94,7 @@ export default function DualTrackConsole() {
   const [srs, setSrs] = useState({});
   const [log, setLog] = useState([]);
   const [modal, setModal] = useState(null);
-  const [themeKey, setThemeKey] = useState("terminal");
+  const [themeKey, setThemeKey] = useState("bloom");
   const [fontKey, setFontKey] = useState(DEFAULT_FONT_KEY);
   const [saveStatus, setSaveStatus] = useState("loading");
   const [confirmReset, setConfirmReset] = useState(false);
@@ -174,7 +174,7 @@ export default function DualTrackConsole() {
     resolvePendingAuthAction();
   }, [resolvePendingAuthAction]);
 
-  const theme = THEMES[themeKey] || THEMES.terminal;
+  const theme = THEMES[themeKey] || THEMES.bloom;
   const fontPack = FONT_PACKS[fontKey] || FONT_PACKS[DEFAULT_FONT_KEY];
   const domainColors = DOMAIN_PALETTES[theme.palette];
   const rootStyle = { ...themeVars(theme), ...fontVars(fontPack) };
@@ -830,9 +830,20 @@ export default function DualTrackConsole() {
           totalDays: globalStats.totalDaysAll,
         }
       : null;
+    // Landing always uses Bloom so the marketing page reads as one bright
+    // composition — dashboard keeps the user's chosen theme separately.
+    const homeTheme = THEMES.bloom;
+    const homeStyle = { ...themeVars(homeTheme), ...fontVars(fontPack) };
     return (
-      <div className="app-root" style={rootStyle}>
-        <BackgroundFX accent={theme.accents.main} effects={theme.effects} />
+      <div
+        className={classNames(
+          "app-root",
+          "landing-root",
+          homeTheme.mode === "light" && "is-light",
+          !homeTheme.effects && "no-fx",
+        )}
+        style={homeStyle}
+      >
         <HomeView
           hasCampaign={!!campaign}
           summary={homeSummary}
@@ -840,6 +851,7 @@ export default function DualTrackConsole() {
           onAddExample={addExamplePlan}
           onOpenBuilder={() => requireAuth(() => setModal({ kind: "builder" }))}
           onOpenAccount={() => setModal({ kind: "account" })}
+          onOpenPricing={() => setModal({ kind: "pricing" })}
           accountLabel={session?.user?.email || null}
           onRequireAuth={requireAuth}
           onGoDashboard={() => setPage("dashboard")}
@@ -863,6 +875,8 @@ export default function DualTrackConsole() {
             activePlanId={activePlanId}
             onAccountAuthenticated={handleAccountAuthenticated}
             onAccountGuest={handleContinueAsGuest}
+            onOpenAccount={() => setModal({ kind: "account" })}
+            onOpenPricing={() => setModal({ kind: "pricing" })}
             onPlanCreated={(plan) => {
               setPlans((prev) => ({ ...prev, [plan.id]: plan }));
               setActivePlanId(plan.id);
@@ -911,6 +925,7 @@ export default function DualTrackConsole() {
           badgeCount={badgeStatuses.filter((s) => s.unlocked).length}
           badgeTotal={badgeStatuses.length}
           onGoHome={() => setPage("home")}
+          onOpenPricing={() => setModal({ kind: "pricing" })}
         />
         <PlanSwitcher
           active={activePlanId}
@@ -1078,6 +1093,8 @@ export default function DualTrackConsole() {
             plans={plans}
             activePlanId={activePlanId}
             badgeStatuses={badgeStatuses}
+            onOpenAccount={() => setModal({ kind: "account" })}
+            onOpenPricing={() => setModal({ kind: "pricing" })}
             onPlanCreated={(plan) => {
               setPlans((prev) => ({ ...prev, [plan.id]: plan }));
               setActivePlanId(plan.id);

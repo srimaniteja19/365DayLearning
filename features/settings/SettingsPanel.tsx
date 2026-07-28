@@ -55,14 +55,17 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="settings-panel">
-      <p className="panel-copy">
-        Bring your own key. Calls go from this browser to the provider you choose.
-        Keys stay in memory unless you opt in to remember them on this device.
+      <p className="settings-lead">
+        Bring your own key. Calls go from this browser to the provider you choose. Keys stay in
+        memory unless you opt in to remember them on this device.
       </p>
 
-      <div className="gen-field">
-        <label className="gen-label">Provider</label>
+      <div className="settings-field">
+        <label className="settings-label" htmlFor="settings-provider">
+          Provider
+        </label>
         <select
+          id="settings-provider"
           className="settings-input"
           value={creds.providerId}
           onChange={(e) => onProviderChange(e.target.value as ProviderId)}
@@ -78,14 +81,14 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
         </a>
       </div>
 
-      <div className="gen-field">
-        <label className="gen-label">Model</label>
-        <div className="seg-row">
+      <div className="settings-field">
+        <label className="settings-label">Model</label>
+        <div className="settings-model-row">
           {provider.models.map((m) => (
             <button
               key={m}
               type="button"
-              className={classNames("seg-btn", creds.model === m && "seg-btn-active")}
+              className={classNames("settings-chip", creds.model === m && "settings-chip-active")}
               onClick={() => update({ model: m })}
             >
               {m}
@@ -102,10 +105,13 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
       </div>
 
       {provider.needsKey && (
-        <div className="gen-field">
-          <label className="gen-label">API key</label>
+        <div className="settings-field">
+          <label className="settings-label" htmlFor="settings-key">
+            API key
+          </label>
           <div className="settings-key-row">
             <input
+              id="settings-key"
               className="settings-input"
               type={reveal ? "text" : "password"}
               value={creds.apiKey || ""}
@@ -114,19 +120,22 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
               autoComplete="off"
               spellCheck={false}
             />
-            <button type="button" className="secondary-btn" onClick={() => setReveal((v) => !v)}>
+            <button type="button" className="settings-btn settings-btn-ghost" onClick={() => setReveal((v) => !v)}>
               {reveal ? "Hide" : "Show"}
             </button>
           </div>
           {creds.remember && creds.apiKey && (
-            <div className="gen-hint">Stored on this device as {maskApiKey(creds.apiKey)}</div>
+            <div className="settings-hint">Stored on this device as {maskApiKey(creds.apiKey)}</div>
           )}
         </div>
       )}
 
-      <div className="gen-field">
-        <label className="gen-label">Base URL (optional)</label>
+      <div className="settings-field">
+        <label className="settings-label" htmlFor="settings-base">
+          Base URL <span className="settings-optional">(optional)</span>
+        </label>
         <input
+          id="settings-base"
           className="settings-input"
           value={creds.baseUrl || ""}
           onChange={(e) => update({ baseUrl: e.target.value })}
@@ -144,21 +153,21 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
           />
           <span>
             Remember this key on this device.
-            <span className="gen-hint">
+            <span className="settings-hint">
               {" "}
-              Anyone with this browser profile, and any script on this page, can read a stored key.
-              Prefer a key scoped to Refrainly with a spend limit.
+              Anyone with this browser profile can read a stored key. Prefer a scoped key with a
+              spend limit.
             </span>
           </span>
         </label>
       )}
 
-      <div className="panel-actions">
-        <button className="primary-btn" type="button" onClick={runTest} disabled={testing}>
+      <div className="settings-actions">
+        <button className="settings-btn settings-btn-primary" type="button" onClick={runTest} disabled={testing}>
           {testing ? "Testing…" : "Test connection"}
         </button>
         <button
-          className="secondary-btn"
+          className="settings-btn settings-btn-ghost"
           type="button"
           onClick={() => {
             forgetCredentials();
@@ -167,13 +176,19 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
         >
           Forget key
         </button>
-        <button className="secondary-btn" type="button" onClick={onClose}>
+        <button className="settings-btn settings-btn-solid" type="button" onClick={onClose}>
           Done
         </button>
       </div>
 
       {testResult && (
-        <div className={classNames("settings-test", testResult.ok ? "settings-test-ok" : "settings-test-err")}>
+        <div
+          className={classNames(
+            "settings-test",
+            testResult.ok ? "settings-test-ok" : "settings-test-err",
+          )}
+          role="status"
+        >
           {testResult.ok ? (
             <>
               <Icon.Check size={14} /> Connected · {testResult.latencyMs}ms · model{" "}

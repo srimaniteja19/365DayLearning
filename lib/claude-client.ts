@@ -1,20 +1,38 @@
 import { getProvider } from "@/lib/providers/index";
 import { getCredentials } from "@/lib/providers/credentials";
 import type { ChatRequest } from "@/lib/providers/types";
-import { AuthError, ProviderError } from "@/lib/providers/errors";
+import { AuthError, ProviderError, SubscriptionError } from "@/lib/providers/errors";
+
+export type ChatKind = "plan" | "action";
+
+/**
+ * True when the next `chat()` call (with no BYOK key set) would route
+ * through the server-managed `/api/claude` proxy rather than failing with
+ * "add a key". Exported so `generatePlan()` can decide up front whether to
+ * reserve plan-generation quota before making any of its many chat() calls.
+ */
+export function willUseManagedAi(): boolean {
+  const creds = getCredentials();
+  const provider = getProvider(creds.providerId);
+  return provider.needsKey && !creds.apiKey?.trim() && provider.id === "anthropic";
+}
 
 /**
  * Chat through the active BYOK provider.
- * Falls back to the server `/api/claude` proxy only when Anthropic is selected
- * and no browser key is set (uses server env key).
+ * Falls back to the server `/api/claude` proxy only when Anthropic is
+ * selected and no browser key is set — that proxy is either a simple
+ * same-origin fallback (no accounts configured) or gated by subscription
+ * tier + quota (accounts configured), depending on server setup.
  */
-export async function chat(req: Omit<ChatRequest, "prompt"> & { prompt: string }): Promise<string> {
+export async function chat(
+  req: Omit<ChatRequest, "prompt"> & { prompt: string; kind?: ChatKind },
+): Promise<string> {
   const creds = getCredentials();
   const provider = getProvider(creds.providerId);
 
   if (provider.needsKey && !creds.apiKey?.trim()) {
     if (provider.id === "anthropic") {
-      return chatViaServerProxy(req.prompt, req.maxTokens, req.signal);
+      return chatViaServerProxy(req.prompt, req.maxTokens, req.signal, req.kind ?? "action");
     }
     throw new AuthError(`Add an API key for ${provider.label} in Settings.`);
   }
@@ -40,17 +58,24 @@ export async function callClaude(prompt: string, maxTokens?: number, signal?: Ab
   return chat({ prompt, maxTokens: maxTokens ?? 1000, signal });
 }
 
-async function chatViaServerProxy(prompt: string, maxTokens?: number, signal?: AbortSignal): Promise<string> {
+async function chatViaServerProxy(
+  prompt: string,
+  maxTokens?: number,
+  signal?: AbortSignal,
+  kind: ChatKind = "action",
+): Promise<string> {
   const res = await fetch("/api/claude", {
     method: "POST",
     signal,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, maxTokens: maxTokens ?? 1000 }),
+    body: JSON.stringify({ prompt, maxTokens: maxTokens ?? 1000, kind }),
   });
 
   const data = (await res.json().catch(() => ({}))) as { text?: string; error?: string };
   if (!res.ok) {
-    if (res.status === 401 || res.status === 403) throw new AuthError(data.error);
+    if (res.status === 401) throw new SubscriptionError(data.error, 401);
+    if (res.status === 402 || res.status === 429) throw new SubscriptionError(data.error, res.status);
+    if (res.status === 403) throw new AuthError(data.error);
     if (res.status === 503) {
       throw new AuthError(
         data.error || "No server Anthropic key. Add ANTHROPIC_API_KEY or paste a key in Settings.",

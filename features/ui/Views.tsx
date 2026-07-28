@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect, useContext } from "react";
+import { useSession } from "next-auth/react";
 import DOMAIN_META from "@/data/domains.json";
 import { Icon } from "@/components/Icon";
 import { classNames } from "@/lib/classNames";
@@ -13,6 +14,12 @@ import {
   FONT_PACKS,
 } from "@/theme/fonts";
 import { callClaude } from "@/lib/claude-client";
+import {
+  SUBSCRIPTION_TIERS,
+  TIER_ORDER,
+  fetchSubscriptionStatus,
+  requestUpgrade,
+} from "@/lib/subscriptions";
 import { stripFences } from "@/lib/stripFences";
 import { downloadText, copyText } from "@/lib/fileIo";
 import { buildMarkdown } from "@/lib/markdown";
@@ -48,7 +55,7 @@ export function BackgroundFX({ accent, effects }) {
       <div className="bg-grid" />
       <div
         className="bg-glow"
-        style={{ background: `radial-gradient(620px circle at 20% 0%, ${hexToRgba(accent, effects ? 0.14 : 0.04)}, transparent 62%)` }}
+        style={{ background: `radial-gradient(520px circle at 18% 0%, ${hexToRgba(accent, effects ? 0.08 : 0.03)}, transparent 58%)` }}
       />
       <div className="bg-scanline" />
     </div>
@@ -65,7 +72,7 @@ const SAVE_COPY = {
   off: "Storage unavailable - this session only",
 };
 
-export function SaveIndicator({ status }) {
+export function SaveIndicator({ status, compact = false }) {
   const label = status === "saving" ? "Saving…"
     : status === "saved" ? "Saved"
     : status === "error" ? "Not saved"
@@ -73,9 +80,18 @@ export function SaveIndicator({ status }) {
     : status === "off" ? "Session only"
     : "Autosaved";
   return (
-    <div className={classNames("stat-chip", "save-chip", `save-${status}`)} title={SAVE_COPY[status]}>
+    <div
+      className={classNames(
+        "stat-chip",
+        "save-chip",
+        `save-${status}`,
+        compact && "save-chip-compact",
+      )}
+      title={SAVE_COPY[status]}
+      aria-label={SAVE_COPY[status]}
+    >
       <span className="save-dot" />
-      <span className="stat-chip-val">{label}</span>
+      {!compact && <span className="stat-chip-val">{label}</span>}
     </div>
   );
 }
@@ -236,6 +252,7 @@ export function TopBar({
   badgeCount,
   badgeTotal,
   onGoHome,
+  onOpenPricing,
 }) {
   const pct = stats.need ? Math.min(100, Math.round((stats.into / stats.need) * 100)) : 0;
   return (
@@ -247,75 +264,91 @@ export function TopBar({
         </button>
         <span className="brand-sub">daily learning campaigns</span>
       </div>
+
       <div className="topbar-right">
-        <button className="stat-chip data-btn" onClick={onGoHome} title="Back to home">
-          <Icon.Home size={13} />
-          <span className="stat-chip-val">Home</span>
-        </button>
-        <button className="stat-chip data-btn" onClick={onNewPlan} title="Create a custom plan">
-          <Icon.Target size={13} />
-          <span className="stat-chip-val">New</span>
-        </button>
-        <button className="stat-chip data-btn" onClick={onOpenSettings} title="AI provider and API key">
-          <Icon.Cloud size={13} />
-          <span className="stat-chip-val">AI</span>
-        </button>
-        <button className="stat-chip data-btn" onClick={onOpenData} title="Export or import your data">
-          <Icon.Download size={13} />
-          <span className="stat-chip-val">Data</span>
-        </button>
-        <button
-          className={classNames("stat-chip data-btn", accountLabel && "account-btn-active")}
-          onClick={onOpenAccount}
-          title={accountLabel ? `Signed in as ${accountLabel}` : "Sign in to sync across devices"}
-        >
-          <Icon.User size={13} />
-          <span className="stat-chip-val">{accountLabel ? "Account" : "Sign in"}</span>
-        </button>
-        <button
-          className="stat-chip data-btn"
-          onClick={onOpenBadges}
-          title={`${badgeCount} of ${badgeTotal} badges unlocked`}
-        >
-          <Icon.Medal size={13} />
-          <span className="stat-chip-val">{badgeCount}/{badgeTotal}</span>
-        </button>
-        <ThemePicker themeKey={themeKey} setThemeKey={setThemeKey} />
-        <FontPicker fontKey={fontKey} setFontKey={setFontKey} />
-        <SaveIndicator status={saveStatus} />
-        {noteCount > 0 && (
-          <div className="stat-chip" title={`${noteCount} ${noteCount === 1 ? "day has" : "days have"} notes`}>
-            <Icon.Note size={13} />
-            <span className="stat-chip-val">{noteCount}</span>
-          </div>
-        )}
-        <div className="stat-chip">
-          <Icon.Trophy size={14} />
-          <span className="stat-chip-label">RANK</span>
-          <span className="stat-chip-val">{stats.rank}</span>
-        </div>
-        <div className="stat-chip level-chip">
-          <span className="level-badge">LV {stats.level}</span>
-          <div className="xp-bar-mini">
-            <div className="xp-bar-mini-fill" style={{ width: pct + "%" }} />
-          </div>
-          <span className="stat-chip-val">{stats.into}/{stats.need} XP</span>
-        </div>
-        <div className="stat-chip">
-          <Icon.Bolt size={14} />
-          <span className="stat-chip-val">{stats.xp.toLocaleString()} XP</span>
-        </div>
-        {confirmReset ? (
-          <div className="reset-confirm">
-            <span>Erase all progress and notes?</span>
-            <button className="reset-yes" onClick={onReset}>Erase</button>
-            <button className="reset-no" onClick={() => setConfirmReset(false)}>Keep</button>
-          </div>
-        ) : (
-          <button className="stat-chip reset-btn" onClick={() => setConfirmReset(true)} title="Reset all progress and notes">
-            <Icon.Rotate size={13} />
+        <nav className="topbar-cluster" aria-label="Workspace">
+          <button className="topbar-item" type="button" onClick={onNewPlan} title="Create a custom plan">
+            <Icon.Target size={13} />
+            <span>New</span>
           </button>
-        )}
+          <button className="topbar-item" type="button" onClick={onOpenSettings} title="AI provider and API key">
+            <Icon.Cloud size={13} />
+            <span>AI</span>
+          </button>
+          <button className="topbar-item" type="button" onClick={onOpenPricing} title="Plans, pricing, and usage">
+            <Icon.Sparkle size={13} />
+            <span>Plans</span>
+          </button>
+          <button className="topbar-item" type="button" onClick={onOpenData} title="Export or import your data">
+            <Icon.Download size={13} />
+            <span>Data</span>
+          </button>
+          <button
+            className={classNames("topbar-item", accountLabel && "topbar-item-active")}
+            type="button"
+            onClick={onOpenAccount}
+            title={accountLabel ? `Signed in as ${accountLabel}` : "Sign in to sync across devices"}
+          >
+            <Icon.User size={13} />
+            <span>{accountLabel ? "Account" : "Sign in"}</span>
+          </button>
+          <button
+            className="topbar-item"
+            type="button"
+            onClick={onOpenBadges}
+            title={`${badgeCount} of ${badgeTotal} badges unlocked`}
+          >
+            <Icon.Medal size={13} />
+            <span>{badgeCount}/{badgeTotal}</span>
+          </button>
+        </nav>
+
+        <div className="topbar-cluster topbar-cluster-look" aria-label="Appearance">
+          <ThemePicker themeKey={themeKey} setThemeKey={setThemeKey} />
+          <FontPicker fontKey={fontKey} setFontKey={setFontKey} />
+        </div>
+
+        <div className="topbar-cluster topbar-cluster-status" aria-label="Progress">
+          <SaveIndicator status={saveStatus} compact />
+          {noteCount > 0 && (
+            <div
+              className="topbar-item topbar-item-static"
+              title={`${noteCount} ${noteCount === 1 ? "day has" : "days have"} notes`}
+            >
+              <Icon.Note size={13} />
+              <span>{noteCount}</span>
+            </div>
+          )}
+          <div
+            className="topbar-item topbar-item-static topbar-progress"
+            title={`${stats.rank} · Level ${stats.level} · ${stats.xp.toLocaleString()} total XP`}
+          >
+            <Icon.Trophy size={13} />
+            <span className="topbar-rank">{stats.rank}</span>
+            <span className="level-badge">LV {stats.level}</span>
+            <div className="xp-bar-mini" aria-hidden="true">
+              <div className="xp-bar-mini-fill" style={{ width: pct + "%" }} />
+            </div>
+            <span className="topbar-xp">{stats.into}/{stats.need}</span>
+            <span className="topbar-xp-total">{stats.xp.toLocaleString()} XP</span>
+          </div>
+          {confirmReset ? (
+            <div className="reset-confirm">
+              <span>Erase all?</span>
+              <button className="reset-yes" type="button" onClick={onReset}>Erase</button>
+              <button className="reset-no" type="button" onClick={() => setConfirmReset(false)}>Keep</button>
+            </div>
+          ) : (
+            <button
+              className="topbar-item topbar-item-icon reset-btn"
+              type="button"
+              onClick={() => setConfirmReset(true)}
+              title="Reset all progress and notes"
+            >
+              <Icon.Rotate size={13} />
+            </button>
+          )}
+        </div>
       </div>
     </header>
   );
@@ -420,47 +453,117 @@ export function CampaignSwitcher(props) {
 /* ============================== LANDING PAGE ============================== */
 const LANDING_FEATURES = [
   {
+    id: "roadmaps",
+    tone: "blue",
+    icon: Icon.Target,
+    title: "Day-by-day roadmaps",
+    copy: "Start from example campaigns or generate a custom plan with outline, periods, and edit-before-save.",
+  },
+  {
+    id: "multiplan",
+    tone: "ink",
+    icon: Icon.LayoutDashboard,
+    title: "Multi-plan campaigns",
+    copy: "Run several learning plans at once and switch between them without losing progress.",
+  },
+  {
+    id: "xp",
+    tone: "pink",
+    icon: Icon.Bolt,
+    title: "XP, levels & ranks",
+    copy: "Earn XP for completed topics, level up, and climb from Recruit toward Architect.",
+  },
+  {
     id: "streaks",
-    tone: "mint",
+    tone: "blue",
     icon: Icon.Flame,
-    title: "Level up daily",
-    copy: "Complete topics, keep your streak alive, and climb from Recruit to Architect as you earn XP.",
+    title: "Daily streaks",
+    copy: "Keep a calendar streak alive by showing up and completing today's mission.",
   },
   {
     id: "srs",
-    tone: "sky",
+    tone: "ink",
     icon: Icon.Rotate,
-    title: "Never forget it",
-    copy: "Spaced-repetition reviews resurface topics right before you'd actually forget them.",
+    title: "Spaced repetition",
+    copy: "Reviews resurface topics on a schedule so you remember them instead of cramming once.",
+  },
+  {
+    id: "quiz",
+    tone: "pink",
+    icon: Icon.Book,
+    title: "AI quiz & study notes",
+    copy: "Generate recall checks and study notes for any day — bring your own key or use a paid plan.",
+  },
+  {
+    id: "linkedin",
+    tone: "blue",
+    icon: Icon.Send,
+    title: "LinkedIn drafts",
+    copy: "Turn a completed day into a shareable post draft without leaving the campaign.",
   },
   {
     id: "journal",
-    tone: "lilac",
+    tone: "ink",
     icon: Icon.Note,
-    title: "Capture every tangent",
-    copy: "Log the other things you learn today \u2014 markdown notes, rich links, AI-written summaries.",
+    title: "Other things I learned",
+    copy: "A sticky-note journal for tangents — markdown, rich links, and AI-written summaries.",
   },
   {
-    id: "ai",
-    tone: "coral",
+    id: "briefing",
+    tone: "pink",
     icon: Icon.Sparkle,
-    title: "AI-generated roadmaps",
-    copy: "Describe what you want to learn and get a full day-by-day plan, instantly. BYOK, your choice of provider.",
+    title: "Daily briefing",
+    copy: "An AI snapshot of today's topics, due reviews, and related journal context.",
+  },
+  {
+    id: "onthisday",
+    tone: "blue",
+    icon: Icon.Calendar,
+    title: "On this day",
+    copy: "Resurface completed days and journal entries from weeks or months ago.",
   },
   {
     id: "badges",
-    tone: "lemon",
+    tone: "ink",
     icon: Icon.Medal,
     title: "Badges & milestones",
-    copy: "Achievements unlock automatically from your progress, streaks, and reviews \u2014 no extra steps.",
+    copy: "Achievements unlock automatically from progress, streaks, reviews, and journal activity.",
   },
-];
-
-const LANDING_CHIPS = [
-  { id: "streak", tone: "mint", icon: Icon.Flame, label: "12 day streak" },
-  { id: "xp", tone: "sky", icon: Icon.Bolt, label: "+15 XP" },
-  { id: "badge", tone: "lemon", icon: Icon.Medal, label: "Badge unlocked" },
-  { id: "review", tone: "lilac", icon: Icon.Rotate, label: "Review due" },
+  {
+    id: "themes",
+    tone: "pink",
+    icon: Icon.Grid,
+    title: "Themes & type voices",
+    copy: "Eight visual themes and uncommon font voices — including Bloom, Ledger, and Matte Black.",
+  },
+  {
+    id: "sync",
+    tone: "blue",
+    icon: Icon.Cloud,
+    title: "Accounts & cloud sync",
+    copy: "Sign in to sync plans, progress, notes, and journal across devices — or continue as a guest.",
+  },
+  {
+    id: "byok",
+    tone: "ink",
+    icon: Icon.Terminal,
+    title: "Bring your own AI key",
+    copy: "Anthropic, OpenAI, Gemini, OpenRouter, or Ollama — free forever on your own key.",
+  },
+  {
+    id: "plans",
+    tone: "pink",
+    icon: Icon.Trophy,
+    title: "Subscription tiers",
+    copy: "Recruit is free BYOK. Operator and Architect add managed AI with monthly plan and action quotas.",
+  },
+  {
+    id: "export",
+    tone: "blue",
+    icon: Icon.Download,
+    title: "Export & import",
+    copy: "Backup everything, share a plan-only file, or merge another backup without starting over.",
+  },
 ];
 
 export function HomeView({
@@ -473,6 +576,7 @@ export function HomeView({
   accountLabel,
   onRequireAuth,
   onGoDashboard,
+  onOpenPricing,
 }) {
   const [started, setStarted] = useState(false);
   const pickerRef = useRef(null);
@@ -486,136 +590,173 @@ export function HomeView({
   const handleGetStarted = () => onRequireAuth(() => setStarted(true));
   const handleBuildCustom = () => onRequireAuth(onOpenBuilder);
 
-  const chips = summary
-    ? [
-        { id: "streak", tone: "mint", icon: Icon.Flame, label: `${summary.streak} day streak` },
-        { id: "xp", tone: "sky", icon: Icon.Bolt, label: `${summary.xp.toLocaleString()} XP` },
-        { id: "rank", tone: "lemon", icon: Icon.Trophy, label: `LV ${summary.level} · ${summary.rank}` },
-        { id: "days", tone: "lilac", icon: Icon.Calendar, label: `${summary.daysComplete}/${summary.totalDays} days` },
-      ]
-    : LANDING_CHIPS;
-
   return (
     <div className="landing">
       <header className="landing-nav">
-        <div className="landing-brand">
-          <span className="brand-mark">◈</span>
-          <span className="brand-text">REFRAIN<span className="brand-accent">LY</span></span>
+        <div className="landing-brand" aria-label="Refrainly">
+          <span className="landing-brand-mark" aria-hidden="true" />
+          <span className="landing-brand-text">REFRAINLY</span>
         </div>
-        <button type="button" className="landing-signin-btn" onClick={onOpenAccount}>
-          <Icon.User size={13} /> {accountLabel ? "Account" : "Sign in"}
-        </button>
+        <div className="landing-nav-actions">
+          <button type="button" className="landing-nav-link" onClick={onOpenPricing}>
+            Plans
+          </button>
+          <button type="button" className="landing-nav-cta" onClick={onOpenAccount}>
+            {accountLabel ? "Account" : "Sign in"}
+          </button>
+        </div>
       </header>
 
-      <section className="landing-hero">
+      <section className="landing-hero" aria-labelledby="landing-hero-title">
+        <div className="landing-hero-stage" aria-hidden="true">
+          <span className="landing-shape landing-shape-a" />
+          <span className="landing-shape landing-shape-b" />
+          <span className="landing-shape landing-shape-c" />
+          <span className="landing-shape landing-shape-d" />
+        </div>
         <div className="landing-hero-copy">
-          <div className="landing-hero-kicker">
-            {hasCampaign ? "WELCOME BACK" : "SIGN IN OR TRY AS A GUEST"}
-          </div>
+          <p className="landing-brand-hero">REFRAINLY</p>
           {hasCampaign ? (
             <>
-              <h1 className="landing-hero-title">Ready for today&apos;s mission?</h1>
+              <h1 id="landing-hero-title" className="landing-hero-title">
+                Ready for today&apos;s mission?
+              </h1>
               <p className="landing-hero-lead">
-                Pick up where you left off on <strong>{summary.name}</strong> &mdash;{" "}
-                {summary.daysComplete} of {summary.totalDays} days down. Your streak, reviews, and
-                journal are all waiting.
+                Continue <strong>{summary.name}</strong> — {summary.daysComplete} of{" "}
+                {summary.totalDays} days done.
               </p>
               <div className="landing-hero-actions">
                 <button type="button" className="landing-cta" onClick={onGoDashboard}>
-                  Go to dashboard <Icon.LayoutDashboard size={14} />
+                  Go to dashboard
                 </button>
-                <button type="button" className="landing-cta-secondary" onClick={handleGetStarted}>
+                <button type="button" className="landing-cta-ghost" onClick={handleGetStarted}>
                   Add another plan
                 </button>
               </div>
             </>
           ) : (
             <>
-              <h1 className="landing-hero-title">
+              <h1 id="landing-hero-title" className="landing-hero-title">
                 Learn something new.
-                <br />
-                <span className="landing-hero-highlight">Every single day.</span>
+                <span className="landing-hero-line">Every single day.</span>
               </h1>
               <p className="landing-hero-lead">
-                Build a day-by-day learning roadmap, chase streaks and XP, get quizzed with spaced
-                repetition, and journal the tangents &mdash; all in one place.
+                Day-by-day roadmaps, streaks, spaced review, and a journal for the tangents —
+                in one place.
               </p>
               <div className="landing-hero-actions">
                 <button type="button" className="landing-cta" onClick={handleGetStarted}>
-                  Get started <Icon.Bolt size={14} />
+                  Get started
                 </button>
-                <button type="button" className="landing-cta-secondary" onClick={handleBuildCustom}>
+                <button type="button" className="landing-cta-ghost" onClick={handleBuildCustom}>
                   Build a custom plan
                 </button>
               </div>
             </>
           )}
         </div>
-        <div className="landing-hero-art" aria-hidden="true">
-          <div className="landing-orb">
-            <span className="landing-orb-mark">◈</span>
+      </section>
+
+      {hasCampaign && summary && (
+        <section className="landing-stats" aria-label="Your progress">
+          <div className="landing-stat">
+            <span className="landing-stat-val">{summary.streak}</span>
+            <span className="landing-stat-label">day streak</span>
           </div>
-          {chips.map((c, i) => (
-            <div key={c.id} className={classNames("landing-chip", `landing-chip-${i + 1}`, `landing-chip-${c.tone}`)}>
-              <c.icon size={15} /> <span>{c.label}</span>
+          <div className="landing-stat">
+            <span className="landing-stat-val">{summary.xp.toLocaleString()}</span>
+            <span className="landing-stat-label">XP</span>
+          </div>
+          <div className="landing-stat">
+            <span className="landing-stat-val">LV {summary.level}</span>
+            <span className="landing-stat-label">{summary.rank}</span>
+          </div>
+          <div className="landing-stat">
+            <span className="landing-stat-val">
+              {summary.daysComplete}/{summary.totalDays}
+            </span>
+            <span className="landing-stat-label">days</span>
+          </div>
+        </section>
+      )}
+
+      <section className="landing-features" aria-label="Everything included">
+        <div className="landing-features-head">
+          <h2 className="landing-features-title">Everything in Refrainly</h2>
+          <p className="landing-features-lead">
+            Campaigns, memory, AI tools, sync, and themes — one daily learning console.
+          </p>
+        </div>
+        <div className="landing-features-grid">
+          {LANDING_FEATURES.map((f, i) => (
+            <div
+              key={f.id}
+              className={classNames("landing-feature", `landing-feature-${f.tone}`)}
+              style={{ "--i": i }}
+            >
+              <div className="landing-feature-icon" aria-hidden="true">
+                <f.icon size={20} />
+              </div>
+              <div className="landing-feature-body">
+                <h3 className="landing-feature-title">{f.title}</h3>
+                <p className="landing-feature-copy">{f.copy}</p>
+              </div>
             </div>
           ))}
         </div>
       </section>
 
-      {!hasCampaign && (
-        <section className="landing-features">
-          {LANDING_FEATURES.map((f) => (
-            <div key={f.id} className={classNames("landing-feature-card", `landing-feature-${f.tone}`)}>
-              <div className="landing-feature-icon"><f.icon size={19} /></div>
-              <h3 className="landing-feature-title">{f.title}</h3>
-              <p className="landing-feature-copy">{f.copy}</p>
-            </div>
-          ))}
-        </section>
-      )}
-
       {!started && !hasCampaign && (
-        <div className="landing-more">
-          <button type="button" className="landing-cta" onClick={handleGetStarted}>
-            Get started <Icon.Bolt size={14} />
+        <section className="landing-band">
+          <div className="landing-band-copy">
+            <h2 className="landing-band-title">Start your first campaign</h2>
+            <p className="landing-band-lead">Sign in, or continue as a guest — your progress saves either way.</p>
+          </div>
+          <button type="button" className="landing-cta landing-cta-band" onClick={handleGetStarted}>
+            Get started
           </button>
-        </div>
+        </section>
       )}
 
       {started && (
         <section className="landing-picker" ref={pickerRef}>
-          <div className="empty-plans-head">
-            <h2 className="empty-plans-title">
-              {hasCampaign ? "Start a new campaign" : "Start your first campaign"}
+          <div className="landing-picker-head">
+            <h2 className="landing-picker-title">
+              {hasCampaign ? "Start a new campaign" : "Pick a starting plan"}
             </h2>
-            <p className="empty-plans-lead">
-              Add one of these example plans to get going right away, or build a custom roadmap
-              around exactly what you want to learn.
+            <p className="landing-picker-lead">
+              Add an example plan as-is, or build a custom roadmap around what you want to learn.
             </p>
           </div>
-          <div className="empty-plans-grid">
+          <div className="landing-picker-grid">
             {examples.map((p, i) => (
-              <div key={p.id} className={classNames("empty-plan-card", `empty-plan-card-${i % 2 === 0 ? "mint" : "coral"}`)}>
-                <div className="empty-plan-days">{p.totalDays} days · example</div>
-                <h3 className="empty-plan-name">{p.name}</h3>
-                <p className="empty-plan-sub">{p.subtitle}</p>
-                {p.blurb && <p className="empty-plan-blurb">{p.blurb}</p>}
-                <button type="button" className="primary-btn" onClick={() => onAddExample(p.id)}>
-                  <Icon.Check size={13} /> Add this plan
+              <div
+                key={p.id}
+                className={classNames("landing-plan", i % 2 === 0 ? "landing-plan-a" : "landing-plan-b")}
+              >
+                <div className="landing-plan-meta">{p.totalDays} days · example</div>
+                <h3 className="landing-plan-name">{p.name}</h3>
+                <p className="landing-plan-sub">{p.subtitle}</p>
+                {p.blurb && <p className="landing-plan-blurb">{p.blurb}</p>}
+                <button type="button" className="landing-plan-btn" onClick={() => onAddExample(p.id)}>
+                  Add this plan
                 </button>
               </div>
             ))}
           </div>
-          <div className="empty-plans-or"><span>or</span></div>
-          <button type="button" className="secondary-btn empty-plans-builder-btn" onClick={handleBuildCustom}>
-            <Icon.Target size={13} /> Build your own custom plan
+          <div className="landing-picker-or">
+            <span>or</span>
+          </div>
+          <button type="button" className="landing-cta-ghost landing-picker-custom" onClick={handleBuildCustom}>
+            Build your own custom plan
           </button>
         </section>
       )}
 
       <footer className="landing-footer">
-        <span>REFRAINLY · chart the arc · progress and notes save automatically</span>
+        <span>REFRAINLY</span>
+        <span className="landing-footer-dot" aria-hidden="true" />
+        <span>progress saves automatically</span>
       </footer>
     </div>
   );
@@ -800,6 +941,165 @@ export function BadgesPanel({ statuses, onClose }) {
       </div>
       <div className="panel-actions">
         <button className="secondary-btn" type="button" onClick={onClose}>Close</button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================== PRICING ============================== */
+function UsageBar({ label, used, limit }) {
+  if (limit == null) return null;
+  const pct = Math.min(100, Math.round((used / Math.max(limit, 1)) * 100));
+  return (
+    <div className="pricing-usage-row">
+      <div className="pricing-usage-label">
+        <span>{label}</span>
+        <span>{used}/{limit}</span>
+      </div>
+      <div className="pricing-usage-track">
+        <div
+          className={classNames("pricing-usage-fill", pct >= 100 && "pricing-usage-fill-full")}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+export function PricingPanel({ onClose, onOpenAccount }) {
+  const { data: session } = useSession();
+  const [usage, setUsage] = useState(null);
+  const [loadingUsage, setLoadingUsage] = useState(false);
+  const [pendingTier, setPendingTier] = useState(null);
+  const [notice, setNotice] = useState(null);
+
+  useEffect(() => {
+    if (!session?.user) {
+      setUsage(null);
+      return;
+    }
+    let cancelled = false;
+    setLoadingUsage(true);
+    fetchSubscriptionStatus().then((res) => {
+      if (cancelled) return;
+      setLoadingUsage(false);
+      if (res.ok) setUsage(res.usage);
+    });
+    return () => { cancelled = true; };
+  }, [session?.user]);
+
+  const currentTier = usage?.tier || (session?.user ? "free" : null);
+
+  const handleUpgrade = async (tierId) => {
+    if (!session?.user) {
+      onOpenAccount?.();
+      return;
+    }
+    setPendingTier(tierId);
+    setNotice(null);
+    const result = await requestUpgrade(tierId);
+    setPendingTier(null);
+    setNotice(result.error || "Upgraded!");
+  };
+
+  return (
+    <div className="pricing-panel">
+      <div className="pricing-intro">
+        <p className="pricing-intro-lead">
+          Recruit is bring-your-own-key and always unlimited. Operator and Architect add managed
+          AI — no key needed — with a monthly plan and action allowance.
+        </p>
+      </div>
+
+      <div className="pricing-grid">
+        {TIER_ORDER.map((id) => {
+          const tier = SUBSCRIPTION_TIERS[id];
+          const isCurrent = currentTier === id;
+          return (
+            <div
+              key={id}
+              className={classNames(
+                "pricing-card",
+                `pricing-card-${id}`,
+                isCurrent && "pricing-card-current",
+              )}
+            >
+              {isCurrent && <div className="pricing-card-badge">Current</div>}
+              <div className="pricing-card-rank">{tier.rankLabel}</div>
+              <div className="pricing-card-price">
+                {tier.priceMonthlyUsd === 0 ? (
+                  <>Free</>
+                ) : (
+                  <>
+                    <span className="pricing-card-amount">${tier.priceMonthlyUsd}</span>
+                    <span className="pricing-card-period">/mo</span>
+                  </>
+                )}
+              </div>
+              <p className="pricing-card-tagline">{tier.tagline}</p>
+              <ul className="pricing-card-features">
+                {tier.features.map((f) => (
+                  <li key={f}>
+                    <Icon.Check size={13} />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              {id === "free" ? (
+                <div className="pricing-card-static">
+                  {isCurrent ? "Your plan" : "Always available"}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="pricing-card-btn"
+                  disabled={isCurrent || pendingTier === id}
+                  onClick={() => handleUpgrade(id)}
+                >
+                  {isCurrent
+                    ? "Active"
+                    : pendingTier === id
+                      ? "Working…"
+                      : session?.user
+                        ? `Upgrade to ${tier.rankLabel}`
+                        : `Sign in to get ${tier.rankLabel}`}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {session?.user && usage && !loadingUsage && (
+        <div className="pricing-usage">
+          <div className="pricing-usage-title">This period</div>
+          <UsageBar
+            label="AI-generated plans"
+            used={usage.planGenerationsUsed}
+            limit={usage.planGenerationsLimit}
+          />
+          <UsageBar
+            label="AI actions"
+            used={usage.aiActionsUsed}
+            limit={usage.aiActionsLimit}
+          />
+          {(usage.planGenerationsLimit != null || usage.aiActionsLimit != null) && (
+            <div className="pricing-usage-reset">
+              Resets {new Date(usage.periodResetAt).toLocaleDateString()}
+            </div>
+          )}
+          {usage.planGenerationsLimit == null && usage.aiActionsLimit == null && (
+            <div className="pricing-usage-reset">Recruit · unlimited on your own key</div>
+          )}
+        </div>
+      )}
+
+      {notice && <div className="pricing-notice" role="status">{notice}</div>}
+
+      <div className="pricing-actions">
+        <button className="pricing-close" type="button" onClick={onClose}>
+          Close
+        </button>
       </div>
     </div>
   );
@@ -1501,7 +1801,7 @@ export function SummaryCard({ label, value, sub, accent }) {
 }
 
 /* ============================== MODALS ============================== */
-export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, progress, srs, log, learned, themeKey, onImport, fireToast, plans, activePlanId, onPlanCreated, badgeStatuses, onAccountAuthenticated, onAccountGuest }) {
+export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, progress, srs, log, learned, themeKey, onImport, fireToast, plans, activePlanId, onPlanCreated, badgeStatuses, onAccountAuthenticated, onAccountGuest, onOpenPricing, onOpenAccount }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKey);
@@ -1517,11 +1817,21 @@ export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, pro
     builder: "New plan",
     account: "Account & sync",
     badges: "Badges",
+    pricing: "Plans & pricing",
   };
 
   return (
     <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className={classNames("modal", modal.kind === "builder" && "modal-wide")} role="dialog" aria-modal="true">
+      <div
+        className={classNames(
+          "modal",
+          (modal.kind === "builder" || modal.kind === "pricing") && "modal-wide",
+          modal.kind === "pricing" && "modal-pricing",
+          modal.kind === "account" && "modal-account",
+        )}
+        role="dialog"
+        aria-modal="true"
+      >
         <div className="modal-head">
           <span className="modal-title">
             {modal.kind === "account" && modal.gated ? "Sign in to continue" : titles[modal.kind]}
@@ -1556,9 +1866,13 @@ export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, pro
               showGuestOption={!!modal.gated}
               onAuthenticated={modal.gated ? onAccountAuthenticated : undefined}
               onGuest={modal.gated ? onAccountGuest : undefined}
+              onViewPricing={onOpenPricing}
             />
           )}
           {modal.kind === "badges" && <BadgesPanel statuses={badgeStatuses} onClose={onClose} />}
+          {modal.kind === "pricing" && (
+            <PricingPanel onClose={onClose} onOpenAccount={onOpenAccount} />
+          )}
           {modal.kind === "notes" && (
             <NotesGenPanel
               day={modal.day}
