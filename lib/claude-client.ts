@@ -32,7 +32,7 @@ export async function chat(
 
   if (provider.needsKey && !creds.apiKey?.trim()) {
     if (provider.id === "anthropic") {
-      return chatViaServerProxy(req.prompt, req.maxTokens, req.signal, req.kind ?? "action");
+      return chatViaServerProxy(req, req.kind ?? "action");
     }
     throw new AuthError(`Add an API key for ${provider.label} in Settings.`);
   }
@@ -59,16 +59,20 @@ export async function callClaude(prompt: string, maxTokens?: number, signal?: Ab
 }
 
 async function chatViaServerProxy(
-  prompt: string,
-  maxTokens?: number,
-  signal?: AbortSignal,
+  req: Omit<ChatRequest, "prompt"> & { prompt: string },
   kind: ChatKind = "action",
 ): Promise<string> {
   const res = await fetch("/api/claude", {
     method: "POST",
-    signal,
+    signal: req.signal,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, maxTokens: maxTokens ?? 1000, kind }),
+    body: JSON.stringify({
+      prompt: req.prompt,
+      system: req.system,
+      maxTokens: req.maxTokens ?? 1000,
+      temperature: req.temperature,
+      kind,
+    }),
   });
 
   const data = (await res.json().catch(() => ({}))) as { text?: string; error?: string };

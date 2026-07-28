@@ -6,6 +6,9 @@ import { requireManagedAiTier, reserveAiActionQuota } from "@/lib/db/subscriptio
 const DEFAULT_MODEL = "claude-sonnet-4-6";
 const MAX_PROMPT_CHARS = 40_000;
 const MAX_TOKENS_CAP = 4096;
+/** Plan generation periods can be large (monthly × 4 topics); allow more headroom. */
+const MAX_TOKENS_CAP_PLAN = 8192;
+const MAX_SYSTEM_CHARS = 8_000;
 const UPSTREAM_TIMEOUT_MS = 60_000;
 
 // Sliding-window rate limit, per IP. In-memory: resets on redeploy and is
@@ -58,7 +61,9 @@ function isSameOrigin(req: NextRequest): boolean {
 
 type ClaudeRequestBody = {
   prompt?: unknown;
+  system?: unknown;
   maxTokens?: unknown;
+  temperature?: unknown;
   /** "plan" = one of the many calls inside a single plan-builder generation
    *  (quota already reserved once via /api/subscription/reserve-plan);
    *  anything else = a standalone AI action (quiz, notes, LinkedIn draft,
@@ -105,11 +110,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "prompt is too long." }, { status: 400 });
   }
 
+  const kind = body.kind === "plan" ? "plan" : "action";
+  const system =
+    typeof body.system === "string" && body.system.trim()
+      ? body.system.trim().slice(0, MAX_SYSTEM_CHARS)
+      : undefined;
+  const temperature =
+    typeof body.temperature === "number" && Number.isFinite(body.temperature)
+      ? Math.min(1, Math.max(0, body.temperature))
+      : undefined;
+
+  const tokenCap = kind === "plan" ? MAX_TOKENS_CAP_PLAN : MAX_TOKENS_CAP;
   const requested =
     typeof body.maxTokens === "number" && Number.isFinite(body.maxTokens)
       ? Math.floor(body.maxTokens)
       : 1000;
-  const maxTokens = Math.min(Math.max(requested, 64), MAX_TOKENS_CAP);
+  const maxTokens = Math.min(Math.max(requested, 64), tokenCap);
   const model = process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
 
   // This route doubles as: (a) a simple same-origin+IP-rate-limited fallback
@@ -127,7 +143,6 @@ export async function POST(req: NextRequest) {
         { status: 401 },
       );
     }
-    const kind = body.kind === "plan" ? "plan" : "action";
     const result =
       kind === "plan" ? await requireManagedAiTier(userId) : await reserveAiActionQuota(userId);
     if (!result.ok) {
@@ -147,6 +162,8 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model,
         max_tokens: maxTokens,
+        ...(system ? { system } : {}),
+        ...(temperature !== undefined ? { temperature } : {}),
         messages: [{ role: "user", content: prompt }],
       }),
     });

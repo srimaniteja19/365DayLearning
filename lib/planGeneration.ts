@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { stripFences } from "@/lib/stripFences";
+import { sanitizeJsonText } from "@/lib/stripFences";
 import { chat, willUseManagedAi } from "@/lib/claude-client";
 import { reservePlanGeneration } from "@/lib/subscriptions";
 import {
@@ -200,7 +200,7 @@ export async function parseJsonWithRepair<T>(
   repair: (error: string, raw: string) => Promise<string>,
 ): Promise<T> {
   const tryParse = (text: string): T => {
-    const cleaned = stripFences(text);
+    const cleaned = sanitizeJsonText(text);
     const data = JSON.parse(cleaned) as unknown;
     return schema.parse(data);
   };
@@ -209,22 +209,63 @@ export async function parseJsonWithRepair<T>(
     return tryParse(raw);
   } catch (first) {
     const msg = first instanceof Error ? first.message : String(first);
-    const repaired = await repair(msg, raw);
+    // Local sanitize may already be enough if the first attempt used a weak path;
+    // give the model the sanitized blob so it isn't fighting fences/prose.
+    const seed = sanitizeJsonText(raw);
+    const repaired = await repair(msg, seed || raw);
     try {
       return tryParse(repaired);
     } catch (second) {
+      const detail = second instanceof Error ? second.message : "JSON repair failed.";
       throw new ContentError(
-        second instanceof Error ? second.message : "JSON repair failed.",
+        `Could not parse the AI response as JSON (${detail}). Try again.`,
       );
     }
   }
 }
 
-function compactTopicList(topics: string[], max = 400): string {
-  if (topics.length <= max) return topics.map((t, i) => `${i + 1}. ${t}`).join("\n");
-  const recent = topics.slice(-max);
-  return `(${topics.length} topics so far; showing most recent ${max})\n` +
-    recent.map((t, i) => `${topics.length - max + i + 1}. ${t}`).join("\n");
+const PLAN_SYSTEM = `You are a senior curriculum designer who builds daily technical learning plans for working engineers.
+Every topic you write names one specific, teachable concept that someone can study in a single sitting and be quizzed on afterward.
+You reply with a single strict JSON object and nothing else: no markdown fences, no prose, no commentary before or after.`;
+
+const REPAIR_SYSTEM = `You repair malformed JSON. You return only the corrected JSON object, preserving as much of the original content as possible.`;
+
+function domainCatalog(draft: BuilderDraft): string {
+  return draft.domains
+    .map((d) => `- ${d.id} — ${d.label} (emphasis: ${d.weight})`)
+    .join("\n");
+}
+
+const INDEX_STOPWORDS = new Set([
+  "the", "and", "for", "with", "from", "into", "your", "that", "this", "using",
+]);
+
+/**
+ * Dedupe context covering the whole plan: recent topics verbatim, older ones
+ * collapsed to a keyword index. Validation rejects duplicates against every
+ * topic generated so far, so the model has to see something for all of them.
+ */
+export function topicIndex(topics: string[], recentMax = 150): string {
+  if (!topics.length) return "(none yet — this is the first period)";
+  const recent = topics.slice(-recentMax);
+  const older = topics.slice(0, Math.max(0, topics.length - recentMax));
+  const parts = [
+    `Most recent ${recent.length} topics, verbatim — do not repeat or rephrase any of these:`,
+    ...recent.map((t) => `- ${t}`),
+  ];
+  if (older.length) {
+    const keywords = Array.from(
+      new Set(
+        older.flatMap((t) => t.toLowerCase().match(/[a-z][a-z0-9+.#-]{2,}/g) || []),
+      ),
+    ).filter((w) => !INDEX_STOPWORDS.has(w));
+    parts.push(
+      "",
+      `The earlier ${older.length} topics already covered these subjects — do not revisit them:`,
+      keywords.join(", "),
+    );
+  }
+  return parts.join("\n");
 }
 
 export type GeneratePlanOptions = {
@@ -315,7 +356,6 @@ export async function generatePlan(opts: GeneratePlanOptions): Promise<Plan> {
         draft,
         meta,
         period,
-        domainIds,
         topicsSoFar: progress.topicsSoFar,
         violations: attempt === 0 ? undefined : lastIssues,
         signal,
@@ -407,33 +447,45 @@ async function fetchOutline(
   signal?: AbortSignal,
   priorErrors?: string[],
 ): Promise<OutlinePeriod[]> {
-  const prompt = `Return ONLY strict JSON (no markdown fences, no prose) with this shape:
-{"periods":[{"label":"Week 1","theme":"one-line theme","start":1,"end":7,"domainMix":["ai-ml"]}]}
+  const prompt = `Produce a learning-plan OUTLINE only — period boundaries and themes, no day topics yet.
 
-Create a learning-plan OUTLINE only (no day topics yet) for:
+Plan
 - Name: ${draft.name}
 - Total days: ${draft.totalDays}
 - Grouping preference: ${draft.grouping}
 - Goal: ${meta.goal}
-- Level: ${meta.level || "unspecified"}
-- Domains (use these ids): ${domainIds.join(", ")}
-- Domain weights: ${draft.domains.map((d) => `${d.id}=${d.weight}`).join(", ")}
-${meta.jobDescription ? `- Job description to weight toward:\n${meta.jobDescription.slice(0, 2500)}` : ""}
-${meta.mustInclude?.length ? `- Must include later (place somewhere sensible): ${meta.mustInclude.join("; ")}` : ""}
-${meta.exclusions?.length ? `- Exclusions: ${meta.exclusions.join("; ")}` : ""}
+- Learner level: ${meta.level || "unspecified"}
 
-Rules:
-- Periods must tile days 1..${draft.totalDays} with no gaps or overlaps.
-- Prefer weekly periods when grouping is weekly; monthly/quarterly when asked.
-- Themes should reflect progression toward the goal.
-${priorErrors?.length ? `\nPrevious outline failed validation:\n${priorErrors.join("\n")}\nReturn a corrected outline JSON only.` : ""}`;
+Domains (use these exact ids in domainMix)
+${domainCatalog(draft)}
+${meta.mustInclude?.length ? `\nMust-include topics — assign each to the period where it fits best:\n${meta.mustInclude.map((m) => `- ${m}`).join("\n")}` : ""}
+${meta.exclusions?.length ? `\nNever cover:\n${meta.exclusions.map((e) => `- ${e}`).join("\n")}` : ""}
 
-  const raw = await chat({ prompt, maxTokens: 2500, temperature: 0.3, signal, kind: "plan" });
+Rules
+- Periods must tile days 1..${draft.totalDays} exactly: first starts at 1, last ends at ${draft.totalDays}, no gaps, no overlaps.
+- Match the grouping preference: weekly means ~7-day periods, monthly ~30, quarterly ~90.
+- Themes must show progression — foundations first, then things that depend on them, then applied or advanced work.
+- domainMix lists the domain ids that period should draw from, ordered by how much time they get. Respect the emphasis levels above across the plan as a whole.
+
+Return exactly this shape:
+{"periods":[{"label":"Week 1","theme":"one-line theme","start":1,"end":7,"domainMix":["distributed-sys","databases"]}]}
+${priorErrors?.length ? `\nYour previous outline was rejected:\n${priorErrors.join("\n")}\nReturn a corrected outline.` : ""}`;
+
+  const raw = await chat({
+    system: PLAN_SYSTEM,
+    prompt,
+    maxTokens: 2500,
+    temperature: 0.3,
+    signal,
+    kind: "plan",
+  });
   return parseJsonWithRepair(raw, outlineSchema, async (error, bad) => {
     return chat({
-      prompt: `Fix this JSON to match {"periods":[{"label","theme","start","end","domainMix"?}]}.
+      system: REPAIR_SYSTEM,
+      prompt: `Fix this into valid JSON matching {"periods":[{"label":"string","theme":"string","start":1,"end":7,"domainMix":["id"]}]}.
+domainMix is optional. Use double quotes only. No trailing commas. No markdown fences.
 Parser error: ${error}
-Raw:
+Broken input:
 ${bad.slice(0, 6000)}
 Return corrected JSON only.`,
       maxTokens: 2500,
@@ -448,38 +500,66 @@ async function fetchPeriodDays(opts: {
   draft: BuilderDraft;
   meta: PlanRequest;
   period: OutlinePeriod;
-  domainIds: string[];
   topicsSoFar: string[];
   violations?: PeriodValidationIssue[];
   signal?: AbortSignal;
 }): Promise<Array<{ day: number; topics: string[]; domains?: string[] }>> {
-  const { draft, meta, period, domainIds, topicsSoFar, violations, signal } = opts;
+  const { draft, meta, period, topicsSoFar, violations, signal } = opts;
   const dayCount = period.end - period.start + 1;
-  const prompt = `Return ONLY strict JSON (no markdown fences):
-{"days":[{"day":${period.start},"topics":["Topic A","Topic B"],"domains":["ai-ml","backend-node"]}]}
+  const maxTokens = Math.min(8000, 600 + dayCount * draft.topicsPerDay * 60);
+  const pending = (meta.mustInclude || []).filter(
+    (m) => !topicsSoFar.some((t) => normalizeTopic(t).includes(normalizeTopic(m))),
+  );
 
-Generate exactly ${dayCount} days for period "${period.label}" (${period.start}-${period.end}).
+  const prompt = `Generate the daily topics for one period of an existing plan.
+
+Period: "${period.label}", days ${period.start}–${period.end} (${dayCount} days)
 Theme: ${period.theme}
-Topics per day: exactly ${draft.topicsPerDay}
-Each topic: 2–10 words, unique across the whole plan.
-Tag each topic with one domain id from: ${domainIds.join(", ")}
-Goal: ${meta.goal}
-Level: ${meta.level || "unspecified"}
-Exclusions (never use): ${(meta.exclusions || []).join("; ") || "(none)"}
-${meta.mustInclude?.length ? `Must-include (place if not already covered): ${meta.mustInclude.join("; ")}` : ""}
-Already generated topics (avoid repeats):
-${compactTopicList(topicsSoFar)}
-${violations?.length ? `\nPrevious attempt failed:\n${violations.map((v) => v.message).join("\n")}\nReturn corrected JSON only for this period.` : ""}`;
+Plan goal: ${meta.goal}
+Learner level: ${meta.level || "unspecified"}
 
-  const raw = await chat({ prompt, maxTokens: 3500, temperature: 0.4, signal, kind: "plan" });
+Domains — tag every topic with exactly one of these ids
+${domainCatalog(draft)}
+${period.domainMix?.length ? `\nThis period should draw mainly from, in order of emphasis: ${period.domainMix.join(", ")}` : ""}
+
+Topic rules
+- Exactly ${dayCount} day objects, numbered ${period.start} through ${period.end}, in order.
+- Exactly ${draft.topicsPerDay} topics per day, each 2–10 words.
+- Each topic names one specific mechanism, technique, or concept — something you could write a quiz question about.
+- No filler or scaffolding topics. Never emit "Review", "Recap", "Catch-up", "Rest day", "Practice session", "Introduction to X", "Overview of X", "Deep dive into X", or "X basics".
+- No duplicates or near-duplicates of anything already covered. Rephrasing an earlier topic counts as a duplicate.
+- Within the period, order topics so prerequisites come before whatever depends on them.
+${pending.length ? `\nStill unplaced must-include topics — work these in here if this period is a sensible home for them:\n${pending.map((m) => `- ${m}`).join("\n")}` : ""}
+${meta.exclusions?.length ? `\nNever cover these subjects, including their sub-topics:\n${meta.exclusions.map((e) => `- ${e}`).join("\n")}` : ""}
+
+Already covered
+${topicIndex(topicsSoFar)}
+
+Expected granularity — match this level of specificity, but do not reuse these topics:
+{"days":[
+  {"day":8,"topics":["Raft leader election and terms","Write-ahead log fsync tradeoffs"],"domains":["distributed-sys","databases"]},
+  {"day":9,"topics":["Quorum reads during network partition","Hinted handoff in Dynamo-style stores"],"domains":["distributed-sys","databases"]}
+]}
+${violations?.length ? `\nYour previous attempt was rejected:\n${violations.map((v) => v.message).join("\n")}\nFix every one of these.` : ""}`;
+
+  const raw = await chat({
+    system: PLAN_SYSTEM,
+    prompt,
+    maxTokens,
+    temperature: 0.4,
+    signal,
+    kind: "plan",
+  });
   const parsed = await parseJsonWithRepair(raw, periodDaysSchema, async (error, bad) => {
     return chat({
-      prompt: `Fix JSON to {"days":[{"day":number,"topics":string[],"domains"?:string[]}]}.
+      system: REPAIR_SYSTEM,
+      prompt: `Fix this into valid JSON matching {"days":[{"day":1,"topics":["Topic A"],"domains":["ai-ml"]}]}.
+domains is optional. Use double quotes only. No trailing commas. No markdown fences.
 Parser error: ${error}
-Raw:
+Broken input:
 ${bad.slice(0, 8000)}
 Return corrected JSON only.`,
-      maxTokens: 3500,
+      maxTokens,
       temperature: 0,
       signal,
       kind: "plan",

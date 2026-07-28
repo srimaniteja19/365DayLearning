@@ -33,7 +33,6 @@ export type PlanRequest = {
   level?: string;
   exclusions?: string[];
   domains?: PlanDomainSpec[];
-  jobDescription?: string;
   mustInclude?: string[];
   totalDays?: number;
   topicsPerDay?: number;

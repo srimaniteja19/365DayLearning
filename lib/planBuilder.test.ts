@@ -37,11 +37,21 @@ describe("plan builder shape helpers", () => {
     d.goal = "Staff backend";
     d.exclusionsText = "HTML basics\n\nCSS intro";
     d.mustIncludeText = "DynamoDB single-table";
-    d.domains = d.domains.slice(0, 2);
+    d.domains = [
+      { id: "backend-node", label: "Node / Nest", weight: "large", color: "#3FE0D0" },
+      { id: "databases", label: "Databases", weight: "medium", color: "#6EE7B7" },
+    ];
     const req = draftToPlanRequest(d);
     expect(req.exclusions).toEqual(["HTML basics", "CSS intro"]);
     expect(req.mustInclude).toEqual(["DynamoDB single-table"]);
     expect(req.domains).toHaveLength(2);
     expect(validateContent(d)).toEqual([]);
+  });
+
+  it("starts with no domains and requires at least one", () => {
+    const d = defaultBuilderDraft();
+    expect(d.domains).toEqual([]);
+    d.goal = "Learn Rust";
+    expect(validateContent(d).some((e) => /domain/i.test(e))).toBe(true);
   });
 });

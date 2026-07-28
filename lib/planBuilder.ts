@@ -1,8 +1,16 @@
 import type { PlanGrouping, PlanPeriod, PlanRequest } from "@/lib/types";
 import { buildWeeks, MONTHS_365, QUARTERS_365 } from "@/data/builtinPlans";
-import DOMAIN_META from "@/data/domains.json";
 
 export type BuilderStep = 1 | 2 | 3 | 4;
+
+export type BuilderDomainWeight = "small" | "medium" | "large";
+
+export type BuilderDomain = {
+  id: string;
+  label: string;
+  weight: BuilderDomainWeight;
+  color: string;
+};
 
 export type BuilderDraft = {
   name: string;
@@ -13,29 +21,20 @@ export type BuilderDraft = {
   goal: string;
   level: string;
   exclusionsText: string;
-  domains: Array<{
-    id: string;
-    label: string;
-    weight: "small" | "medium" | "large";
-    color: string;
-  }>;
-  jobDescription: string;
+  domains: BuilderDomain[];
   mustIncludeText: string;
 };
 
-const DEFAULT_COLORS = [
+export const BUILDER_DOMAIN_COLORS = [
   "#F5A623", "#3FE0D0", "#C792EA", "#6EE7B7", "#60A5FA",
   "#F472B6", "#FB923C", "#EF4444", "#A3E635", "#FACC15", "#94A3B8",
 ];
 
-export function defaultBuilderDraft(): BuilderDraft {
-  const domains = Object.entries(DOMAIN_META).map(([id, meta], i) => ({
-    id,
-    label: (meta as { label: string }).label,
-    weight: "medium" as const,
-    color: DEFAULT_COLORS[i % DEFAULT_COLORS.length],
-  }));
+export function colorForDomainIndex(i: number): string {
+  return BUILDER_DOMAIN_COLORS[i % BUILDER_DOMAIN_COLORS.length];
+}
 
+export function defaultBuilderDraft(): BuilderDraft {
   return {
     name: "",
     subtitle: "",
@@ -45,8 +44,7 @@ export function defaultBuilderDraft(): BuilderDraft {
     goal: "",
     level: "",
     exclusionsText: "",
-    domains,
-    jobDescription: "",
+    domains: [],
     mustIncludeText: "",
   };
 }
@@ -142,7 +140,6 @@ export function draftToPlanRequest(draft: BuilderDraft): PlanRequest {
       weight: d.weight,
       color: d.color,
     })),
-    jobDescription: draft.jobDescription.trim() || undefined,
     mustInclude: linesToList(draft.mustIncludeText),
     totalDays: draft.totalDays,
     topicsPerDay: draft.topicsPerDay,

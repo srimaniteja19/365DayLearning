@@ -2329,6 +2329,25 @@ select.settings-input { cursor: pointer; }
 .builder-pane { display: flex; flex-direction: column; gap: 14px; max-height: 58vh; overflow-y: auto; padding-right: 4px; }
 .builder-textarea { resize: vertical; font-family: var(--sans); line-height: 1.55; }
 .builder-domains { display: flex; flex-direction: column; gap: 8px; }
+.builder-domain-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  flex-wrap: wrap;
+}
+.builder-domain-head .gen-label { margin: 0; }
+.builder-domain-suggest {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 34px; padding: 6px 12px; font-size: 12.5px;
+}
+.builder-domain-suggest:disabled { opacity: 0.55; cursor: not-allowed; }
+.builder-domains-empty {
+  padding: 14px 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-ctl);
+  color: var(--text-faint);
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: center;
+}
 .builder-domain-row {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   padding: 8px 10px; border: 1px solid var(--border-soft); border-radius: var(--r-ctl);

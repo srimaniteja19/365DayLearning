@@ -6,6 +6,8 @@ import { Icon } from "@/components/Icon";
 import {
   type BuilderDraft,
   type BuilderStep,
+  BUILDER_DOMAIN_COLORS,
+  colorForDomainIndex,
   defaultBuilderDraft,
   draftToPlanRequest,
   estimateGeneration,
@@ -21,6 +23,7 @@ import {
   saveGenDraft,
   type GenProgress,
 } from "@/lib/planGeneration";
+import { suggestDomainsFromGoal } from "@/lib/domainSuggest";
 import { ProviderError } from "@/lib/providers/errors";
 import { PlanEditor } from "@/features/planBuilder/PlanEditor";
 
@@ -32,10 +35,6 @@ const GROUPING_OPTS: Array<{ key: PlanGrouping; label: string; hint: string }> =
   { key: "quarterly-monthly", label: "Quarter + month", hint: "Full period tree" },
 ];
 const WEIGHTS = ["small", "medium", "large"] as const;
-const DOMAIN_COLORS = [
-  "#F5A623", "#3FE0D0", "#C792EA", "#6EE7B7", "#60A5FA",
-  "#F472B6", "#FB923C", "#EF4444", "#A3E635", "#FACC15",
-];
 
 type Props = {
   onClose: () => void;
@@ -52,7 +51,10 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
   const [genError, setGenError] = useState("");
   const [running, setRunning] = useState(false);
   const [editablePlan, setEditablePlan] = useState<Plan | null>(null);
+  const [suggestingDomains, setSuggestingDomains] = useState(false);
+  const [domainSuggestError, setDomainSuggestError] = useState("");
   const abortRef = useRef<AbortController | null>(null);
+  const domainSuggestAbortRef = useRef<AbortController | null>(null);
   const draftRef = useRef(draft);
 
   useEffect(() => {
@@ -66,7 +68,6 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
   const dirty =
     draft.name.trim() !== "" ||
     draft.goal.trim() !== "" ||
-    draft.jobDescription.trim() !== "" ||
     running ||
     !!editablePlan;
 
@@ -191,11 +192,43 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
           id,
           label,
           weight: "medium",
-          color: DOMAIN_COLORS[draft.domains.length % DOMAIN_COLORS.length],
+          color: colorForDomainIndex(draft.domains.length),
         },
       ],
     });
     setNewDomain("");
+  };
+
+  const suggestDomains = async () => {
+    if (!draft.goal.trim() || suggestingDomains || running) return;
+    domainSuggestAbortRef.current?.abort();
+    const ac = new AbortController();
+    domainSuggestAbortRef.current = ac;
+    setSuggestingDomains(true);
+    setDomainSuggestError("");
+    try {
+      const domains = await suggestDomainsFromGoal({
+        goal: draft.goal,
+        level: draft.level,
+        exclusions: draft.exclusionsText
+          .split("\n")
+          .map((l) => l.trim())
+          .filter(Boolean),
+        signal: ac.signal,
+      });
+      patch({ domains });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      const msg =
+        err instanceof ProviderError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Could not suggest domains.";
+      setDomainSuggestError(msg);
+    } finally {
+      setSuggestingDomains(false);
+    }
   };
 
   return (
@@ -346,7 +379,10 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
               className="settings-input builder-textarea"
               rows={3}
               value={draft.goal}
-              onChange={(e) => patch({ goal: e.target.value })}
+              onChange={(e) => {
+                patch({ goal: e.target.value });
+                if (domainSuggestError) setDomainSuggestError("");
+              }}
               placeholder="Become a Staff-level backend engineer focused on NestJS and distributed systems"
               autoFocus
             />
@@ -372,8 +408,32 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
             <div className="gen-hint">Topics too basic to include.</div>
           </div>
           <div className="gen-field">
-            <label className="gen-label">Domains & weights</label>
+            <div className="builder-domain-head">
+              <label className="gen-label">Domains & weights</label>
+              <button
+                type="button"
+                className="secondary-btn builder-domain-suggest"
+                onClick={suggestDomains}
+                disabled={!draft.goal.trim() || suggestingDomains || running}
+                title={
+                  draft.goal.trim()
+                    ? "Suggest domains from your goal"
+                    : "Add a goal first"
+                }
+              >
+                <Icon.Sparkle size={13} />
+                {suggestingDomains ? "Suggesting…" : "Suggest with AI"}
+              </button>
+            </div>
+            <div className="gen-hint">
+              Start empty — generate from your goal, or add domains by hand. Adjust weights after.
+            </div>
             <div className="builder-domains">
+              {draft.domains.length === 0 && !suggestingDomains && (
+                <div className="builder-domains-empty">
+                  No domains yet. Use Suggest with AI once your goal is set, or add one below.
+                </div>
+              )}
               {draft.domains.map((d, idx) => (
                 <div key={d.id} className="builder-domain-row">
                   <button
@@ -384,9 +444,11 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
                     onClick={() => {
                       const next = [...draft.domains];
                       const color =
-                        DOMAIN_COLORS[
-                          (DOMAIN_COLORS.indexOf(d.color) + 1 + DOMAIN_COLORS.length) %
-                            DOMAIN_COLORS.length
+                        BUILDER_DOMAIN_COLORS[
+                          (BUILDER_DOMAIN_COLORS.indexOf(d.color) +
+                            1 +
+                            BUILDER_DOMAIN_COLORS.length) %
+                            BUILDER_DOMAIN_COLORS.length
                         ];
                       next[idx] = { ...d, color };
                       patch({ domains: next });
@@ -439,16 +501,11 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
                 Add
               </button>
             </div>
-          </div>
-          <div className="gen-field">
-            <label className="gen-label">Job description (optional)</label>
-            <textarea
-              className="settings-input builder-textarea"
-              rows={4}
-              value={draft.jobDescription}
-              onChange={(e) => patch({ jobDescription: e.target.value })}
-              placeholder="Paste a JD to weight the plan toward that stack…"
-            />
+            {domainSuggestError && (
+              <div className="builder-errors" role="alert">
+                {domainSuggestError}
+              </div>
+            )}
           </div>
           <div className="gen-field">
             <label className="gen-label">Must-include topics (optional, one per line)</label>

@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   normalizeTopic,
   parseJsonWithRepair,
+  topicIndex,
   validateOutlineTiles,
   validatePeriodDays,
 } from "@/lib/planGeneration";
@@ -96,6 +97,23 @@ describe("period day validation", () => {
     }
     expect(allIssues).toBe(0);
     expect(seen.size).toBe(180);
+  });
+});
+
+describe("topicIndex", () => {
+  it("says none yet when empty", () => {
+    expect(topicIndex([])).toMatch(/none yet/i);
+  });
+
+  it("lists recent topics verbatim and indexes older ones as keywords", () => {
+    const topics = Array.from({ length: 160 }, (_, i) => `Raft Consensus Round ${i + 1}`);
+    const text = topicIndex(topics, 10);
+    expect(text).toContain("Raft Consensus Round 160");
+    expect(text).toContain("Raft Consensus Round 151");
+    expect(text).not.toContain("Raft Consensus Round 1\n");
+    expect(text).toMatch(/earlier 150 topics/i);
+    expect(text).toMatch(/raft/i);
+    expect(text).toMatch(/consensus/i);
   });
 });
 
