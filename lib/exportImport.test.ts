@@ -65,9 +65,9 @@ function slice(partial: Partial<AppDataSlice> = {}): AppDataSlice {
 describe("exportPlan / exportAll", () => {
   beforeEach(() => {
     setCredentials({
-      providerId: "anthropic",
-      model: "claude-sonnet-4-6",
-      apiKey: "sk-ant-export-test-KEY-9999",
+      providerId: "openrouter",
+      model: "anthropic/claude-sonnet-5",
+      apiKey: "sk-or-export-test-KEY-9999",
       remember: false,
     });
   });

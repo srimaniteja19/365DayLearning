@@ -1,8 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { mapHttpError, AuthError, RateLimitError, QuotaError } from "@/lib/providers/errors";
-import { anthropicProvider } from "@/lib/providers/anthropic";
-import { openaiProvider, openrouterProvider } from "@/lib/providers/openai";
-import { geminiProvider } from "@/lib/providers/gemini";
+import { openrouterProvider } from "@/lib/providers/openrouter";
 import {
   assertNoCredentialsInExport,
   forgetCredentials,
@@ -29,7 +27,7 @@ describe("provider HTTP error mapping", () => {
   });
 });
 
-describe("provider adapters", () => {
+describe("OpenRouter provider", () => {
   beforeEach(() => {
     vi.stubGlobal(
       "fetch",
@@ -46,40 +44,16 @@ describe("provider adapters", () => {
     vi.unstubAllGlobals();
   });
 
-  it("Anthropic chat maps 401 to AuthError", async () => {
-    await expect(
-      anthropicProvider.chat(
-        { prompt: "hi", maxTokens: 5 },
-        { apiKey: "sk-ant-test", model: "claude-sonnet-4-6" },
-      ),
-    ).rejects.toBeInstanceOf(AuthError);
-  });
-
-  it("OpenAI chat maps 401 to AuthError", async () => {
-    await expect(
-      openaiProvider.chat(
-        { prompt: "hi", maxTokens: 5 },
-        { apiKey: "sk-test", model: "gpt-4.1" },
-      ),
-    ).rejects.toBeInstanceOf(AuthError);
-  });
-
-  it("Gemini and OpenRouter chat map 401 to AuthError", async () => {
-    await expect(
-      geminiProvider.chat(
-        { prompt: "hi", maxTokens: 5 },
-        { apiKey: "gem-test", model: "gemini-2.0-flash" },
-      ),
-    ).rejects.toBeInstanceOf(AuthError);
+  it("maps 401 to AuthError", async () => {
     await expect(
       openrouterProvider.chat(
         { prompt: "hi", maxTokens: 5 },
-        { apiKey: "or-test", model: "openai/gpt-4.1" },
+        { apiKey: "sk-or-test", model: "anthropic/claude-sonnet-5" },
       ),
     ).rejects.toBeInstanceOf(AuthError);
   });
 
-  it("Anthropic chat maps 429 to RateLimitError", async () => {
+  it("maps 429 to RateLimitError", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
@@ -89,11 +63,10 @@ describe("provider adapters", () => {
         text: async () => "rate limit",
       })),
     );
-    // retries=1 means two attempts; still ends as RateLimitError
     await expect(
-      anthropicProvider.chat(
+      openrouterProvider.chat(
         { prompt: "hi", maxTokens: 5 },
-        { apiKey: "sk-ant-test", model: "claude-sonnet-4-6" },
+        { apiKey: "sk-or-test", model: "anthropic/claude-sonnet-5" },
       ),
     ).rejects.toBeInstanceOf(RateLimitError);
   });
@@ -101,7 +74,7 @@ describe("provider adapters", () => {
 
 describe("export never includes API keys", () => {
   it("assertNoCredentialsInExport throws when key is present", () => {
-    const key = "sk-ant-secret-SHOULD-NOT-LEAK-B4f2";
+    const key = "sk-or-secret-SHOULD-NOT-LEAK-B4f2";
     expect(() => assertNoCredentialsInExport(`{"ok":true}`, key)).not.toThrow();
     expect(() => assertNoCredentialsInExport(`backup ${key} end`, key)).toThrow(/leaked/i);
   });
@@ -111,7 +84,7 @@ describe("export never includes API keys", () => {
       progress: {},
       apiKey: "sk-secret",
       credentials: { apiKey: "x" },
-      provider: { apiKey: "y", id: "anthropic" },
+      provider: { apiKey: "y", id: "openrouter" },
     });
     expect(cleaned.apiKey).toBeUndefined();
     expect(cleaned.credentials).toBeUndefined();
@@ -121,9 +94,9 @@ describe("export never includes API keys", () => {
 
   it("full backup builder path excludes in-memory key", () => {
     setCredentials({
-      providerId: "anthropic",
-      model: "claude-sonnet-4-6",
-      apiKey: "sk-ant-export-test-KEY-9999",
+      providerId: "openrouter",
+      model: "anthropic/claude-sonnet-5",
+      apiKey: "sk-or-export-test-KEY-9999",
       remember: false,
     });
     const backup = JSON.stringify({
@@ -131,7 +104,6 @@ describe("export never includes API keys", () => {
       version: 3,
       progress: {},
       notes: {},
-      // no credentials
     });
     expect(() => assertNoCredentialsInExport(backup, getCredentials().apiKey)).not.toThrow();
     forgetCredentials();

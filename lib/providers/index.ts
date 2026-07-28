@@ -1,26 +1,23 @@
-import { anthropicProvider } from "@/lib/providers/anthropic";
-import { openaiProvider, openrouterProvider } from "@/lib/providers/openai";
-import { geminiProvider } from "@/lib/providers/gemini";
-import { ollamaProvider } from "@/lib/providers/ollama";
 import type { Provider, ProviderId } from "@/lib/providers/types";
+import { openrouterProvider } from "@/lib/providers/openrouter";
 
-export const PROVIDERS: Provider[] = [
-  anthropicProvider,
-  openaiProvider,
-  geminiProvider,
-  openrouterProvider,
-  ollamaProvider,
-];
+/** Refrainly uses OpenRouter exclusively for BYOK model access. */
+export const PROVIDERS: Provider[] = [openrouterProvider];
 
-export const PROVIDERS_BY_ID: Record<ProviderId, Provider> = Object.fromEntries(
-  PROVIDERS.map((p) => [p.id, p]),
-) as Record<ProviderId, Provider>;
+export const PROVIDERS_BY_ID: Record<ProviderId, Provider> = {
+  openrouter: openrouterProvider,
+};
 
-export function getProvider(id: ProviderId): Provider {
-  const p = PROVIDERS_BY_ID[id];
-  if (!p) throw new Error(`Unknown provider: ${id}`);
-  return p;
+export function getProvider(id: ProviderId | string): Provider {
+  if (id === "openrouter") return openrouterProvider;
+  // Legacy saved provider ids all map to OpenRouter now.
+  return openrouterProvider;
 }
 
 export * from "@/lib/providers/types";
 export * from "@/lib/providers/errors";
+export {
+  OPENROUTER_DEFAULT_MODEL,
+  OPENROUTER_SUGGESTED_MODELS,
+  fetchOpenRouterModels,
+} from "@/lib/providers/openrouter";

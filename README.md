@@ -7,7 +7,7 @@ Multi-plan learning campaigns: progress, spaced repetition, notes, themes, custo
 - **Next.js 16** (App Router) + React 19 + TypeScript
 - Persistence via **IndexedDB** (`idb-keyval`) with **localStorage** fallback
 - Optional accounts + cloud sync: **Neon Postgres** (via Vercel's database integration) + **Auth.js v5** (credentials)
-- BYOK providers: Anthropic, OpenAI, Gemini, OpenRouter, Ollama
+- BYOK via OpenRouter (paste your key + model in Settings)
 - Optional server fallback: `/api/claude` when Anthropic is selected and no browser key is set
 
 ## Setup
@@ -22,7 +22,7 @@ cp .env.example .env.local
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-Or open **AI** in the top bar and paste a provider key at runtime.
+Or open **AI** in the top bar and paste your OpenRouter key at runtime.
 
 ## Accounts + cloud sync (optional)
 
@@ -120,7 +120,7 @@ Storage keys keep the legacy `dualtrack:` prefix so existing local data still lo
 ## Manual checklist
 
 - Fresh browser/storage: app opens to the "Start your first campaign" example picker, not a plan
-- Generate a 30-day plan with at least two providers
+- Generate a 30-day plan with OpenRouter
 - Cancel generation midway, then resume
 - Switch all eight themes on builder + progress screens (esp. Ledger & Matte)
 - Reload: plans, progress, and theme survive; API key is gone unless “remember” was ticked

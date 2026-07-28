@@ -1,8 +1,15 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { PROVIDERS } from "@/lib/providers";
-import type { ProviderId } from "@/lib/providers/types";
+import {
+  buildModelCatalog,
+  fetchOpenRouterModels,
+  groupModelsByCategory,
+  openrouterProvider,
+  shortModelName,
+  type ModelPricingTier,
+  type OpenRouterModelInfo,
+} from "@/lib/providers/openrouter";
 import {
   forgetCredentials,
   getCredentials,
@@ -12,7 +19,6 @@ import {
   subscribeCredentials,
 } from "@/lib/providers/credentials";
 import { testConnection } from "@/lib/claude-client";
-import { Icon } from "@/components/Icon";
 import { classNames } from "@/lib/classNames";
 
 export function SettingsPanel({ onClose }: { onClose: () => void }) {
@@ -20,30 +26,41 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const [reveal, setReveal] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<Awaited<ReturnType<typeof testConnection>> | null>(null);
+  const [liveModels, setLiveModels] = useState<OpenRouterModelInfo[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [modelsError, setModelsError] = useState("");
+  const [tier, setTier] = useState<ModelPricingTier>("paid");
 
   useEffect(() => {
     hydrateCredentialsFromStorage();
     return subscribeCredentials(() => setCreds(getCredentials()));
   }, []);
 
-  const provider = useMemo(
-    () => PROVIDERS.find((p) => p.id === creds.providerId) || PROVIDERS[0],
-    [creds.providerId],
-  );
+  useEffect(() => {
+    const ac = new AbortController();
+    setLoadingModels(true);
+    setModelsError("");
+    fetchOpenRouterModels(ac.signal)
+      .then((models) => setLiveModels(models))
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setModelsError("Could not refresh live models — showing curated suggestions.");
+      })
+      .finally(() => setLoadingModels(false));
+    return () => ac.abort();
+  }, []);
 
   const update = (partial: Parameters<typeof setCredentials>[0]) => {
     setTestResult(null);
     setCreds(setCredentials(partial));
   };
 
-  const onProviderChange = (id: ProviderId) => {
-    const next = PROVIDERS.find((p) => p.id === id) || PROVIDERS[0];
-    update({
-      providerId: next.id,
-      model: next.models[0],
-      baseUrl: next.defaultBaseUrl,
-    });
-  };
+  const catalog = useMemo(() => buildModelCatalog(liveModels), [liveModels]);
+
+  const groups = useMemo(() => groupModelsByCategory(catalog, tier), [catalog, tier]);
+
+  const freeCount = useMemo(() => catalog.filter((m) => m.free).length, [catalog]);
+  const paidCount = useMemo(() => catalog.filter((m) => !m.free).length, [catalog]);
 
   const runTest = async () => {
     setTesting(true);
@@ -56,79 +73,113 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   return (
     <div className="settings-panel">
       <p className="settings-lead">
-        Bring your own key. Calls go from this browser to the provider you choose. Keys stay in
-        memory unless you opt in to remember them on this device.
+        Refrainly uses <strong>OpenRouter</strong> only. Paste your OpenRouter key and pick a model —
+        requests go from this browser to OpenRouter. Keys stay in memory unless you opt in to remember
+        them on this device.
       </p>
 
       <div className="settings-field">
-        <label className="settings-label" htmlFor="settings-provider">
-          Provider
-        </label>
-        <select
-          id="settings-provider"
-          className="settings-input"
-          value={creds.providerId}
-          onChange={(e) => onProviderChange(e.target.value as ProviderId)}
-        >
-          {PROVIDERS.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.label}
-            </option>
-          ))}
-        </select>
-        <a className="settings-docs" href={provider.docsUrl} target="_blank" rel="noreferrer">
-          Get a key →
-        </a>
+        <label className="settings-label">Provider</label>
+        <div className="settings-input" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          OpenRouter
+          <a className="settings-docs" href={openrouterProvider.docsUrl} target="_blank" rel="noreferrer">
+            Get a key →
+          </a>
+        </div>
       </div>
 
       <div className="settings-field">
         <label className="settings-label">Model</label>
-        <div className="settings-model-row">
-          {provider.models.map((m) => (
-            <button
-              key={m}
-              type="button"
-              className={classNames("settings-chip", creds.model === m && "settings-chip-active")}
-              onClick={() => update({ model: m })}
-            >
-              {m}
-            </button>
+        <div className="settings-tier-row" role="tablist" aria-label="Pricing tier">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tier === "paid"}
+            className={classNames("settings-tier-btn", tier === "paid" && "settings-tier-btn-active")}
+            onClick={() => setTier("paid")}
+          >
+            Paid{paidCount ? ` · ${Math.min(paidCount, 999)}` : ""}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tier === "free"}
+            className={classNames("settings-tier-btn", tier === "free" && "settings-tier-btn-active")}
+            onClick={() => setTier("free")}
+          >
+            Free{freeCount ? ` · ${freeCount}` : ""}
+          </button>
+        </div>
+
+        <div className="settings-model-groups">
+          {groups.length === 0 && (
+            <div className="settings-hint">
+              {loadingModels ? "Loading models…" : `No ${tier} models available right now.`}
+            </div>
+          )}
+          {groups.map((group) => (
+            <div key={group.category} className="settings-model-group">
+              <div className="settings-model-group-label">{group.label}</div>
+              <div className="settings-model-row">
+                {group.models.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className={classNames(
+                      "settings-chip",
+                      m.free && "settings-chip-free",
+                      creds.model === m.id && "settings-chip-active",
+                    )}
+                    onClick={() => update({ model: m.id })}
+                    title={m.id}
+                  >
+                    {shortModelName(m.id)}
+                    {m.free && <span className="settings-chip-badge">free</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
+
         <input
           className="settings-input"
           value={creds.model}
           onChange={(e) => update({ model: e.target.value })}
-          placeholder="model id"
+          placeholder="deepseek/deepseek-v4-flash"
           spellCheck={false}
         />
+        <div className="settings-hint">
+          {loadingModels
+            ? "Checking OpenRouter availability…"
+            : modelsError ||
+              "Top OpenRouter models by usage, frontier quality, and free tier. Paste any OpenRouter id if you need something else."}
+        </div>
       </div>
 
-      {provider.needsKey && (
-        <div className="settings-field">
-          <label className="settings-label" htmlFor="settings-key">
-            API key
-          </label>
-          <div className="settings-key-row">
-            <input
-              id="settings-key"
-              className="settings-input"
-              type={reveal ? "text" : "password"}
-              value={creds.apiKey || ""}
-              onChange={(e) => update({ apiKey: e.target.value })}
-              placeholder={provider.keyHint}
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <button type="button" className="settings-btn settings-btn-ghost" onClick={() => setReveal((v) => !v)}>
-              {reveal ? "Hide" : "Show"}
-            </button>
-          </div>
-          {creds.remember && creds.apiKey && (
-            <div className="settings-hint">Stored on this device as {maskApiKey(creds.apiKey)}</div>
-          )}
+      <div className="settings-field">
+        <label className="settings-label" htmlFor="settings-key">
+          OpenRouter API key
+        </label>
+        <div className="settings-key-row">
+          <input
+            id="settings-key"
+            className="settings-input"
+            type={reveal ? "text" : "password"}
+            value={creds.apiKey || ""}
+            onChange={(e) => update({ apiKey: e.target.value })}
+            placeholder={openrouterProvider.keyHint}
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <button type="button" className="settings-btn settings-btn-ghost" onClick={() => setReveal((v) => !v)}>
+            {reveal ? "Hide" : "Show"}
+          </button>
         </div>
-      )}
+        {creds.remember && creds.apiKey && (
+          <div className="settings-hint">Stored on this device as {maskApiKey(creds.apiKey)}</div>
+        )}
+      </div>
 
       <div className="settings-field">
         <label className="settings-label" htmlFor="settings-base">
@@ -139,28 +190,26 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
           className="settings-input"
           value={creds.baseUrl || ""}
           onChange={(e) => update({ baseUrl: e.target.value })}
-          placeholder={provider.defaultBaseUrl || "https://…"}
+          placeholder={openrouterProvider.defaultBaseUrl}
           spellCheck={false}
         />
       </div>
 
-      {provider.needsKey && (
-        <label className="settings-remember">
-          <input
-            type="checkbox"
-            checked={!!creds.remember}
-            onChange={(e) => update({ remember: e.target.checked })}
-          />
-          <span>
-            Remember this key on this device.
-            <span className="settings-hint">
-              {" "}
-              Anyone with this browser profile can read a stored key. Prefer a scoped key with a
-              spend limit.
-            </span>
+      <label className="settings-remember">
+        <input
+          type="checkbox"
+          checked={!!creds.remember}
+          onChange={(e) => update({ remember: e.target.checked })}
+        />
+        <span>
+          Remember this key on this device.
+          <span className="settings-hint">
+            {" "}
+            Anyone with this browser profile can read a stored key. Prefer a scoped key with a spend
+            limit.
           </span>
-        </label>
-      )}
+        </span>
+      </label>
 
       <div className="settings-actions">
         <button className="settings-btn settings-btn-primary" type="button" onClick={runTest} disabled={testing}>
@@ -182,25 +231,10 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
       </div>
 
       {testResult && (
-        <div
-          className={classNames(
-            "settings-test",
-            testResult.ok ? "settings-test-ok" : "settings-test-err",
-          )}
-          role="status"
-        >
-          {testResult.ok ? (
-            <>
-              <Icon.Check size={14} /> Connected · {testResult.latencyMs}ms · model{" "}
-              <code>{testResult.model}</code>
-              {testResult.sample ? ` · “${testResult.sample}”` : ""}
-            </>
-          ) : (
-            <>
-              <Icon.X size={14} /> {testResult.errorCode ? `[${testResult.errorCode}] ` : ""}
-              {testResult.error}
-            </>
-          )}
+        <div className={classNames("settings-test", testResult.ok ? "settings-test-ok" : "settings-test-err")}>
+          {testResult.ok
+            ? `Connected · ${testResult.model} · ${testResult.latencyMs}ms`
+            : testResult.error || "Connection failed"}
         </div>
       )}
     </div>

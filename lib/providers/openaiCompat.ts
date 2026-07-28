@@ -1,7 +1,7 @@
-import type { ChatRequest, Provider, ProviderConfig } from "@/lib/providers/types";
+import type { ChatRequest, ProviderConfig } from "@/lib/providers/types";
 import { ContentError, fetchWithRetry, mapHttpError } from "@/lib/providers/errors";
 
-async function openAiCompatibleChat(
+export async function openAiCompatibleChat(
   endpoint: string,
   req: ChatRequest,
   cfg: ProviderConfig,
@@ -49,7 +49,6 @@ async function openAiCompatibleChat(
 
   const raw = await res.text();
   if (!res.ok) {
-    // Some models reject json_schema — retry once with json_object.
     if (
       opts?.preferJsonSchema &&
       req.structured &&
@@ -83,7 +82,6 @@ async function openAiCompatibleChat(
   return text;
 }
 
-/** OpenAI strict json_schema wants additionalProperties:false on every object. */
 function withAdditionalPropertiesFalse(schema: Record<string, unknown>): Record<string, unknown> {
   const walk = (node: unknown): unknown => {
     if (!node || typeof node !== "object") return node;
@@ -105,52 +103,3 @@ function withAdditionalPropertiesFalse(schema: Record<string, unknown>): Record<
   };
   return walk(schema) as Record<string, unknown>;
 }
-
-export const openaiProvider: Provider = {
-  id: "openai",
-  label: "OpenAI",
-  models: ["gpt-4.1", "gpt-4.1-mini", "gpt-4o", "o4-mini"],
-  needsKey: true,
-  keyHint: "sk-...",
-  docsUrl: "https://platform.openai.com/api-keys",
-  defaultBaseUrl: "https://api.openai.com",
-
-  async chat(req: ChatRequest, cfg: ProviderConfig): Promise<string> {
-    const base = (cfg.baseUrl || this.defaultBaseUrl!).replace(/\/$/, "");
-    return openAiCompatibleChat(`${base}/v1/chat/completions`, req, cfg, undefined, {
-      preferJsonSchema: true,
-    });
-  },
-};
-
-export const openrouterProvider: Provider = {
-  id: "openrouter",
-  label: "OpenRouter",
-  models: [
-    "anthropic/claude-sonnet-4",
-    "openai/gpt-4.1",
-    "google/gemini-2.5-pro",
-    "meta-llama/llama-4-maverick",
-  ],
-  needsKey: true,
-  keyHint: "sk-or-...",
-  docsUrl: "https://openrouter.ai/keys",
-  defaultBaseUrl: "https://openrouter.ai/api",
-
-  async chat(req: ChatRequest, cfg: ProviderConfig): Promise<string> {
-    const base = (cfg.baseUrl || this.defaultBaseUrl!).replace(/\/$/, "");
-    return openAiCompatibleChat(
-      `${base}/v1/chat/completions`,
-      req,
-      cfg,
-      {
-        "HTTP-Referer": typeof window !== "undefined" ? window.location.origin : "https://refrainly.local",
-        "X-Title": "Refrainly",
-      },
-      // OpenRouter model support varies — json_object is the portable force-JSON mode.
-      { preferJsonSchema: false },
-    );
-  },
-};
-
-export { openAiCompatibleChat };

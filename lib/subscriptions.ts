@@ -32,7 +32,7 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierDefinition> = {
     managedAi: false,
     planGenerationsPerPeriod: null,
     aiActionsPerPeriod: null,
-    tagline: "Bring your own AI key.",
+    tagline: "Bring your own OpenRouter key.",
     features: [
       "Unlimited custom plans on your own API key",
       "Unlimited quiz, notes, LinkedIn drafts & journal insights on your key",

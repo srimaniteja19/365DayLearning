@@ -598,8 +598,8 @@ const LANDING_FEATURES = [
     id: "byok",
     tone: "ink",
     icon: Icon.Terminal,
-    title: "Bring your own AI key",
-    copy: "Anthropic, OpenAI, Gemini, OpenRouter, or Ollama — free forever on your own key.",
+    title: "Bring your own OpenRouter key",
+    copy: "Paste an OpenRouter key and pick any model — free forever on your own credits.",
   },
   {
     id: "plans",

@@ -21,12 +21,7 @@ export type ProviderConfig = {
   baseUrl?: string;
 };
 
-export type ProviderId =
-  | "anthropic"
-  | "openai"
-  | "gemini"
-  | "openrouter"
-  | "ollama";
+export type ProviderId = "openrouter";
 
 export interface Provider {
   id: ProviderId;
