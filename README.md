@@ -64,7 +64,7 @@ Three tiers, named after ranks from the XP ladder (`lib/xp.ts`) and defined in `
   tracked per account (`plan_generations_used`, `ai_actions_used`, `usage_period_start` columns
   on `users`, reset lazily on read — see `lib/db/subscriptionQuota.ts`).
 - "AI-generated plans" = full plan-builder runs (`generatePlan()` in `lib/planGeneration.ts`);
-  "AI actions" = quiz, notes, LinkedIn drafts, journal insights, and daily briefings. Static
+  "AI actions" = quiz, notes, LinkedIn drafts, and journal insights. Static
   example plans (Longhaul/Fastburn) and per-day edits/regenerates never consume either quota.
 - `/api/claude` enforces this only when `DATABASE_URL` is set — a bare `ANTHROPIC_API_KEY` deploy
   with no accounts configured keeps behaving as a simple same-origin fallback, same as before.

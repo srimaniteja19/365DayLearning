@@ -68,48 +68,37 @@ export type ChatStructuredOpts<T> = {
 
 /**
  * Prefer provider structured/tool output, then locally heal + schema-validate.
- * Retries the whole model call once if parsing still fails.
+ * Repair is a single follow-up chat when local healing fails — no full re-roll
+ * (plan generation already issues many calls; doubling them makes it crawl).
  */
 export async function chatStructured<T>(opts: ChatStructuredOpts<T>): Promise<T> {
-  const runOnce = async () => {
-    const raw = await chat({
-      system: opts.system,
-      prompt: opts.prompt,
-      maxTokens: opts.maxTokens,
-      temperature: opts.temperature,
-      signal: opts.signal,
-      kind: opts.kind,
-      structured: opts.structured,
-    });
-    return opts.parse(raw, opts.schema, async (error, bad) => {
-      const repairPrompt =
-        opts.repairPrompt?.(error, bad) ||
-        `Fix this into valid JSON matching the required schema.
+  const raw = await chat({
+    system: opts.system,
+    prompt: opts.prompt,
+    maxTokens: opts.maxTokens,
+    temperature: opts.temperature,
+    signal: opts.signal,
+    kind: opts.kind,
+    structured: opts.structured,
+  });
+  return opts.parse(raw, opts.schema, async (error, bad) => {
+    const repairPrompt =
+      opts.repairPrompt?.(error, bad) ||
+      `Fix this into valid JSON matching the required schema.
 Parser error: ${error}
 Broken input:
 ${bad.slice(0, 8000)}
 Return corrected JSON only. No markdown.`;
-      return chat({
-        system: "You repair malformed JSON. Return only the corrected JSON object.",
-        prompt: repairPrompt,
-        maxTokens: opts.maxTokens,
-        temperature: 0,
-        signal: opts.signal,
-        kind: opts.kind,
-        structured: opts.structured,
-      });
+    return chat({
+      system: "You repair malformed JSON. Return only the corrected JSON object.",
+      prompt: repairPrompt,
+      maxTokens: Math.min(opts.maxTokens, 4000),
+      temperature: 0,
+      signal: opts.signal,
+      kind: opts.kind,
+      structured: opts.structured,
     });
-  };
-
-  try {
-    return await runOnce();
-  } catch (first) {
-    try {
-      return await runOnce();
-    } catch {
-      throw first;
-    }
-  }
+  });
 }
 
 export async function testConnection(): Promise<{

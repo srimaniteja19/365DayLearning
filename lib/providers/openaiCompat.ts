@@ -49,12 +49,15 @@ export async function openAiCompatibleChat(
 
   const raw = await res.text();
   if (!res.ok) {
-    if (
-      opts?.preferJsonSchema &&
-      req.structured &&
-      (res.status === 400 || res.status === 422)
-    ) {
-      return openAiCompatibleChat(endpoint, req, cfg, extraHeaders, { preferJsonSchema: false });
+    if (req.structured && (res.status === 400 || res.status === 422)) {
+      if (opts?.preferJsonSchema) {
+        return openAiCompatibleChat(endpoint, req, cfg, extraHeaders, {
+          preferJsonSchema: false,
+        });
+      }
+      // Model rejects response_format entirely — retry as plain chat.
+      const plainReq: ChatRequest = { ...req, structured: undefined };
+      return openAiCompatibleChat(endpoint, plainReq, cfg, extraHeaders, opts);
     }
     throw mapHttpError(res.status, raw, res.headers.get("Retry-After"));
   }

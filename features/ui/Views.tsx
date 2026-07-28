@@ -20,7 +20,7 @@ import {
   fetchSubscriptionStatus,
   requestUpgrade,
 } from "@/lib/subscriptions";
-import { stripFences } from "@/lib/stripFences";
+import { parseJsonText } from "@/lib/stripFences";
 import { downloadText, copyText } from "@/lib/fileIo";
 import { buildMarkdown } from "@/lib/markdown";
 import { relativeDue, SRS_INTERVALS, DAY_MS, dueList } from "@/lib/srs";
@@ -560,13 +560,6 @@ const LANDING_FEATURES = [
     copy: "A sticky-note journal for tangents — markdown, rich links, and AI-written summaries.",
   },
   {
-    id: "briefing",
-    tone: "pink",
-    icon: Icon.Sparkle,
-    title: "Daily briefing",
-    copy: "An AI snapshot of today's topics, due reviews, and related journal context.",
-  },
-  {
     id: "onthisday",
     tone: "blue",
     icon: Icon.Calendar,
@@ -922,42 +915,6 @@ export function OnThisDayCard({ memory, onDismiss }) {
   );
 }
 
-export function DailyBriefingCard({ status, text, error, onGenerate }) {
-  return (
-    <div className="today-widget daily-briefing-card">
-      <div className="today-widget-icon"><Icon.Sparkle size={15} /></div>
-      <div className="today-widget-body">
-        <div className="today-widget-eyebrow">TODAY&apos;S BRIEFING</div>
-        {status === "idle" && (
-          <div className="briefing-idle">
-            <p className="today-widget-copy">
-              Get a short AI briefing on today&rsquo;s mission, due reviews, and your streak.
-            </p>
-            <button type="button" className="secondary-btn briefing-btn" onClick={onGenerate}>
-              <Icon.Sparkle size={12} /> Get today&rsquo;s briefing
-            </button>
-          </div>
-        )}
-        {status === "loading" && <p className="today-widget-copy briefing-loading">Thinking…</p>}
-        {status === "error" && (
-          <div className="briefing-idle">
-            <p className="today-widget-copy briefing-error">{error}</p>
-            <button type="button" className="secondary-btn briefing-btn" onClick={onGenerate}>Try again</button>
-          </div>
-        )}
-        {status === "ready" && (
-          <>
-            <p className="today-widget-copy">{text}</p>
-            <button type="button" className="briefing-refresh" onClick={onGenerate} title="Regenerate briefing">
-              <Icon.Rotate size={11} />
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
 /* ============================== BADGES ============================== */
 export function BadgesPanel({ statuses, onClose }) {
   const unlockedCount = statuses.filter((s) => s.unlocked).length;
@@ -1289,7 +1246,7 @@ const CONSOLE_LAYOUT_KEY = "dualtrack:console-layout";
 const CONSOLE_LAYOUTS = [
   { key: "list", label: "List", hint: "Classic day rows", Icon: Icon.List },
   { key: "bento", label: "Bento", hint: "Soft tile grid", Icon: Icon.LayoutDashboard },
-  { key: "timeline", label: "Mission", hint: "Vertical briefing spine", Icon: Icon.Path },
+  { key: "timeline", label: "Mission", hint: "Vertical timeline spine", Icon: Icon.Path },
 ];
 
 function readConsoleLayout() {
@@ -2640,7 +2597,7 @@ Write exactly 5 short recall questions that test genuine understanding of these 
 Respond with ONLY a JSON array, no preamble and no markdown fences:
 [{"q":"question","a":"model answer"}]`;
       const raw = await callClaude(prompt, 1400);
-      const parsed = JSON.parse(stripFences(raw));
+      const parsed = parseJsonText(raw);
       if (!Array.isArray(parsed) || parsed.length === 0) throw new Error("Unexpected format");
       setQuestions(parsed);
       setShown({});

@@ -47,7 +47,6 @@ import {
 import { hydrateCredentialsFromStorage } from "@/lib/providers/credentials";
 import { computeBadges } from "@/lib/achievements";
 import { findOnThisDayMemory } from "@/lib/onThisDay";
-import { generateDailyBriefing, loadCachedBriefing, saveCachedBriefing } from "@/lib/dailyBriefing";
 import { dateKey } from "@/lib/learned";
 
 import {
@@ -69,7 +68,6 @@ import {
   Footer,
   HomeView,
   OnThisDayCard,
-  DailyBriefingCard,
 } from "@/features/ui/Views";
 import { LearnedView } from "@/features/learned/LearnedView";
 
@@ -578,22 +576,6 @@ export default function DualTrackConsole() {
     }
   }, [todayKey]);
 
-  const [briefingStatus, setBriefingStatus] = useState("idle");
-  const [briefingText, setBriefingText] = useState("");
-  const [briefingError, setBriefingError] = useState("");
-
-  useEffect(() => {
-    if (!campaign) return;
-    const cached = loadCachedBriefing(todayKey, campaign.id);
-    if (cached) {
-      setBriefingText(cached.text);
-      setBriefingStatus("ready");
-    } else {
-      setBriefingText("");
-      setBriefingStatus("idle");
-    }
-  }, [campaign?.id, todayKey]);
-
   const campaignStats = useMemo(() => {
     const stats = {};
     visiblePlans.forEach((c) => {
@@ -775,37 +757,6 @@ export default function DualTrackConsole() {
     [srs],
   );
 
-  const handleGenerateBriefing = useCallback(async () => {
-    if (!campaign) return;
-    setBriefingStatus("loading");
-    setBriefingError("");
-    try {
-      const activeDay = campaignStats[campaign.id]?.activeDay;
-      let journalHint;
-      for (const d of Object.keys(learned).sort().reverse()) {
-        const items = learned[d];
-        if (items && items.length) {
-          journalHint = items[0].title;
-          break;
-        }
-      }
-      const text = await generateDailyBriefing({
-        planName: campaign.name,
-        activeDayLabel: activeDay ? `Day ${activeDay.day}` : "your next day",
-        activeDayTopics: activeDay ? activeDay.topics : [],
-        dueReviewCount: reviewQueue.length,
-        streak: campaignStats[campaign.id]?.streak || 0,
-        journalHint,
-      });
-      setBriefingText(text);
-      setBriefingStatus("ready");
-      saveCachedBriefing(todayKey, campaign.id, text);
-    } catch (err) {
-      setBriefingError(err instanceof Error ? err.message : "Could not generate a briefing.");
-      setBriefingStatus("error");
-    }
-  }, [campaign, campaignStats, reviewQueue, learned, todayKey]);
-
   if (saveStatus === "loading") {
     return (
       <div className="app-root" style={rootStyle}>
@@ -939,17 +890,11 @@ export default function DualTrackConsole() {
         />
         <CampaignHero campaign={campaign} stats={stats} />
 
-        <div className="today-widgets-row">
-          {onThisDayMemory && !onThisDayDismissed && (
+        {onThisDayMemory && !onThisDayDismissed && (
+          <div className="today-widgets-row">
             <OnThisDayCard memory={onThisDayMemory} onDismiss={dismissOnThisDay} />
-          )}
-          <DailyBriefingCard
-            status={briefingStatus}
-            text={briefingText}
-            error={briefingError}
-            onGenerate={handleGenerateBriefing}
-          />
-        </div>
+          </div>
+        )}
 
         <ViewTabs view={view} setView={setView} dueCount={reviewQueue.length} />
 

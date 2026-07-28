@@ -181,8 +181,8 @@ export function estimateGeneration(draft: BuilderDraft): {
   const topicCount = draft.totalDays * draft.topicsPerDay;
   return {
     periods,
-    apiCalls: 1 + periods, // outline + per-period
+    apiCalls: 1 + Math.ceil(periods / 3),
     topicCount,
-    note: "Uses your AI settings. Outline + one call per period.",
+    note: "Uses your AI settings. Outline + periods in parallel batches.",
   };
 }

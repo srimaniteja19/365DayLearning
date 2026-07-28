@@ -54,9 +54,9 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierDefinition> = {
     features: [
       "Everything in Recruit",
       "3 AI-generated custom plans / month",
-      "150 AI actions / month (quiz, notes, drafts, insights, briefings)",
+      "150 AI actions / month (quiz, notes, drafts, insights)",
       "Managed AI — no API key needed",
-      "Daily briefing & on-this-day memories",
+      "On-this-day memories",
       "BYOK still available anytime",
     ],
   },

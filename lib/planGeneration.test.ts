@@ -4,6 +4,9 @@ import {
   ensureContiguousDays,
   normalizeTopic,
   parseJsonWithRepair,
+  shouldRetryPeriod,
+  skeletonOutlinePeriods,
+  snapOutlineToSkeleton,
   topicIndex,
   validateOutlineTiles,
   validatePeriodDays,
@@ -33,6 +36,47 @@ describe("outline tiling", () => {
     );
     expect(errors.length).toBeGreaterThan(0);
     expect(errors.some((e) => /start at 1/i.test(e))).toBe(true);
+  });
+
+  it("builds a weekly skeleton that tiles 1..N", () => {
+    const skeleton = skeletonOutlinePeriods(21, "weekly");
+    expect(validateOutlineTiles(skeleton, 21)).toEqual([]);
+    expect(skeleton[0].start).toBe(1);
+    expect(skeleton[skeleton.length - 1].end).toBe(21);
+  });
+
+  it("snaps a broken model outline onto the skeleton without a second LLM call", () => {
+    const skeleton = skeletonOutlinePeriods(14, "weekly");
+    const snapped = snapOutlineToSkeleton(
+      [
+        { label: "Weird", theme: "Foundations of RPC", start: 1, end: 10 },
+        { label: "Also weird", theme: "Applied systems", start: 12, end: 20 },
+      ],
+      skeleton,
+    );
+    expect(validateOutlineTiles(snapped, 14)).toEqual([]);
+    expect(snapped.some((p) => /Foundations/i.test(p.theme))).toBe(true);
+  });
+});
+
+describe("period retry policy", () => {
+  it("does not retry soft padding issues", () => {
+    expect(
+      shouldRetryPeriod(
+        [{ code: "topics_padded", message: "padded" }],
+        { label: "W1", theme: "x", start: 1, end: 7 },
+      ),
+    ).toBe(false);
+  });
+
+  it("retries when many days are missing", () => {
+    const issues = Array.from({ length: 4 }, (_, i) => ({
+      code: "missing_day",
+      message: `Missing day ${i + 1}`,
+    }));
+    expect(
+      shouldRetryPeriod(issues, { label: "W1", theme: "x", start: 1, end: 7 }),
+    ).toBe(true);
   });
 });
 

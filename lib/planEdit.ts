@@ -4,7 +4,7 @@ import {
   normalizeTopic,
   parseJsonWithRepair,
 } from "@/lib/planGeneration";
-import { chat } from "@/lib/claude-client";
+import { chatStructured } from "@/lib/claude-client";
 import { z } from "zod";
 
 export type PlanEditIssue = {
@@ -213,6 +213,16 @@ const singleDaySchema = z.object({
   domains: z.array(z.string()).optional(),
 });
 
+const SINGLE_DAY_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["topics"],
+  properties: {
+    topics: { type: "array", items: { type: "string" }, minItems: 1 },
+    domains: { type: "array", items: { type: "string" } },
+  },
+} as const;
+
 export async function regenerateDay(
   plan: Plan,
   dayNum: number,
@@ -229,25 +239,31 @@ export async function regenerateDay(
     .flatMap((d) => d.topics)
     .slice(-80);
 
-  const prompt = `Return ONLY strict JSON: {"topics":["..."],"domains":["..."]}
-Regenerate day ${dayNum} of plan "${plan.name}".
+  const prompt = `Regenerate day ${dayNum} of plan "${plan.name}".
 Topics per day: exactly ${plan.topicsPerDay}
 Instruction: ${instruction || "Improve depth and specificity"}
 Current topics: ${day.topics.join(" | ")}
 Goal: ${plan.meta.goal || ""}
 Domain ids: ${domainIds.join(", ")}
 Avoid repeating: ${others.join("; ") || "(none)"}
-Each topic 2–10 words.`;
+Each topic 2–10 words. Never put double-quote characters inside topic text.`;
 
-  const raw = await chat({ prompt, maxTokens: 800, temperature: 0.4, signal });
-  const parsed = await parseJsonWithRepair(raw, singleDaySchema, async (error, bad) =>
-    chat({
-      prompt: `Fix JSON to {"topics":string[],"domains"?:string[]}. Error: ${error}\n${bad.slice(0, 2000)}\nJSON only.`,
-      maxTokens: 800,
-      temperature: 0,
-      signal,
-    }),
-  );
+  const parsed = await chatStructured({
+    system:
+      "You regenerate a single learning-plan day as strict JSON. Prefer a structured tool when available.",
+    prompt,
+    maxTokens: 800,
+    temperature: 0.4,
+    signal,
+    kind: "action",
+    schema: singleDaySchema,
+    structured: {
+      name: "submit_day",
+      description: "Submit regenerated day topics and domain ids.",
+      schema: SINGLE_DAY_JSON_SCHEMA as unknown as Record<string, unknown>,
+    },
+    parse: parseJsonWithRepair,
+  });
 
   let topics = parsed.topics.map((t) => t.trim()).filter(Boolean);
   while (topics.length < plan.topicsPerDay) topics.push("Additional depth topic");

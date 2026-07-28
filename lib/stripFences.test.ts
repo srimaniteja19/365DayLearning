@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  escapeBrokenStringQuotes,
   extractJsonBlob,
   healJson,
-  insertMissingCommas,
+  insertMissingSeparators,
+  parseJsonText,
   sanitizeJsonText,
   stripFences,
 } from "@/lib/stripFences";
@@ -51,10 +53,47 @@ describe("stripFences / sanitizeJsonText", () => {
     expect(JSON.parse(fixed).periods).toHaveLength(2);
   });
 
+  it("inserts missing colons between keys and values (domain suggest failure mode)", () => {
+    const raw = `{
+  "domains": [
+    { "id" "systems-eng", "label" "Systems Engineering", "weight" "large" }
+    { "id" "ai-ml", "label" "AI / ML", "weight" "medium" }
+  ]
+}`;
+    expect(() => JSON.parse(raw)).toThrow(/Expected ':' after property name/);
+    const parsed = parseJsonText(raw) as {
+      domains: Array<{ id: string; label: string; weight: string }>;
+    };
+    expect(parsed.domains).toEqual([
+      { id: "systems-eng", label: "Systems Engineering", weight: "large" },
+      { id: "ai-ml", label: "AI / ML", weight: "medium" },
+    ]);
+  });
+
+  it("escapes unescaped quotes inside string values", () => {
+    const raw = `{"label":"Use the "RPC" pattern","weight":"large"}`;
+    expect(() => JSON.parse(raw)).toThrow();
+    expect(JSON.parse(escapeBrokenStringQuotes(raw))).toEqual({
+      label: 'Use the "RPC" pattern',
+      weight: "large",
+    });
+    expect(parseJsonText(raw)).toEqual({
+      label: 'Use the "RPC" pattern',
+      weight: "large",
+    });
+  });
+
+  it("quotes bare keys", () => {
+    const raw = `{ domains: [ { id: "x", label: "X", weight: "large" } ] }`;
+    expect(parseJsonText(raw)).toEqual({
+      domains: [{ id: "x", label: "X", weight: "large" }],
+    });
+  });
+
   it("does not break already-valid JSON", () => {
     const raw = `{"periods":[{"label":"W1","theme":"a","start":1,"end":7},{"label":"W2","theme":"b","start":8,"end":14}]}`;
     expect(sanitizeJsonText(raw)).toBe(raw);
-    expect(insertMissingCommas(raw)).toBe(raw);
+    expect(insertMissingSeparators(raw)).toBe(raw);
   });
 
   it("heals unterminated strings and truncated objects", () => {

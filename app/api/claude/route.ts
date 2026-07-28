@@ -67,7 +67,7 @@ type ClaudeRequestBody = {
   /** "plan" = one of the many calls inside a single plan-builder generation
    *  (quota already reserved once via /api/subscription/reserve-plan);
    *  anything else = a standalone AI action (quiz, notes, LinkedIn draft,
-   *  journal insight, daily briefing) checked/incremented right here. */
+   *  journal insight) checked/incremented right here. */
   kind?: unknown;
   /** Optional structured tool schema — forces Anthropic tool_use output. */
   structured?: unknown;

@@ -19,8 +19,7 @@ export function extractJsonBlob(t: string): string {
   const arrStart = s.indexOf("[");
   if (objStart < 0 && arrStart < 0) return s;
 
-  const useArray =
-    arrStart >= 0 && (objStart < 0 || arrStart < objStart);
+  const useArray = arrStart >= 0 && (objStart < 0 || arrStart < objStart);
   const start = useArray ? arrStart : objStart;
   const open = useArray ? "[" : "{";
   const close = useArray ? "]" : "}";
@@ -62,46 +61,281 @@ function isValueStart(ch: string): boolean {
   );
 }
 
+function peekNonWs(input: string, from: number): string | null {
+  for (let j = from; j < input.length; j++) {
+    if (!/\s/.test(input[j])) return input[j];
+  }
+  return null;
+}
+
 /**
- * Insert commas when the model forgot them between adjacent values —
- * the classic `}\n{` / `"a"\n"b"` plan-outline failure mode.
+ * Escape double-quotes that appear mid-string (models love writing `Say "hello"`).
+ * A quote is treated as a real closer when the next non-ws token is structural
+ * (`, } ] :`) or another `"`, so `"key" "value"` still closes cleanly for
+ * separator repair.
  */
-export function insertMissingCommas(input: string): string {
+export function escapeBrokenStringQuotes(input: string): string {
   let out = "";
   let inString = false;
   let escape = false;
 
-  const peekNonWs = (from: number): string | null => {
-    for (let j = from; j < input.length; j++) {
-      if (!/\s/.test(input[j])) return input[j];
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (!inString) {
+      out += ch;
+      if (ch === '"') inString = true;
+      continue;
     }
-    return null;
+    if (escape) {
+      out += ch;
+      escape = false;
+      continue;
+    }
+    if (ch === "\\") {
+      out += ch;
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      const next = peekNonWs(input, i + 1);
+      if (
+        next === null ||
+        next === "," ||
+        next === "}" ||
+        next === "]" ||
+        next === ":" ||
+        next === '"'
+      ) {
+        out += '"';
+        inString = false;
+      } else {
+        out += '\\"';
+      }
+      continue;
+    }
+    if (ch === "\n") {
+      out += "\\n";
+      continue;
+    }
+    if (ch === "\r") {
+      out += "\\r";
+      continue;
+    }
+    if (ch === "\t") {
+      out += "\\t";
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+/** Quote bare object keys: `{ label: "x" }` → `{ "label": "x" }`. */
+export function quoteBareKeys(input: string): string {
+  let out = "";
+  let inString = false;
+  let escape = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (inString) {
+      out += ch;
+      if (escape) escape = false;
+      else if (ch === "\\") escape = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      out += ch;
+      continue;
+    }
+    if ((ch === "{" || ch === ",") && i + 1 < input.length) {
+      out += ch;
+      let j = i + 1;
+      while (j < input.length && /\s/.test(input[j])) {
+        out += input[j];
+        j += 1;
+      }
+      if (j < input.length && /[A-Za-z_]/.test(input[j])) {
+        const start = j;
+        j += 1;
+        while (j < input.length && /[A-Za-z0-9_]/.test(input[j])) j += 1;
+        let k = j;
+        while (k < input.length && /\s/.test(input[k])) k += 1;
+        if (input[k] === ":") {
+          out += `"${input.slice(start, j)}"`;
+          i = j - 1;
+          continue;
+        }
+      }
+      i = j - 1;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+type Ctx = { kind: "object" | "array"; expect: "key" | "colon" | "value" | "comma" };
+
+/**
+ * Insert missing `:` between object keys and values, and missing `,` between
+ * adjacent values. Critical: `"label" "foo"` must become `"label":"foo"`,
+ * not `"label","foo"` (that yields "Expected ':' after property name").
+ */
+export function insertMissingSeparators(input: string): string {
+  let out = "";
+  let inString = false;
+  let escape = false;
+  const stack: Ctx[] = [];
+  const top = () => stack[stack.length - 1];
+
+  const afterValueClosed = (nextFrom: number) => {
+    const ctx = top();
+    if (!ctx || ctx.expect !== "value") return;
+    ctx.expect = "comma";
+    const next = peekNonWs(input, nextFrom);
+    if (next && isValueStart(next)) {
+      out += ",";
+      ctx.expect = ctx.kind === "object" ? "key" : "value";
+    }
   };
 
   for (let i = 0; i < input.length; i++) {
     const ch = input[i];
-    out += ch;
 
     if (inString) {
+      out += ch;
       if (escape) escape = false;
       else if (ch === "\\") escape = true;
       else if (ch === '"') {
         inString = false;
-        const next = peekNonWs(i + 1);
-        if (next && isValueStart(next)) out += ",";
+        const ctx = top();
+        if (ctx?.kind === "object" && ctx.expect === "key") {
+          ctx.expect = "colon";
+          const next = peekNonWs(input, i + 1);
+          if (next && isValueStart(next)) {
+            out += ":";
+            ctx.expect = "value";
+          }
+        } else if (ctx?.expect === "value") {
+          afterValueClosed(i + 1);
+        }
       }
       continue;
     }
 
     if (ch === '"') {
       inString = true;
+      out += ch;
       continue;
     }
 
-    if (ch === "}" || ch === "]") {
-      const next = peekNonWs(i + 1);
-      if (next && isValueStart(next)) out += ",";
+    if (ch === "{") {
+      stack.push({ kind: "object", expect: "key" });
+      out += ch;
+      continue;
     }
+    if (ch === "[") {
+      stack.push({ kind: "array", expect: "value" });
+      out += ch;
+      continue;
+    }
+    if (ch === "}" || ch === "]") {
+      if (stack.length) {
+        const ctx = stack[stack.length - 1];
+        if ((ch === "}" && ctx.kind === "object") || (ch === "]" && ctx.kind === "array")) {
+          stack.pop();
+        }
+      }
+      out += ch;
+      afterValueClosed(i + 1);
+      continue;
+    }
+
+    if (ch === ":") {
+      const ctx = top();
+      if (ctx?.kind === "object") ctx.expect = "value";
+      out += ch;
+      continue;
+    }
+
+    if (ch === ",") {
+      const ctx = top();
+      if (ctx) ctx.expect = ctx.kind === "object" ? "key" : "value";
+      out += ch;
+      continue;
+    }
+
+    if (/\s/.test(ch)) {
+      out += ch;
+      continue;
+    }
+
+    // Numbers / true / false / null
+    if (ch === "-" || (ch >= "0" && ch <= "9") || ch === "t" || ch === "f" || ch === "n") {
+      let j = i;
+      if (ch === "-" || (ch >= "0" && ch <= "9")) {
+        j += 1;
+        while (j < input.length && /[0-9.eE+-]/.test(input[j])) j += 1;
+      } else if (input.startsWith("true", i)) j = i + 4;
+      else if (input.startsWith("false", i)) j = i + 5;
+      else if (input.startsWith("null", i)) j = i + 4;
+      else {
+        out += ch;
+        continue;
+      }
+      out += input.slice(i, j);
+      const ctx = top();
+      if (ctx?.expect === "value") afterValueClosed(j);
+      i = j - 1;
+      continue;
+    }
+
+    out += ch;
+  }
+
+  return out;
+}
+
+/** @deprecated Use insertMissingSeparators — kept for older imports/tests. */
+export function insertMissingCommas(input: string): string {
+  return insertMissingSeparators(input);
+}
+
+/** Strip // line comments and block comments outside of strings. */
+export function stripJsonComments(input: string): string {
+  let out = "";
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (inString) {
+      out += ch;
+      if (escape) escape = false;
+      else if (ch === "\\") escape = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      out += ch;
+      continue;
+    }
+    if (ch === "/" && input[i + 1] === "/") {
+      i += 2;
+      while (i < input.length && input[i] !== "\n") i += 1;
+      out += "\n";
+      continue;
+    }
+    if (ch === "/" && input[i + 1] === "*") {
+      i += 2;
+      while (i + 1 < input.length && !(input[i] === "*" && input[i + 1] === "/")) i += 1;
+      i += 1;
+      continue;
+    }
+    out += ch;
   }
   return out;
 }
@@ -111,18 +345,25 @@ export function sanitizeJsonText(t: string): string {
   let s = extractJsonBlob(t);
   // Smart quotes → ASCII
   s = s.replace(/[\u201C\u201D\u201E\u201F]/g, '"').replace(/[\u2018\u2019\u201A\u201B]/g, "'");
+  s = stripJsonComments(s);
+  s = quoteBareKeys(s);
+  s = escapeBrokenStringQuotes(s);
   // Trailing commas before } or ]
   s = s.replace(/,\s*([}\]])/g, "$1");
-  // Missing commas between adjacent values
-  s = insertMissingCommas(s);
-  // In case insertMissingCommas interacted oddly with an already-valid trailing comma case
+  s = insertMissingSeparators(s);
+  // In case separator insert interacted oddly with trailing commas
   s = s.replace(/,\s*([}\]])/g, "$1");
   return healJson(s.trim());
 }
 
+/** Parse after local healing. Throws SyntaxError/Zod-irrelevant JSON errors. */
+export function parseJsonText(t: string): unknown {
+  return JSON.parse(sanitizeJsonText(t));
+}
+
 /**
- * Close truncated / unterminated JSON: escape raw control chars inside strings,
- * close an open string, then close outstanding braces/brackets.
+ * Close truncated / unterminated JSON: close an open string, then close
+ * outstanding braces/brackets. Control chars inside strings are handled earlier.
  */
 export function healJson(input: string): string {
   let s = input.trim();
@@ -135,7 +376,7 @@ export function healJson(input: string): string {
     // continue healing
   }
 
-  // Escape raw newlines/tabs inside strings (common model mistake)
+  // Escape raw newlines/tabs inside strings (backup if escapeBrokenStringQuotes missed)
   {
     let out = "";
     let inString = false;

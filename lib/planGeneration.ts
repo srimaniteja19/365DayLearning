@@ -1,15 +1,18 @@
 import { z } from "zod";
-import { sanitizeJsonText } from "@/lib/stripFences";
+import { parseJsonText, sanitizeJsonText } from "@/lib/stripFences";
 import { chatStructured, willUseManagedAi } from "@/lib/claude-client";
 import { reservePlanGeneration } from "@/lib/subscriptions";
 import {
   buildPeriodScopes,
   draftToPlanRequest,
   type BuilderDraft,
+  type PlanGrouping,
 } from "@/lib/planBuilder";
 import type { Plan, PlanDay, PlanRequest } from "@/lib/types";
 import { ContentError } from "@/lib/providers/errors";
 
+/** How many period day-gens to run at once. Cuts wall-clock without huge prompt drift. */
+const PERIOD_CONCURRENCY = 3;
 export const outlinePeriodSchema = z.object({
   label: z.string().min(1),
   theme: z.string().min(1),
@@ -122,6 +125,62 @@ export function validateOutlineTiles(
     }
   }
   return errors;
+}
+
+/** Deterministic period tiling from the builder grouping preference. */
+export function skeletonOutlinePeriods(
+  totalDays: number,
+  grouping: PlanGrouping,
+): OutlinePeriod[] {
+  const scopes = buildPeriodScopes(totalDays, grouping);
+  const periods =
+    scopes.find((s) => s.key === "week")?.periods ||
+    scopes.find((s) => s.key === "month")?.periods ||
+    [{ label: "All days", sub: "Full campaign", start: 1, end: totalDays }];
+  return periods.map((p) => ({
+    label: p.label,
+    theme: p.sub || p.label,
+    start: p.start,
+    end: p.end,
+  }));
+}
+
+/**
+ * Snap a model outline onto a valid tiling. Keeps themes/domainMix when ranges
+ * overlap; never requires a second LLM call for bad boundaries.
+ */
+export function snapOutlineToSkeleton(
+  outline: OutlinePeriod[],
+  skeleton: OutlinePeriod[],
+): OutlinePeriod[] {
+  if (!skeleton.length) return outline;
+  if (validateOutlineTiles(outline, skeleton[skeleton.length - 1].end).length === 0) {
+    return [...outline].sort((a, b) => a.start - b.start);
+  }
+  return skeleton.map((sk, i) => {
+    const overlap =
+      outline.find((o) => o.start <= sk.end && o.end >= sk.start) ||
+      outline[Math.min(i, Math.max(0, outline.length - 1))];
+    return {
+      label: sk.label,
+      theme: (overlap?.theme || sk.theme).trim() || sk.theme,
+      start: sk.start,
+      end: sk.end,
+      domainMix: overlap?.domainMix,
+    };
+  });
+}
+
+/** Only re-roll a period when the model missed a large chunk of days. */
+export function shouldRetryPeriod(
+  issues: PeriodValidationIssue[],
+  period: OutlinePeriod,
+): boolean {
+  const expected = period.end - period.start + 1;
+  const hard = issues.filter((i) => i.code === "missing_day" || i.code === "day_count");
+  if (hard.length >= Math.max(2, Math.ceil(expected * 0.35))) return true;
+  if (issues.filter((i) => i.code === "exclusion").length >= 3) return true;
+  return false;
 }
 
 function wordCount(topic: string): number {
@@ -378,8 +437,7 @@ export async function parseJsonWithRepair<T>(
   repair: (error: string, raw: string) => Promise<string>,
 ): Promise<T> {
   const tryParse = (text: string): T => {
-    const cleaned = sanitizeJsonText(text);
-    const data = JSON.parse(cleaned) as unknown;
+    const data = parseJsonText(text);
     return schema.parse(data);
   };
 
@@ -402,7 +460,7 @@ export async function parseJsonWithRepair<T>(
       // One more local pass in case the repair model added fences/prose
       // but left fixable comma issues.
       try {
-        return tryParse(sanitizeJsonText(repaired));
+        return tryParse(repaired);
       } catch {
         const detail = second instanceof Error ? second.message : "JSON repair failed.";
         throw new ContentError(
@@ -498,19 +556,9 @@ export async function generatePlan(opts: GeneratePlanOptions): Promise<Plan> {
   let outline = opts.resume?.outline;
   if (!outline) {
     emit();
-    outline = await fetchOutline(draft, meta, domainIds, signal);
-    const tileErrors = validateOutlineTiles(outline, draft.totalDays);
-    if (tileErrors.length) {
-      // one repair pass with violations
-      outline = await fetchOutline(draft, meta, domainIds, signal, tileErrors);
-      const again = validateOutlineTiles(outline, draft.totalDays);
-      if (again.length) {
-        progress.phase = "error";
-        progress.message = again.join(" ");
-        emit();
-        throw new ContentError(again.join(" "));
-      }
-    }
+    const skeleton = skeletonOutlinePeriods(draft.totalDays, draft.grouping);
+    const rawOutline = await fetchOutline(draft, meta, skeleton, signal);
+    outline = snapOutlineToSkeleton(rawOutline, skeleton);
     progress.outline = outline;
   }
 
@@ -523,7 +571,7 @@ export async function generatePlan(opts: GeneratePlanOptions): Promise<Plan> {
   progress.topicsSoFar = progress.days.flatMap((d) => d.topics);
 
   const startIdx = opts.resume?.periodIndex ?? 0;
-  for (let i = startIdx; i < outline.length; i++) {
+  for (let i = startIdx; i < outline.length; i += PERIOD_CONCURRENCY) {
     if (signal?.aborted) {
       progress.phase = "cancelled";
       progress.message = "Cancelled";
@@ -532,23 +580,34 @@ export async function generatePlan(opts: GeneratePlanOptions): Promise<Plan> {
       throw new DOMException("Aborted", "AbortError");
     }
 
-    const period = outline[i];
+    const batch = outline.slice(i, Math.min(i + PERIOD_CONCURRENCY, outline.length));
+    const topicsSnapshot = [...progress.topicsSoFar];
     progress.periodIndex = i;
-    progress.message = `Period ${i + 1} of ${outline.length}: ${period.label}`;
+    progress.message =
+      batch.length === 1
+        ? `Period ${i + 1} of ${outline.length}: ${batch[0].label}`
+        : `Periods ${i + 1}–${i + batch.length} of ${outline.length}`;
     emit();
 
-    let ok = false;
-    let lastIssues: PeriodValidationIssue[] = [];
-    for (let attempt = 0; attempt < 2 && !ok; attempt++) {
-      const rawDays = await fetchPeriodDays({
-        draft,
-        meta,
-        period,
-        topicsSoFar: progress.topicsSoFar,
-        violations: attempt === 0 ? undefined : lastIssues,
-        signal,
-      });
-      const { issues, fixedDays, newTopics } = validatePeriodDays({
+    const rawBatches = await Promise.all(
+      batch.map((period) =>
+        fetchPeriodDays({
+          draft,
+          meta,
+          period,
+          topicsSoFar: topicsSnapshot,
+          signal,
+        }),
+      ),
+    );
+
+    for (let j = 0; j < batch.length; j++) {
+      const period = batch[j];
+      const periodIndex = i + j;
+      progress.periodIndex = periodIndex;
+
+      let rawDays = rawBatches[j];
+      let validated = validatePeriodDays({
         days: rawDays,
         period,
         topicsPerDay: draft.topicsPerDay,
@@ -556,37 +615,47 @@ export async function generatePlan(opts: GeneratePlanOptions): Promise<Plan> {
         seenTopics: seen,
         domainIds,
       });
-      if (issues.length === 0) {
-        const stamped = fixedDays.map((d) => ({ ...d, id: `${planId}:${d.day}` }));
-        progress.days.push(...stamped);
-        newTopics.forEach((t) => {
-          seen.add(normalizeTopic(t));
-          progress.topicsSoFar.push(t);
+
+      if (shouldRetryPeriod(validated.issues, period) && !signal?.aborted) {
+        progress.message = `Retrying ${period.label}…`;
+        emit();
+        rawDays = await fetchPeriodDays({
+          draft,
+          meta,
+          period,
+          topicsSoFar: progress.topicsSoFar,
+          violations: validated.issues,
+          signal,
         });
-        ok = true;
-      } else {
-        lastIssues = issues;
-        if (attempt === 1) {
-          progress.failedPeriods.push(i);
-          // accept best-effort stamped days so user can edit later
-          const stamped = fixedDays.map((d) => ({ ...d, id: `${planId}:${d.day}` }));
-          // only add days not already present
-          for (const d of stamped) {
-            if (!progress.days.some((x) => x.day === d.day)) {
-              progress.days.push(d);
-              d.topics.forEach((t) => {
-                const k = normalizeTopic(t);
-                if (!seen.has(k)) {
-                  seen.add(k);
-                  progress.topicsSoFar.push(t);
-                }
-              });
+        validated = validatePeriodDays({
+          days: rawDays,
+          period,
+          topicsPerDay: draft.topicsPerDay,
+          exclusions,
+          seenTopics: seen,
+          domainIds,
+        });
+      }
+
+      if (shouldRetryPeriod(validated.issues, period)) {
+        progress.failedPeriods.push(periodIndex);
+        progress.message = `Period ${period.label} needs attention (${validated.issues.length} issues)`;
+      }
+
+      const stamped = validated.fixedDays.map((d) => ({ ...d, id: `${planId}:${d.day}` }));
+      for (const d of stamped) {
+        if (!progress.days.some((x) => x.day === d.day)) {
+          progress.days.push(d);
+          d.topics.forEach((t) => {
+            const k = normalizeTopic(t);
+            if (!seen.has(k)) {
+              seen.add(k);
+              progress.topicsSoFar.push(t);
             }
-          }
-          progress.message = `Period ${period.label} needs attention (${issues.length} issues)`;
-          emit();
+          });
         }
       }
+      emit();
     }
   }
 
@@ -642,11 +711,14 @@ export async function generatePlan(opts: GeneratePlanOptions): Promise<Plan> {
 async function fetchOutline(
   draft: BuilderDraft,
   meta: PlanRequest,
-  domainIds: string[],
+  skeleton: OutlinePeriod[],
   signal?: AbortSignal,
-  priorErrors?: string[],
 ): Promise<OutlinePeriod[]> {
-  const prompt = `Produce a learning-plan OUTLINE only — period boundaries and themes, no day topics yet.
+  const bounds = skeleton
+    .map((p) => `- ${p.label}: days ${p.start}-${p.end}`)
+    .join("\n");
+
+  const prompt = `Produce a learning-plan OUTLINE only — themes and domain mix for fixed periods. No day topics.
 
 Plan
 - Name: ${draft.name}
@@ -660,18 +732,19 @@ ${domainCatalog(draft)}
 ${meta.mustInclude?.length ? `\nMust-include topics — assign each to the period where it fits best:\n${meta.mustInclude.map((m) => `- ${m}`).join("\n")}` : ""}
 ${meta.exclusions?.length ? `\nNever cover:\n${meta.exclusions.map((e) => `- ${e}`).join("\n")}` : ""}
 
+Use EXACTLY these period boundaries (same labels, start, and end — do not change them):
+${bounds}
+
 Rules
-- Periods must tile days 1..${draft.totalDays} exactly: first starts at 1, last ends at ${draft.totalDays}, no gaps, no overlaps.
-- Match the grouping preference: weekly means ~7-day periods, monthly ~30, quarterly ~90.
-- Themes must show progression — foundations first, then things that depend on them, then applied or advanced work.
-- domainMix lists the domain ids that period should draw from, ordered by how much time they get. Respect the emphasis levels above across the plan as a whole.
-- Do not use double-quote characters inside label or theme text.
-${priorErrors?.length ? `\nYour previous outline was rejected:\n${priorErrors.join("\n")}\nReturn a corrected outline.` : ""}`;
+- Return one period object per row above, with the same label/start/end.
+- Themes must show progression — foundations first, then dependent topics, then applied work.
+- domainMix lists domain ids for that period, ordered by emphasis.
+- Do not use double-quote characters inside label or theme text.`;
 
   const parsed = await chatStructured({
     system: PLAN_SYSTEM,
     prompt,
-    maxTokens: 3500,
+    maxTokens: 2000,
     temperature: 0.2,
     signal,
     kind: "plan",
@@ -703,7 +776,8 @@ async function fetchPeriodDays(opts: {
 }): Promise<Array<{ day: number; topics: string[]; domains?: string[] }>> {
   const { draft, meta, period, topicsSoFar, violations, signal } = opts;
   const dayCount = period.end - period.start + 1;
-  const maxTokens = Math.min(8000, Math.max(2000, 800 + dayCount * draft.topicsPerDay * 80));
+  // Keep caps modest — large max_tokens slows many OpenRouter models.
+  const maxTokens = Math.min(3500, Math.max(900, 350 + dayCount * draft.topicsPerDay * 55));
   const pending = (meta.mustInclude || []).filter(
     (m) => !topicsSoFar.some((t) => normalizeTopic(t).includes(normalizeTopic(m))),
   );
@@ -723,20 +797,20 @@ Topic rules
 - Exactly ${dayCount} day objects, numbered with ABSOLUTE day numbers ${period.start} through ${period.end} (not 1..${dayCount}).
 - Exactly ${draft.topicsPerDay} topics per day, each 2–10 words.
 - Each topic names one specific mechanism, technique, or concept — something you could write a quiz question about.
-- No filler or scaffolding topics. Never emit Review, Recap, Catch-up, Rest day, Practice session, Introduction to X, Overview of X, Deep dive into X, or X basics.
-- No duplicates or near-duplicates of anything already covered. Rephrasing an earlier topic counts as a duplicate.
-- Within the period, order topics so prerequisites come before whatever depends on them.
+- No filler: never Review, Recap, Catch-up, Rest day, Practice session, Introduction to X, Overview of X, Deep dive into X, or X basics.
+- No duplicates of already-covered topics (rephrasing counts).
+- Prerequisites before dependents within the period.
 - Do not use double-quote characters inside topic text. Prefer parentheses for acronyms, e.g. Remote Procedure Call (RPC).
-${pending.length ? `\nStill unplaced must-include topics — work these in here if this period is a sensible home for them:\n${pending.map((m) => `- ${m}`).join("\n")}` : ""}
-${meta.exclusions?.length ? `\nNever cover these subjects, including their sub-topics:\n${meta.exclusions.map((e) => `- ${e}`).join("\n")}` : ""}
+${pending.length ? `\nStill unplaced must-include topics — work these in if this period fits:\n${pending.map((m) => `- ${m}`).join("\n")}` : ""}
+${meta.exclusions?.length ? `\nNever cover:\n${meta.exclusions.map((e) => `- ${e}`).join("\n")}` : ""}
 
-Already covered
-${topicIndex(topicsSoFar)}
+Already covered (do not repeat):
+${topicIndex(topicsSoFar, 40)}
 
-Expected granularity — match this level of specificity, but do not reuse these topics:
-day 8 topics: Raft leader election and terms; Write-ahead log fsync tradeoffs
-day 9 topics: Quorum reads during network partition; Hinted handoff in Dynamo-style stores
-${violations?.length ? `\nYour previous attempt was rejected:\n${violations.map((v) => v.message).join("\n")}\nFix every one of these.` : ""}`;
+Example specificity (do not reuse):
+day 8: Raft leader election and terms; Write-ahead log fsync tradeoffs
+day 9: Quorum reads during network partition; Hinted handoff recovery
+${violations?.length ? `\nPrevious attempt rejected — fix every issue:\n${violations.map((v) => v.message).join("\n")}` : ""}`;
 
   const parsed = await chatStructured({
     system: PLAN_SYSTEM,
