@@ -2229,7 +2229,6 @@
 }
 .settings-input:focus { border-color: var(--accent-main); }
 select.settings-input { cursor: pointer; }
-.settings-model-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .settings-tier-row {
   display: inline-flex;
   gap: 4px;
@@ -2259,84 +2258,45 @@ select.settings-input { cursor: pointer; }
 .settings-model-groups {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  max-height: 360px;
+  gap: 10px;
+  max-height: 240px;
   overflow-y: auto;
   padding-right: 2px;
 }
-.settings-model-group { display: flex; flex-direction: column; gap: 6px; }
+.settings-model-group { display: flex; flex-direction: column; gap: 5px; }
 .settings-model-group-label {
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-faint);
 }
+.settings-model-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .settings-chip {
   cursor: pointer;
   font-family: var(--mono);
   font-size: 11.5px;
   font-weight: 650;
-  background: var(--bg);
-  border: 1.5px solid var(--border);
+  background: transparent;
+  border: 1px solid var(--border-soft);
   color: var(--text-dim);
-  border-radius: 10px;
-  padding: 8px 11px;
+  border-radius: 8px;
+  padding: 6px 10px;
   display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  max-width: 100%;
+  align-items: center;
+  line-height: 1.2;
   transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
-.settings-chip-name { line-height: 1.2; }
-.settings-chip-price {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-faint);
-  letter-spacing: 0.01em;
+.settings-chip:hover {
+  border-color: var(--border);
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 3%, transparent);
 }
-.settings-chip-tags { display: flex; flex-wrap: wrap; gap: 4px; }
-.settings-chip:hover { border-color: var(--border-hover); color: var(--text); }
-.settings-chip:hover .settings-chip-price { color: var(--text-dim); }
 .settings-chip-active {
   border-color: var(--text);
   background: var(--text);
   color: var(--bg);
-}
-.settings-chip-active .settings-chip-price { color: color-mix(in srgb, var(--bg) 72%, transparent); }
-.settings-chip-free {
-  border-color: color-mix(in srgb, #059669 35%, var(--border));
-}
-.settings-chip-band-budget { border-color: color-mix(in srgb, #0d9488 28%, var(--border)); }
-.settings-chip-band-mid { border-color: color-mix(in srgb, #2563eb 28%, var(--border)); }
-.settings-chip-band-frontier { border-color: color-mix(in srgb, #7c3aed 28%, var(--border)); }
-.settings-chip-default { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-main) 35%, transparent); }
-.settings-chip-badge {
-  font-size: 9.5px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 2px 5px;
-  border-radius: 999px;
-  background: color-mix(in srgb, #059669 16%, transparent);
-  color: #047857;
-}
-.settings-chip-badge-muted {
-  background: color-mix(in srgb, var(--text) 7%, transparent);
-  color: var(--text-faint);
-  text-transform: none;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-.settings-chip-badge-default {
-  background: color-mix(in srgb, var(--accent-main) 18%, transparent);
-  color: var(--accent-main);
-}
-.settings-chip-active .settings-chip-badge {
-  background: color-mix(in srgb, #fff 22%, transparent);
-  color: inherit;
 }
 .settings-key-row { display: flex; gap: 8px; align-items: center; }
 .settings-key-row .settings-input { flex: 1; }

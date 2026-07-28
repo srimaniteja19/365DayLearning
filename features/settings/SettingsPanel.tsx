@@ -125,40 +125,23 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
               <div className="settings-model-row">
                 {group.models.map((m) => {
                   const meta = getCuratedModelMeta(m.id);
-                  const tags = (m.tags || meta?.tags || []).filter(
-                    (t) => t.toLowerCase() !== "free" && t.toLowerCase() !== group.label.toLowerCase(),
-                  );
-                  const price = meta
-                    ? formatModelPrice(meta)
-                    : m.free
-                      ? "$0 / $0"
-                      : "";
-                  const isDefault = (m.tags || []).includes("Default") || m.id === "deepseek/deepseek-v4-flash";
+                  const price = meta ? formatModelPrice(meta) : m.free ? "$0" : "";
+                  const tags = (m.tags || meta?.tags || []).join(" · ");
+                  const isDefault =
+                    (m.tags || []).includes("Default") || m.id === "deepseek/deepseek-v4-flash";
                   return (
                     <button
                       key={m.id}
                       type="button"
                       className={classNames(
                         "settings-chip",
-                        `settings-chip-band-${group.category}`,
-                        m.free && "settings-chip-free",
-                        isDefault && "settings-chip-default",
                         creds.model === m.id && "settings-chip-active",
                       )}
                       onClick={() => update({ model: m.id })}
-                      title={`${m.id}${price ? ` · ${price}` : ""}${(m.tags || []).length ? ` · ${(m.tags || []).join(" · ")}` : ""}`}
+                      title={[m.id, price, tags].filter(Boolean).join(" · ")}
                     >
-                      <span className="settings-chip-name">{shortModelName(m.id)}</span>
-                      {price && <span className="settings-chip-price">{price}</span>}
-                      <span className="settings-chip-tags">
-                        {m.free && <span className="settings-chip-badge">Free</span>}
-                        {isDefault && <span className="settings-chip-badge settings-chip-badge-default">Default</span>}
-                        {tags.slice(0, 2).map((tag) => (
-                          <span key={tag} className="settings-chip-badge settings-chip-badge-muted">
-                            {tag}
-                          </span>
-                        ))}
-                      </span>
+                      {shortModelName(m.id)}
+                      {isDefault && creds.model !== m.id ? " · default" : ""}
                     </button>
                   );
                 })}
@@ -179,8 +162,8 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             ? "Checking OpenRouter availability…"
             : modelsError ||
               (tier === "free"
-                ? "Free models failover to other free models, then budget paid ones. Daily free caps (~50/day) skip straight to paid."
-                : "Grouped cheapest → costliest. Tags show cost band, provider, and strengths. Paste any OpenRouter id if needed.")}
+                ? "Free models failover to other free, then budget paid. Hover a chip for price and tags."
+                : "Cheapest → costliest. Hover for price and tags. Paste any OpenRouter id if needed.")}
         </div>
       </div>
 
