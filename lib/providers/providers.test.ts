@@ -22,6 +22,28 @@ describe("provider HTTP error mapping", () => {
     expect((err as RateLimitError).retryAfterMs).toBe(2000);
   });
 
+  it("maps OpenRouter free-models-per-day into actionable copy", () => {
+    const body = JSON.stringify({
+      error: {
+        message:
+          "Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day",
+        code: 429,
+        metadata: {
+          headers: {
+            "X-RateLimit-Limit": "50",
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": "1785283200",
+          },
+        },
+      },
+    });
+    const err = mapHttpError(429, body);
+    expect(err).toBeInstanceOf(RateLimitError);
+    expect(err.message).toMatch(/free-model daily limit/i);
+    expect(err.message).toMatch(/Paid model/i);
+    expect((err as RateLimitError).retryAfterMs).toBeGreaterThan(0);
+  });
+
   it("maps 402 to QuotaError", () => {
     expect(mapHttpError(402, "no credits")).toBeInstanceOf(QuotaError);
   });
@@ -61,6 +83,9 @@ describe("OpenRouter provider", () => {
         status: 429,
         headers: { get: (h: string) => (h === "Retry-After" ? "0" : null) },
         text: async () => "rate limit",
+        clone: function clone() {
+          return this;
+        },
       })),
     );
     await expect(

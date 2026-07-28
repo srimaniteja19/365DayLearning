@@ -153,7 +153,9 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
           {loadingModels
             ? "Checking OpenRouter availability…"
             : modelsError ||
-              "Top OpenRouter models by usage, frontier quality, and free tier. Paste any OpenRouter id if you need something else."}
+              (tier === "free"
+                ? "Free models are capped (~50 requests/day on OpenRouter). Hit the limit? Switch to Paid, or add credits at openrouter.ai."
+                : "Top OpenRouter models by usage and frontier quality. Paste any OpenRouter id if you need something else.")}
         </div>
       </div>
 

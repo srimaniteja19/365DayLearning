@@ -24,7 +24,7 @@ import {
   type GenProgress,
 } from "@/lib/planGeneration";
 import { suggestDomainsFromGoal } from "@/lib/domainSuggest";
-import { ProviderError } from "@/lib/providers/errors";
+import { formatAiError } from "@/lib/providers/errors";
 import { PlanEditor } from "@/features/planBuilder/PlanEditor";
 
 const DAY_PRESETS = [30, 45, 90, 180, 365];
@@ -161,12 +161,7 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
         );
         return;
       }
-      const msg =
-        err instanceof ProviderError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : "Generation failed";
+      const msg = formatAiError(err) || "Generation failed";
       setGenError(msg);
       setGen((p) => (p ? { ...p, phase: "error", message: msg } : p));
     }
@@ -219,12 +214,7 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
       patch({ domains });
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
-      const msg =
-        err instanceof ProviderError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : "Could not suggest domains.";
+      const msg = formatAiError(err) || "Could not suggest domains.";
       setDomainSuggestError(msg);
     } finally {
       setSuggestingDomains(false);

@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { classNames } from "@/lib/classNames";
 import { callClaude } from "@/lib/claude-client";
-import { ProviderError } from "@/lib/providers/errors";
+import { formatAiError } from "@/lib/providers/errors";
 import {
   createLearnedId,
   dateKey,
@@ -16,16 +16,6 @@ import { MiniMarkdown } from "@/features/ui/Views";
 
 const STICKY_COLORS = ["lemon", "coral", "mint", "sky", "blush", "butter", "lilac", "seafoam"];
 const BENTO_SIZES = ["sm", "md", "wide", "tall", "lg"];
-
-function formatAiError(e) {
-  if (e instanceof ProviderError) {
-    if (e.code === "auth") return `${e.message} Open AI settings to fix your key.`;
-    if (e.code === "rate_limit") return `${e.message} Wait a moment and retry.`;
-    if (e.code === "quota") return `${e.message} Check billing for this provider.`;
-    if (e.code === "network") return e.message;
-  }
-  return e?.message || "Something went wrong";
-}
 
 function hashStr(s) {
   let h = 0;

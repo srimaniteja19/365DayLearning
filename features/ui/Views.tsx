@@ -28,7 +28,7 @@ import { seedBuiltinPlans } from "@/data/builtinPlans";
 import { SettingsPanel } from "@/features/settings/SettingsPanel";
 import { AccountPanel } from "@/features/account/AccountPanel";
 import { PlanBuilder } from "@/features/planBuilder/PlanBuilder";
-import { ProviderError } from "@/lib/providers/errors";
+import { formatAiError } from "@/lib/providers/errors";
 import {
   applyFullImport,
   applyPlanImport,
@@ -37,16 +37,6 @@ import {
   exportPlan,
   serializeExport,
 } from "@/lib/exportImport";
-
-function formatAiError(e) {
-  if (e instanceof ProviderError) {
-    if (e.code === "auth") return `${e.message} Open AI settings to fix your key.`;
-    if (e.code === "rate_limit") return `${e.message} Wait a moment and retry.`;
-    if (e.code === "quota") return `${e.message} Check billing for this provider.`;
-    if (e.code === "network") return e.message;
-  }
-  return e?.message || "Something went wrong";
-}
 
 /* ============================== BACKGROUND FX ============================== */
 export function BackgroundFX({ accent, effects }) {

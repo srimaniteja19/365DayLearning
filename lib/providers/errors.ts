@@ -58,19 +58,98 @@ export class SubscriptionError extends ProviderError {
   }
 }
 
+type ParsedProviderBody = {
+  message: string;
+  resetUnix?: number;
+};
+
+/** Pull a human message out of plain text or OpenRouter-style JSON error bodies. */
+export function extractProviderErrorMessage(bodyText: string): ParsedProviderBody {
+  const trimmed = bodyText.trim();
+  if (!trimmed) return { message: "" };
+
+  try {
+    const json = JSON.parse(trimmed) as {
+      error?: {
+        message?: string;
+        metadata?: { headers?: Record<string, string> };
+      };
+      message?: string;
+    };
+    const message = (json.error?.message || json.message || "").trim();
+    const resetRaw = json.error?.metadata?.headers?.["X-RateLimit-Reset"];
+    const resetUnix = resetRaw ? Number(resetRaw) : undefined;
+    return {
+      message: message || trimmed.slice(0, 280),
+      resetUnix: Number.isFinite(resetUnix) ? resetUnix : undefined,
+    };
+  } catch {
+    return { message: trimmed.slice(0, 280) };
+  }
+}
+
+/** Friendlier copy for common OpenRouter limit cases. */
+export function humanizeProviderMessage(raw: string): string {
+  const msg = raw.trim();
+  if (!msg) return "";
+
+  if (/free-models-per-day|free model requests per day/i.test(msg)) {
+    return (
+      "OpenRouter free-model daily limit reached (usually 50/day). " +
+      "Switch to a Paid model in Settings, or add credits at openrouter.ai/settings/credits " +
+      "to raise free-model limits."
+    );
+  }
+  if (/free-models-per-min|requests per minute/i.test(msg)) {
+    return "OpenRouter rate limit hit. Wait a minute, or switch to a Paid model in Settings.";
+  }
+  if (/Add \d+ credits/i.test(msg) && /rate limit/i.test(msg)) {
+    return `${msg} Or pick a Paid model in Settings.`;
+  }
+  return msg;
+}
+
 export function mapHttpError(status: number, bodyText: string, retryAfterHeader?: string | null): ProviderError {
-  const snippet = bodyText.slice(0, 240).trim();
+  const parsed = extractProviderErrorMessage(bodyText);
+  const message = humanizeProviderMessage(parsed.message) || parsed.message;
+
   if (status === 401 || status === 403) {
-    return new AuthError(snippet || undefined, status);
+    return new AuthError(message || undefined, status);
   }
   if (status === 429) {
-    const retryAfterMs = parseRetryAfter(retryAfterHeader);
-    return new RateLimitError(snippet || undefined, retryAfterMs, status);
+    let retryAfterMs = parseRetryAfter(retryAfterHeader);
+    if (retryAfterMs == null && parsed.resetUnix) {
+      // OpenRouter often sends unix seconds in X-RateLimit-Reset metadata.
+      const ms = parsed.resetUnix > 1e12 ? parsed.resetUnix : parsed.resetUnix * 1000;
+      retryAfterMs = Math.max(0, ms - Date.now());
+    }
+    return new RateLimitError(message || undefined, retryAfterMs, status);
   }
-  if (status === 402 || /quota|billing|insufficient.?credit|payment/i.test(snippet)) {
-    return new QuotaError(snippet || undefined, status === 402 ? 402 : status);
+  if (
+    status === 402 ||
+    /quota|billing|insufficient.?credit|payment|add \d+ credits/i.test(message || parsed.message)
+  ) {
+    return new QuotaError(message || undefined, status === 402 ? 402 : status);
   }
-  return new ProviderError(snippet || `Request failed (${status})`, "http", status);
+  return new ProviderError(message || `Request failed (${status})`, "http", status);
+}
+
+/** Shared client-facing AI error text. */
+export function formatAiError(err: unknown): string {
+  if (err instanceof ProviderError) {
+    if (err.code === "auth") return `${err.message} Open Settings to fix your key.`;
+    if (err.code === "rate_limit") {
+      if (/free-model|openrouter\.ai\/settings\/credits|Paid model/i.test(err.message)) {
+        return err.message;
+      }
+      return `${err.message} Wait a moment and retry.`;
+    }
+    if (err.code === "quota") return `${err.message} Check OpenRouter billing/credits.`;
+    if (err.code === "network") return err.message;
+    return err.message;
+  }
+  if (err instanceof Error) return err.message;
+  return "Something went wrong";
 }
 
 function parseRetryAfter(header?: string | null): number | undefined {
@@ -120,10 +199,21 @@ export async function fetchWithRetry(
       );
     }
 
-    if (res.status !== 429 || attempt >= retries) return res;
+    // Don't burn retries on free-model daily caps — they won't clear in seconds.
+    if (res.status === 429 && attempt < retries) {
+      let peek = "";
+      try {
+        peek = typeof res.clone === "function" ? await res.clone().text() : "";
+      } catch {
+        peek = "";
+      }
+      if (/free-models-per-day/i.test(peek)) return res;
+      const retryAfter = parseRetryAfter(res.headers.get("Retry-After")) ?? 800 * (attempt + 1);
+      attempt += 1;
+      await sleep(retryAfter, init.signal ?? undefined);
+      continue;
+    }
 
-    const retryAfter = parseRetryAfter(res.headers.get("Retry-After")) ?? 800 * (attempt + 1);
-    attempt += 1;
-    await sleep(retryAfter, init.signal ?? undefined);
+    return res;
   }
 }
