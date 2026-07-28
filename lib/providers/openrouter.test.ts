@@ -3,6 +3,7 @@ import { RateLimitError } from "@/lib/providers/errors";
 import {
   OPENROUTER_DEFAULT_MODEL,
   OPENROUTER_FRONTIER,
+  OPENROUTER_GOOGLE,
   OPENROUTER_PAID_FAILOVER,
   OPENROUTER_TOP_FREE,
   OPENROUTER_TOP_USAGE,
@@ -31,9 +32,10 @@ describe("openrouter model catalog helpers", () => {
   it("groups paid into usage + frontier and free into top free", () => {
     const catalog = buildModelCatalog([]);
     const paid = groupModelsByCategory(catalog, "paid");
-    expect(paid.map((g) => g.category)).toEqual(["usage", "frontier"]);
+    expect(paid.map((g) => g.category)).toEqual(["usage", "frontier", "google"]);
     expect(paid[0].models[0].id).toBe("xiaomi/mimo-v2.5");
     expect(paid[1].models.map((m) => m.id)).toEqual([...OPENROUTER_FRONTIER]);
+    expect(paid[2].models.some((m) => m.id === "google/gemini-3.6-flash")).toBe(true);
 
     const free = groupModelsByCategory(catalog, "free");
     expect(free).toHaveLength(1);
@@ -53,9 +55,11 @@ describe("openrouter model catalog helpers", () => {
     ]);
     expect(catalog.some((m) => m.id === OPENROUTER_DEFAULT_MODEL)).toBe(true);
     expect(catalog.some((m) => m.id === "anthropic/claude-opus-4.8")).toBe(true);
+    expect(catalog.some((m) => m.id === "google/gemini-3.6-flash")).toBe(true);
+    expect(catalog.some((m) => m.id === "google/gemma-4-26b-a4b-it:free")).toBe(true);
     expect(catalog.some((m) => m.id === "anthropic/claude-opus-5-fast")).toBe(false);
     expect(catalog.filter((m) => !m.free).length).toBeLessThanOrEqual(
-      OPENROUTER_TOP_USAGE.length + OPENROUTER_FRONTIER.length,
+      OPENROUTER_TOP_USAGE.length + OPENROUTER_FRONTIER.length + OPENROUTER_GOOGLE.length,
     );
     expect(OPENROUTER_TOP_FREE).toContain("openrouter/free");
     expect(vendorFromModelId("xiaomi/mimo-v2.5")).toBe("xiaomi");

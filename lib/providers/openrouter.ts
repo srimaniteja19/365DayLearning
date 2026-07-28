@@ -24,6 +24,14 @@ export const OPENROUTER_FRONTIER: readonly string[] = [
   "x-ai/grok-4.5",
 ];
 
+/** Latest Google Gemini models on OpenRouter. */
+export const OPENROUTER_GOOGLE: readonly string[] = [
+  "google/gemini-3.6-flash",
+  "google/gemini-3.5-flash",
+  "google/gemini-3.5-flash-lite",
+  "google/gemini-3.1-pro-preview",
+];
+
 export const OPENROUTER_TOP_FREE: readonly string[] = [
   "openrouter/free",
   "nvidia/nemotron-3-ultra-550b-a55b:free",
@@ -33,14 +41,16 @@ export const OPENROUTER_TOP_FREE: readonly string[] = [
   "poolside/laguna-xs-2.1:free",
   "openai/gpt-oss-20b:free",
   "google/gemma-4-31b-it:free",
+  "google/gemma-4-26b-a4b-it:free",
   "inclusionai/ling-3.0-flash:free",
 ];
 
-export type ModelCategory = "usage" | "frontier" | "free";
+export type ModelCategory = "usage" | "frontier" | "google" | "free";
 
 export const OPENROUTER_CATEGORY_LABELS: Record<ModelCategory, string> = {
   usage: "Top by usage",
   frontier: "Frontier",
+  google: "Google Gemini",
   free: "Top free",
 };
 
@@ -66,6 +76,7 @@ export const OPENROUTER_VENDOR_LABELS: Record<string, string> = {
 export const OPENROUTER_SUGGESTED_MODELS = [
   ...OPENROUTER_TOP_USAGE,
   ...OPENROUTER_FRONTIER,
+  ...OPENROUTER_GOOGLE,
   ...OPENROUTER_TOP_FREE,
 ] as const;
 
@@ -111,9 +122,12 @@ export function isFreeModel(m: {
 /** Cheap/popular paid models used only after free options fail. */
 export const OPENROUTER_PAID_FAILOVER: readonly string[] = [
   "deepseek/deepseek-v4-flash",
+  "google/gemini-3.6-flash",
+  "google/gemini-3.5-flash-lite",
   "xiaomi/mimo-v2.5",
   "tencent/hy3",
   "deepseek/deepseek-v4-pro",
+  "google/gemini-3.5-flash",
   "stepfun/step-3.7-flash",
   "moonshotai/kimi-k3",
   "z-ai/glm-5.2",
@@ -237,6 +251,9 @@ export function groupModelsByCategory(
     const frontier = OPENROUTER_FRONTIER.map((id) => byId.get(id)).filter(
       (m): m is OpenRouterModelInfo => !!m && !m.free,
     );
+    const google = OPENROUTER_GOOGLE.map((id) => byId.get(id)).filter(
+      (m): m is OpenRouterModelInfo => !!m && !m.free,
+    );
     if (usage.length) {
       groups.push({ category: "usage", label: OPENROUTER_CATEGORY_LABELS.usage, models: usage });
     }
@@ -245,6 +262,13 @@ export function groupModelsByCategory(
         category: "frontier",
         label: OPENROUTER_CATEGORY_LABELS.frontier,
         models: frontier,
+      });
+    }
+    if (google.length) {
+      groups.push({
+        category: "google",
+        label: OPENROUTER_CATEGORY_LABELS.google,
+        models: google,
       });
     }
   } else {
@@ -328,6 +352,9 @@ export function buildModelCatalog(live: OpenRouterModelInfo[]): OpenRouterModelI
   }
   for (const id of OPENROUTER_FRONTIER) {
     push(id, false, "frontier");
+  }
+  for (const id of OPENROUTER_GOOGLE) {
+    push(id, false, "google");
   }
   for (const id of OPENROUTER_TOP_FREE) {
     push(id, true, "free");
