@@ -1,10 +1,75 @@
 import type { ChatRequest, Provider, ProviderConfig } from "@/lib/providers/types";
 import { openAiCompatibleChat } from "@/lib/providers/openaiCompat";
 
+/** Cost band used for Settings grouping (cheapest → costliest). */
+export type CostBand = "free" | "budget" | "mid" | "frontier";
+
+/** @deprecated Prefer CostBand — kept for older category names in UI/tests. */
+export type ModelCategory = CostBand | "usage" | "google";
+
+export type CuratedModelMeta = {
+  id: string;
+  costBand: CostBand;
+  /** USD per million input tokens */
+  inputPerM: number;
+  /** USD per million output tokens */
+  outputPerM: number;
+  /** Chip tags shown in Settings */
+  tags: string[];
+  /** Cheapest → costliest sort key */
+  sortOrder: number;
+};
+
 /**
- * Top OpenRouter models by category (usage / intelligence, July 2026).
- * IDs match OpenRouter’s public catalog.
+ * Full picker catalog with tags + sticker prices (USD / M tokens).
+ * Sorted cheapest → costliest within each band.
  */
+export const OPENROUTER_CURATED_MODELS: readonly CuratedModelMeta[] = [
+  // Free
+  { id: "openrouter/free", costBand: "free", inputPerM: 0, outputPerM: 0, tags: ["Free", "Auto-router"], sortOrder: 1 },
+  { id: "nvidia/nemotron-3-ultra-550b-a55b:free", costBand: "free", inputPerM: 0, outputPerM: 0, tags: ["Free", "NVIDIA", "Long-context"], sortOrder: 2 },
+  { id: "poolside/laguna-s-2.1:free", costBand: "free", inputPerM: 0, outputPerM: 0, tags: ["Free", "Poolside", "Coding"], sortOrder: 3 },
+  { id: "nvidia/nemotron-3-super-120b-a12b:free", costBand: "free", inputPerM: 0, outputPerM: 0, tags: ["Free", "NVIDIA", "Agentic"], sortOrder: 4 },
+  { id: "cohere/north-mini-code:free", costBand: "free", inputPerM: 0, outputPerM: 0, tags: ["Free", "Cohere", "Coding"], sortOrder: 5 },
+  { id: "poolside/laguna-xs-2.1:free", costBand: "free", inputPerM: 0, outputPerM: 0, tags: ["Free", "Poolside", "Coding"], sortOrder: 6 },
+  { id: "openai/gpt-oss-20b:free", costBand: "free", inputPerM: 0, outputPerM: 0, tags: ["Free", "OpenAI", "Open-weight"], sortOrder: 7 },
+  { id: "google/gemma-4-31b-it:free", costBand: "free", inputPerM: 0, outputPerM: 0, tags: ["Free", "Google", "Multimodal"], sortOrder: 8 },
+  { id: "google/gemma-4-26b-a4b-it:free", costBand: "free", inputPerM: 0, outputPerM: 0, tags: ["Free", "Google", "MoE"], sortOrder: 9 },
+  { id: "inclusionai/ling-3.0-flash:free", costBand: "free", inputPerM: 0, outputPerM: 0, tags: ["Free", "InclusionAI"], sortOrder: 10 },
+  // Budget
+  { id: "deepseek/deepseek-v4-flash", costBand: "budget", inputPerM: 0.09, outputPerM: 0.18, tags: ["Budget", "DeepSeek", "Default"], sortOrder: 11 },
+  { id: "minimax/minimax-m3", costBand: "budget", inputPerM: 0.1, outputPerM: 1.21, tags: ["Budget", "MiniMax", "Multimodal"], sortOrder: 12 },
+  { id: "xiaomi/mimo-v2.5", costBand: "budget", inputPerM: 0.11, outputPerM: 0.22, tags: ["Budget", "Xiaomi"], sortOrder: 13 },
+  { id: "tencent/hy3", costBand: "budget", inputPerM: 0.14, outputPerM: 0.58, tags: ["Budget", "Tencent", "Agentic"], sortOrder: 14 },
+  { id: "stepfun/step-3.7-flash", costBand: "budget", inputPerM: 0.2, outputPerM: 1.15, tags: ["Budget", "StepFun", "Fast"], sortOrder: 15 },
+  { id: "google/gemini-3.5-flash-lite", costBand: "budget", inputPerM: 0.3, outputPerM: 2.5, tags: ["Budget", "Google", "High-volume"], sortOrder: 16 },
+  { id: "deepseek/deepseek-v4-pro", costBand: "budget", inputPerM: 0.44, outputPerM: 0.87, tags: ["Budget", "DeepSeek", "SWE-bench"], sortOrder: 17 },
+  // Mid-tier
+  { id: "nvidia/nemotron-3-ultra-550b-a55b", costBand: "mid", inputPerM: 0.5, outputPerM: 2.5, tags: ["Mid-tier", "NVIDIA", "1M ctx"], sortOrder: 18 },
+  { id: "z-ai/glm-5.2", costBand: "mid", inputPerM: 0.45, outputPerM: 3.31, tags: ["Mid-tier", "Z.ai", "Open-weight IQ"], sortOrder: 19 },
+  { id: "x-ai/grok-4.5", costBand: "mid", inputPerM: 2, outputPerM: 6, tags: ["Mid-tier", "xAI", "Cheapest frontier"], sortOrder: 20 },
+  { id: "google/gemini-3.6-flash", costBand: "mid", inputPerM: 1.5, outputPerM: 7.5, tags: ["Mid-tier", "Google", "Coding"], sortOrder: 21 },
+  { id: "google/gemini-3.5-flash", costBand: "mid", inputPerM: 1.5, outputPerM: 9, tags: ["Mid-tier", "Google"], sortOrder: 22 },
+  { id: "google/gemini-3.1-pro-preview", costBand: "mid", inputPerM: 2, outputPerM: 12, tags: ["Mid-tier", "Google", "Long-ctx pricing"], sortOrder: 23 },
+  // Frontier
+  { id: "moonshotai/kimi-k3", costBand: "frontier", inputPerM: 3, outputPerM: 15, tags: ["Frontier", "Moonshot", "Cache-friendly"], sortOrder: 24 },
+  { id: "anthropic/claude-opus-4.8", costBand: "frontier", inputPerM: 5, outputPerM: 25, tags: ["Frontier", "Anthropic", "Top intelligence"], sortOrder: 25 },
+  { id: "openai/gpt-5.6-sol", costBand: "frontier", inputPerM: 5, outputPerM: 30, tags: ["Frontier", "OpenAI", "Costliest"], sortOrder: 26 },
+];
+
+const META_BY_ID = Object.fromEntries(
+  OPENROUTER_CURATED_MODELS.map((m) => [m.id, m]),
+) as Record<string, CuratedModelMeta>;
+
+export function getCuratedModelMeta(id: string): CuratedModelMeta | undefined {
+  return META_BY_ID[id];
+}
+
+export const OPENROUTER_TOP_FREE: readonly string[] = OPENROUTER_CURATED_MODELS
+  .filter((m) => m.costBand === "free")
+  .map((m) => m.id);
+
+/** Popular paid models (budget + a few mid) — used by older call sites. */
 export const OPENROUTER_TOP_USAGE: readonly string[] = [
   "xiaomi/mimo-v2.5",
   "deepseek/deepseek-v4-flash",
@@ -17,14 +82,13 @@ export const OPENROUTER_TOP_USAGE: readonly string[] = [
   "moonshotai/kimi-k3",
 ];
 
-/** Premium / frontier when quality > price. */
 export const OPENROUTER_FRONTIER: readonly string[] = [
   "anthropic/claude-opus-4.8",
   "openai/gpt-5.6-sol",
+  "moonshotai/kimi-k3",
   "x-ai/grok-4.5",
 ];
 
-/** Latest Google Gemini models on OpenRouter. */
 export const OPENROUTER_GOOGLE: readonly string[] = [
   "google/gemini-3.6-flash",
   "google/gemini-3.5-flash",
@@ -32,26 +96,11 @@ export const OPENROUTER_GOOGLE: readonly string[] = [
   "google/gemini-3.1-pro-preview",
 ];
 
-export const OPENROUTER_TOP_FREE: readonly string[] = [
-  "openrouter/free",
-  "nvidia/nemotron-3-ultra-550b-a55b:free",
-  "poolside/laguna-s-2.1:free",
-  "nvidia/nemotron-3-super-120b-a12b:free",
-  "cohere/north-mini-code:free",
-  "poolside/laguna-xs-2.1:free",
-  "openai/gpt-oss-20b:free",
-  "google/gemma-4-31b-it:free",
-  "google/gemma-4-26b-a4b-it:free",
-  "inclusionai/ling-3.0-flash:free",
-];
-
-export type ModelCategory = "usage" | "frontier" | "google" | "free";
-
-export const OPENROUTER_CATEGORY_LABELS: Record<ModelCategory, string> = {
-  usage: "Top by usage",
+export const OPENROUTER_CATEGORY_LABELS: Record<CostBand, string> = {
+  free: "Free",
+  budget: "Budget",
+  mid: "Mid-tier",
   frontier: "Frontier",
-  google: "Google Gemini",
-  free: "Top free",
 };
 
 export const OPENROUTER_VENDOR_LABELS: Record<string, string> = {
@@ -73,12 +122,7 @@ export const OPENROUTER_VENDOR_LABELS: Record<string, string> = {
   openrouter: "OpenRouter",
 };
 
-export const OPENROUTER_SUGGESTED_MODELS = [
-  ...OPENROUTER_TOP_USAGE,
-  ...OPENROUTER_FRONTIER,
-  ...OPENROUTER_GOOGLE,
-  ...OPENROUTER_TOP_FREE,
-] as const;
+export const OPENROUTER_SUGGESTED_MODELS = OPENROUTER_CURATED_MODELS.map((m) => m.id);
 
 /** Sensible default: fast, cheap, widely used for agentic work. */
 export const OPENROUTER_DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
@@ -90,7 +134,11 @@ export type OpenRouterModelInfo = {
   name: string;
   vendor: string;
   free: boolean;
-  category?: ModelCategory;
+  category?: CostBand;
+  tags?: string[];
+  inputPerM?: number;
+  outputPerM?: number;
+  sortOrder?: number;
   created?: number;
   contextLength?: number;
   promptPrice?: number;
@@ -108,6 +156,12 @@ export function vendorLabel(vendor: string): string {
 
 export function shortModelName(id: string): string {
   return id.replace(/^[^/]+\//, "").replace(/:free$/, "");
+}
+
+export function formatModelPrice(meta: Pick<CuratedModelMeta, "inputPerM" | "outputPerM" | "costBand">): string {
+  if (meta.costBand === "free" || (meta.inputPerM === 0 && meta.outputPerM === 0)) return "$0 / $0";
+  const fmt = (n: number) => (n < 1 ? `$${n.toFixed(2)}` : `$${n % 1 === 0 ? n.toFixed(0) : n.toFixed(2)}`);
+  return `${fmt(meta.inputPerM)} / ${fmt(meta.outputPerM)} per M`;
 }
 
 export function isFreeModel(m: {
@@ -232,56 +286,34 @@ export function clearSessionPreferredModel(): void {
 }
 
 export type ModelCategoryGroup = {
-  category: ModelCategory;
+  category: CostBand;
   label: string;
   models: OpenRouterModelInfo[];
 };
 
-/** Group curated models in display order for the active tier. */
+/** Group curated models by cost band for the active Free/Paid tab. */
 export function groupModelsByCategory(
   models: OpenRouterModelInfo[],
   tier: ModelPricingTier,
 ): ModelCategoryGroup[] {
   const byId = new Map(models.map((m) => [m.id, m]));
-  const groups: ModelCategoryGroup[] = [];
+  const bands: CostBand[] =
+    tier === "free" ? ["free"] : ["budget", "mid", "frontier"];
 
-  if (tier === "paid") {
-    const usage = OPENROUTER_TOP_USAGE.map((id) => byId.get(id)).filter(
-      (m): m is OpenRouterModelInfo => !!m && !m.free,
-    );
-    const frontier = OPENROUTER_FRONTIER.map((id) => byId.get(id)).filter(
-      (m): m is OpenRouterModelInfo => !!m && !m.free,
-    );
-    const google = OPENROUTER_GOOGLE.map((id) => byId.get(id)).filter(
-      (m): m is OpenRouterModelInfo => !!m && !m.free,
-    );
-    if (usage.length) {
-      groups.push({ category: "usage", label: OPENROUTER_CATEGORY_LABELS.usage, models: usage });
-    }
-    if (frontier.length) {
-      groups.push({
-        category: "frontier",
-        label: OPENROUTER_CATEGORY_LABELS.frontier,
-        models: frontier,
-      });
-    }
-    if (google.length) {
-      groups.push({
-        category: "google",
-        label: OPENROUTER_CATEGORY_LABELS.google,
-        models: google,
-      });
-    }
-  } else {
-    const free = OPENROUTER_TOP_FREE.map((id) => byId.get(id)).filter(
-      (m): m is OpenRouterModelInfo => !!m && m.free,
-    );
-    if (free.length) {
-      groups.push({ category: "free", label: OPENROUTER_CATEGORY_LABELS.free, models: free });
-    }
-  }
-
-  return groups;
+  return bands
+    .map((band) => {
+      const ids = OPENROUTER_CURATED_MODELS.filter((m) => m.costBand === band).map((m) => m.id);
+      const list = ids
+        .map((id) => byId.get(id))
+        .filter((m): m is OpenRouterModelInfo => !!m && (tier === "free" ? m.free : !m.free))
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+      return {
+        category: band,
+        label: OPENROUTER_CATEGORY_LABELS[band],
+        models: list,
+      };
+    })
+    .filter((g) => g.models.length > 0);
 }
 
 /** @deprecated Prefer groupModelsByCategory — kept for older imports/tests. */
@@ -314,13 +346,17 @@ export function groupModelsByVendor(models: OpenRouterModelInfo[]): ModelVendorG
   }));
 }
 
-function curatedAsInfo(id: string, free: boolean, category: ModelCategory): OpenRouterModelInfo {
+function curatedAsInfo(meta: CuratedModelMeta): OpenRouterModelInfo {
   return {
-    id,
-    name: id,
-    vendor: vendorFromModelId(id),
-    free,
-    category,
+    id: meta.id,
+    name: meta.id,
+    vendor: vendorFromModelId(meta.id),
+    free: meta.costBand === "free",
+    category: meta.costBand,
+    tags: [...meta.tags],
+    inputPerM: meta.inputPerM,
+    outputPerM: meta.outputPerM,
+    sortOrder: meta.sortOrder,
   };
 }
 
@@ -330,38 +366,20 @@ function curatedAsInfo(id: string, free: boolean, category: ModelCategory): Open
  */
 export function buildModelCatalog(live: OpenRouterModelInfo[]): OpenRouterModelInfo[] {
   const liveById = new Map(live.map((m) => [m.id, m]));
-  const out: OpenRouterModelInfo[] = [];
-  const seen = new Set<string>();
-
-  const push = (id: string, free: boolean, category: ModelCategory) => {
-    if (seen.has(id)) return;
-    seen.add(id);
-    const liveHit = liveById.get(id);
-    if (liveHit) {
-      out.push({
-        ...liveHit,
-        free: free || liveHit.free,
-        category,
-      });
-      return;
-    }
-    out.push(curatedAsInfo(id, free, category));
-  };
-
-  for (const id of OPENROUTER_TOP_USAGE) {
-    push(id, isFreeModel({ id }), "usage");
-  }
-  for (const id of OPENROUTER_FRONTIER) {
-    push(id, false, "frontier");
-  }
-  for (const id of OPENROUTER_GOOGLE) {
-    push(id, false, "google");
-  }
-  for (const id of OPENROUTER_TOP_FREE) {
-    push(id, true, "free");
-  }
-
-  return out;
+  return OPENROUTER_CURATED_MODELS.map((meta) => {
+    const base = curatedAsInfo(meta);
+    const liveHit = liveById.get(meta.id);
+    if (!liveHit) return base;
+    return {
+      ...liveHit,
+      free: meta.costBand === "free" || liveHit.free,
+      category: meta.costBand,
+      tags: [...meta.tags],
+      inputPerM: meta.inputPerM,
+      outputPerM: meta.outputPerM,
+      sortOrder: meta.sortOrder,
+    };
+  });
 }
 
 /** Public OpenRouter models list (no key required). */

@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { RateLimitError } from "@/lib/providers/errors";
 import {
+  OPENROUTER_CURATED_MODELS,
   OPENROUTER_DEFAULT_MODEL,
-  OPENROUTER_FRONTIER,
-  OPENROUTER_GOOGLE,
   OPENROUTER_PAID_FAILOVER,
   OPENROUTER_TOP_FREE,
-  OPENROUTER_TOP_USAGE,
   buildModelCatalog,
   buildModelFailoverChain,
+  formatModelPrice,
+  getCuratedModelMeta,
   groupModelsByCategory,
   isFailoverWorthyError,
   isFreeModel,
@@ -29,13 +29,14 @@ describe("openrouter model catalog helpers", () => {
     ).toBe(false);
   });
 
-  it("groups paid into usage + frontier and free into top free", () => {
+  it("groups paid by cost band cheapest to costliest and free separately", () => {
     const catalog = buildModelCatalog([]);
     const paid = groupModelsByCategory(catalog, "paid");
-    expect(paid.map((g) => g.category)).toEqual(["usage", "frontier", "google"]);
-    expect(paid[0].models[0].id).toBe("xiaomi/mimo-v2.5");
-    expect(paid[1].models.map((m) => m.id)).toEqual([...OPENROUTER_FRONTIER]);
-    expect(paid[2].models.some((m) => m.id === "google/gemini-3.6-flash")).toBe(true);
+    expect(paid.map((g) => g.category)).toEqual(["budget", "mid", "frontier"]);
+    expect(paid[0].models[0].id).toBe("deepseek/deepseek-v4-flash");
+    expect(paid[0].models[0].tags).toContain("Default");
+    expect(paid[2].models.some((m) => m.id === "anthropic/claude-opus-4.8")).toBe(true);
+    expect(paid[2].models.some((m) => m.id === "moonshotai/kimi-k3")).toBe(true);
 
     const free = groupModelsByCategory(catalog, "free");
     expect(free).toHaveLength(1);
@@ -43,24 +44,16 @@ describe("openrouter model catalog helpers", () => {
     expect(free[0].models.some((m) => m.id === "google/gemma-4-31b-it:free")).toBe(true);
   });
 
-  it("buildModelCatalog stays curated to the July 2026 top lists", () => {
-    const catalog = buildModelCatalog([
-      {
-        id: "anthropic/claude-opus-5-fast",
-        name: "Opus fast",
-        vendor: "anthropic",
-        free: false,
-        created: 9e12,
-      },
-    ]);
-    expect(catalog.some((m) => m.id === OPENROUTER_DEFAULT_MODEL)).toBe(true);
-    expect(catalog.some((m) => m.id === "anthropic/claude-opus-4.8")).toBe(true);
+  it("attaches tags and sticker prices to curated models", () => {
+    const meta = getCuratedModelMeta("deepseek/deepseek-v4-flash");
+    expect(meta?.tags).toEqual(expect.arrayContaining(["Budget", "DeepSeek", "Default"]));
+    expect(formatModelPrice(meta!)).toBe("$0.09 / $0.18 per M");
+
+    const catalog = buildModelCatalog([]);
+    expect(catalog.some((m) => m.id === OPENROUTER_DEFAULT_MODEL && m.tags?.includes("Default"))).toBe(true);
     expect(catalog.some((m) => m.id === "google/gemini-3.6-flash")).toBe(true);
-    expect(catalog.some((m) => m.id === "google/gemma-4-26b-a4b-it:free")).toBe(true);
     expect(catalog.some((m) => m.id === "anthropic/claude-opus-5-fast")).toBe(false);
-    expect(catalog.filter((m) => !m.free).length).toBeLessThanOrEqual(
-      OPENROUTER_TOP_USAGE.length + OPENROUTER_FRONTIER.length + OPENROUTER_GOOGLE.length,
-    );
+    expect(catalog).toHaveLength(OPENROUTER_CURATED_MODELS.length);
     expect(OPENROUTER_TOP_FREE).toContain("openrouter/free");
     expect(vendorFromModelId("xiaomi/mimo-v2.5")).toBe("xiaomi");
   });
