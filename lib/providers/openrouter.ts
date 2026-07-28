@@ -195,7 +195,8 @@ export function isFailoverWorthyError(err: unknown): boolean {
   if (err.name === "AbortError") return false;
   if (err instanceof DOMException && err.name === "AbortError") return false;
 
-  const code = "code" in err ? String((err as { code?: string }).code || "") : "";
+  const maybeCode = (err as unknown as { code?: unknown }).code;
+  const code = typeof maybeCode === "string" ? maybeCode : "";
   if (code === "auth" || code === "subscription") return false;
 
   // Rate limits, quota on a specific free model, empty/bad content, HTTP 5xx-ish.
