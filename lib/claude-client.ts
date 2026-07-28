@@ -1,7 +1,8 @@
 import { getProvider } from "@/lib/providers/index";
 import { getCredentials } from "@/lib/providers/credentials";
-import type { ChatRequest } from "@/lib/providers/types";
+import type { ChatRequest, StructuredSchema } from "@/lib/providers/types";
 import { AuthError, ProviderError, SubscriptionError } from "@/lib/providers/errors";
+import type { ZodType } from "zod";
 
 export type ChatKind = "plan" | "action";
 
@@ -44,6 +45,7 @@ export async function chat(
       maxTokens: req.maxTokens,
       temperature: req.temperature,
       signal: req.signal,
+      structured: req.structured,
     },
     {
       apiKey: creds.apiKey,
@@ -72,6 +74,7 @@ async function chatViaServerProxy(
       maxTokens: req.maxTokens ?? 1000,
       temperature: req.temperature,
       kind,
+      structured: req.structured,
     }),
   });
 
@@ -89,6 +92,69 @@ async function chatViaServerProxy(
   }
   if (!data.text?.trim()) throw new ProviderError("Empty response", "content");
   return data.text.trim();
+}
+
+export type ChatStructuredOpts<T> = {
+  system?: string;
+  prompt: string;
+  maxTokens: number;
+  temperature?: number;
+  signal?: AbortSignal;
+  kind?: ChatKind;
+  structured: StructuredSchema;
+  schema: ZodType<T>;
+  repairPrompt?: (error: string, bad: string) => string;
+  parse: (
+    raw: string,
+    schema: ZodType<T>,
+    repair: (error: string, raw: string) => Promise<string>,
+  ) => Promise<T>;
+};
+
+/**
+ * Prefer provider structured/tool output, then locally heal + schema-validate.
+ * Retries the whole model call once if parsing still fails.
+ */
+export async function chatStructured<T>(opts: ChatStructuredOpts<T>): Promise<T> {
+  const runOnce = async () => {
+    const raw = await chat({
+      system: opts.system,
+      prompt: opts.prompt,
+      maxTokens: opts.maxTokens,
+      temperature: opts.temperature,
+      signal: opts.signal,
+      kind: opts.kind,
+      structured: opts.structured,
+    });
+    return opts.parse(raw, opts.schema, async (error, bad) => {
+      const repairPrompt =
+        opts.repairPrompt?.(error, bad) ||
+        `Fix this into valid JSON matching the required schema.
+Parser error: ${error}
+Broken input:
+${bad.slice(0, 8000)}
+Return corrected JSON only. No markdown.`;
+      return chat({
+        system: "You repair malformed JSON. Return only the corrected JSON object.",
+        prompt: repairPrompt,
+        maxTokens: opts.maxTokens,
+        temperature: 0,
+        signal: opts.signal,
+        kind: opts.kind,
+        structured: opts.structured,
+      });
+    });
+  };
+
+  try {
+    return await runOnce();
+  } catch (first) {
+    try {
+      return await runOnce();
+    } catch {
+      throw first;
+    }
+  }
 }
 
 export async function testConnection(): Promise<{

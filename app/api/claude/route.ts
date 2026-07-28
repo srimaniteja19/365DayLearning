@@ -9,7 +9,7 @@ const MAX_TOKENS_CAP = 4096;
 /** Plan generation periods can be large (monthly × 4 topics); allow more headroom. */
 const MAX_TOKENS_CAP_PLAN = 8192;
 const MAX_SYSTEM_CHARS = 8_000;
-const UPSTREAM_TIMEOUT_MS = 60_000;
+const UPSTREAM_TIMEOUT_MS = 90_000;
 
 // Sliding-window rate limit, per IP. In-memory: resets on redeploy and is
 // per-instance, which is acceptable for this app's single-region scale.
@@ -69,7 +69,24 @@ type ClaudeRequestBody = {
    *  anything else = a standalone AI action (quiz, notes, LinkedIn draft,
    *  journal insight, daily briefing) checked/incremented right here. */
   kind?: unknown;
+  /** Optional structured tool schema — forces Anthropic tool_use output. */
+  structured?: unknown;
 };
+
+function readStructured(
+  value: unknown,
+): { name: string; description?: string; schema: Record<string, unknown> } | null {
+  if (!value || typeof value !== "object") return null;
+  const obj = value as Record<string, unknown>;
+  if (typeof obj.name !== "string" || !obj.name.trim()) return null;
+  if (!obj.schema || typeof obj.schema !== "object") return null;
+  return {
+    name: obj.name.trim().slice(0, 64),
+    description:
+      typeof obj.description === "string" ? obj.description.slice(0, 500) : undefined,
+    schema: obj.schema as Record<string, unknown>,
+  };
+}
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -127,6 +144,7 @@ export async function POST(req: NextRequest) {
       : 1000;
   const maxTokens = Math.min(Math.max(requested, 64), tokenCap);
   const model = process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
+  const structured = readStructured(body.structured);
 
   // This route doubles as: (a) a simple same-origin+IP-rate-limited fallback
   // for self-hosted setups with no accounts configured at all, and (b) the
@@ -151,6 +169,24 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const upstreamBody: Record<string, unknown> = {
+      model,
+      max_tokens: maxTokens,
+      ...(system ? { system } : {}),
+      ...(temperature !== undefined ? { temperature } : {}),
+      messages: [{ role: "user", content: prompt }],
+    };
+    if (structured) {
+      upstreamBody.tools = [
+        {
+          name: structured.name,
+          description: structured.description || "Submit the structured result.",
+          input_schema: structured.schema,
+        },
+      ];
+      upstreamBody.tool_choice = { type: "tool", name: structured.name };
+    }
+
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
@@ -159,18 +195,13 @@ export async function POST(req: NextRequest) {
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
       },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        ...(system ? { system } : {}),
-        ...(temperature !== undefined ? { temperature } : {}),
-        messages: [{ role: "user", content: prompt }],
-      }),
+      body: JSON.stringify(upstreamBody),
     });
 
     const data = (await res.json()) as {
-      content?: Array<{ type: string; text?: string }>;
+      content?: Array<{ type: string; text?: string; name?: string; input?: unknown }>;
       error?: { message?: string };
+      stop_reason?: string;
     };
 
     if (!res.ok) {
@@ -190,11 +221,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const text = (data.content || [])
-      .filter((b) => b.type === "text" && b.text)
-      .map((b) => b.text)
-      .join("\n")
-      .trim();
+    let text = "";
+    if (structured) {
+      const tool = (data.content || []).find(
+        (b) => b.type === "tool_use" && b.name === structured.name,
+      );
+      if (tool?.input !== undefined) {
+        text = JSON.stringify(tool.input);
+      }
+    }
+    if (!text) {
+      text = (data.content || [])
+        .filter((b) => b.type === "text" && b.text)
+        .map((b) => b.text)
+        .join("\n")
+        .trim();
+    }
 
     if (!text) {
       return NextResponse.json({ error: "Empty response from model." }, { status: 502 });

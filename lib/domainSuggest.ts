@@ -1,6 +1,6 @@
 import { z } from "zod";
 import DOMAIN_META from "@/data/domains.json";
-import { chat } from "@/lib/claude-client";
+import { chatStructured } from "@/lib/claude-client";
 import {
   type BuilderDomain,
   type BuilderDomainWeight,
@@ -25,8 +25,31 @@ const suggestSchema = z.object({
     .max(8),
 });
 
+const SUGGEST_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["domains"],
+  properties: {
+    domains: {
+      type: "array",
+      minItems: 2,
+      maxItems: 8,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["label", "weight"],
+        properties: {
+          id: { type: "string" },
+          label: { type: "string" },
+          weight: { type: "string", enum: ["small", "medium", "large"] },
+        },
+      },
+    },
+  },
+} as const;
+
 const SYSTEM = `You pick learning domains and relative weights for a personal technical study plan.
-Return one strict JSON object only — no markdown fences, no prose.`;
+Never put double-quote characters inside labels. Prefer a structured tool when available.`;
 
 function knownDomainCatalog(): string {
   return Object.entries(DOMAIN_META)
@@ -93,37 +116,25 @@ ${knownDomainCatalog()}
 
 Rules
 - Return 3 to 6 domains that matter for the goal. Do not pad with weakly related domains.
-- weight is how much of the plan that domain should take: "large" = primary focus, "medium" = supporting, "small" = light coverage.
-- At least one domain must be "large". Not every domain should be the same weight.
+- weight is how much of the plan that domain should take: large = primary focus, medium = supporting, small = light coverage.
+- At least one domain must be large. Not every domain should be the same weight.
 - Skip domains the learner already excludes or that are irrelevant to the goal.
-- Use double quotes for every key and string. No trailing commas. No comments. No markdown.
+- Do not use double-quote characters inside labels.`;
 
-Return exactly this shape:
-{"domains":[{"id":"backend-node","label":"Node / Nest","weight":"large"},{"id":"distributed-sys","label":"Distributed Sys","weight":"medium"}]}`;
-
-  const raw = await chat({
+  const parsed = await chatStructured({
     system: SYSTEM,
     prompt,
     maxTokens: 900,
     temperature: 0.2,
     signal: opts.signal,
     kind: "action",
-  });
-
-  const parsed = await parseJsonWithRepair(raw, suggestSchema, async (error, bad) => {
-    return chat({
-      system: "You repair malformed JSON. Return only the corrected JSON object.",
-      prompt: `Fix this into valid JSON matching {"domains":[{"id":"string","label":"string","weight":"small|medium|large"}]}.
-Use double quotes only. No trailing commas. No markdown fences.
-Parser error: ${error}
-Broken input:
-${bad.slice(0, 4000)}
-Return corrected JSON only.`,
-      maxTokens: 900,
-      temperature: 0,
-      signal: opts.signal,
-      kind: "action",
-    });
+    schema: suggestSchema,
+    structured: {
+      name: "submit_domains",
+      description: "Submit suggested learning domains and weights.",
+      schema: SUGGEST_JSON_SCHEMA as unknown as Record<string, unknown>,
+    },
+    parse: parseJsonWithRepair,
   });
 
   const domains = normalizeSuggestedDomains(parsed.domains);

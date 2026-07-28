@@ -581,7 +581,10 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
               {gen.failedPeriods.length > 0 && (
                 <div className="gen-hint">
                   Periods needing attention:{" "}
-                  {gen.failedPeriods.map((i) => i + 1).join(", ")}
+                  {gen.failedPeriods
+                    .filter((i) => i >= 0)
+                    .map((i) => i + 1)
+                    .join(", ") || "some days were backfilled"}
                 </div>
               )}
             </div>

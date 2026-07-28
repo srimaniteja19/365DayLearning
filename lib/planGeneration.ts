@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { sanitizeJsonText } from "@/lib/stripFences";
-import { chat, willUseManagedAi } from "@/lib/claude-client";
+import { chatStructured, willUseManagedAi } from "@/lib/claude-client";
 import { reservePlanGeneration } from "@/lib/subscriptions";
 import {
   buildPeriodScopes,
@@ -31,6 +31,52 @@ export const generatedDaySchema = z.object({
 export const periodDaysSchema = z.object({
   days: z.array(generatedDaySchema).min(1),
 });
+
+const OUTLINE_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["periods"],
+  properties: {
+    periods: {
+      type: "array",
+      minItems: 1,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["label", "theme", "start", "end"],
+        properties: {
+          label: { type: "string" },
+          theme: { type: "string" },
+          start: { type: "integer", minimum: 1 },
+          end: { type: "integer", minimum: 1 },
+          domainMix: { type: "array", items: { type: "string" } },
+        },
+      },
+    },
+  },
+} as const;
+
+const PERIOD_DAYS_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["days"],
+  properties: {
+    days: {
+      type: "array",
+      minItems: 1,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["day", "topics"],
+        properties: {
+          day: { type: "integer", minimum: 1 },
+          topics: { type: "array", minItems: 1, items: { type: "string" } },
+          domains: { type: "array", items: { type: "string" } },
+        },
+      },
+    },
+  },
+} as const;
 
 export type OutlinePeriod = z.infer<typeof outlinePeriodSchema>;
 export type GenProgress = {
@@ -91,27 +137,100 @@ export type PeriodValidationIssue = {
   message: string;
 };
 
+type RawGenDay = { day: number; topics: string[]; domains?: string[] };
+
+/**
+ * Models often number days 1..N inside a period even when the period is
+ * days 15–21. Remap relative sequences onto the absolute period range.
+ */
+export function alignDaysToPeriod(
+  days: RawGenDay[],
+  period: OutlinePeriod,
+): RawGenDay[] {
+  const expected = period.end - period.start + 1;
+  if (!days.length) return [];
+
+  const inRange = days.filter((d) => d.day >= period.start && d.day <= period.end);
+  if (inRange.length === days.length) return inRange;
+  // Enough absolute hits to trust — keep them and let padding fill gaps.
+  if (inRange.length >= Math.ceil(expected / 2)) return inRange;
+
+  const sorted = [...days].sort((a, b) => a.day - b.day);
+  return sorted.slice(0, expected).map((d, i) => ({
+    ...d,
+    day: period.start + i,
+  }));
+}
+
+function placeholderTopic(dayNum: number, slot: number): string {
+  // Must be 2–10 words and unique enough to pass duplicate checks when padded.
+  return slot === 0
+    ? `Needs review topic ${dayNum}`
+    : `Needs review follow-up ${dayNum}-${slot + 1}`;
+}
+
+function padTopics(
+  topics: string[],
+  domains: string[],
+  topicsPerDay: number,
+  dayNum: number,
+  domainIds: string[],
+): { topics: string[]; domains: string[]; padded: boolean } {
+  const nextTopics: string[] = [];
+  let padded = false;
+  for (let i = 0; i < topics.length && nextTopics.length < topicsPerDay; i++) {
+    let s = topics[i]?.trim() || "";
+    if (!s) {
+      nextTopics.push(placeholderTopic(dayNum, nextTopics.length));
+      padded = true;
+      continue;
+    }
+    const words = s.split(/\s+/).filter(Boolean);
+    if (words.length < 2) {
+      s = `${s} core concepts`;
+      padded = true;
+    } else if (words.length > 10) {
+      s = words.slice(0, 10).join(" ");
+      padded = true;
+    }
+    nextTopics.push(s);
+  }
+  while (nextTopics.length < topicsPerDay) {
+    nextTopics.push(placeholderTopic(dayNum, nextTopics.length));
+    padded = true;
+  }
+  const trimmedTopics = nextTopics.slice(0, topicsPerDay);
+  const nextDomains = domains.map((d) => d.trim());
+  const trimmedDomains = trimmedTopics.map((t, i) => {
+    const d = nextDomains[i];
+    if (d && domainIds.includes(d)) return d;
+    return classifyDomain(t, domainIds);
+  });
+  return { topics: trimmedTopics, domains: trimmedDomains, padded };
+}
+
 export function validatePeriodDays(opts: {
-  days: Array<{ day: number; topics: string[]; domains?: string[] }>;
+  days: RawGenDay[];
   period: OutlinePeriod;
   topicsPerDay: number;
   exclusions: string[];
   seenTopics: Set<string>;
   domainIds: string[];
 }): { issues: PeriodValidationIssue[]; fixedDays: PlanDay[]; newTopics: string[] } {
-  const { days, period, topicsPerDay, exclusions, seenTopics, domainIds } = opts;
+  const { period, topicsPerDay, exclusions, seenTopics, domainIds } = opts;
   const issues: PeriodValidationIssue[] = [];
   const excl = new Set(exclusions.map(normalizeTopic));
   const expectedDays = period.end - period.start + 1;
+  const aligned = alignDaysToPeriod(opts.days, period);
 
-  if (days.length !== expectedDays) {
+  if (aligned.length !== expectedDays) {
     issues.push({
       code: "day_count",
-      message: `Expected ${expectedDays} days for ${period.label}, got ${days.length}.`,
+      message: `Expected ${expectedDays} days for ${period.label}, got ${aligned.length}.`,
     });
   }
 
-  const byDay = new Map(days.map((d) => [d.day, d]));
+  const byDay = new Map(aligned.map((d) => [d.day, d]));
   const fixedDays: PlanDay[] = [];
   const newTopics: string[] = [];
   const localSeen = new Set(seenTopics);
@@ -119,18 +238,43 @@ export function validatePeriodDays(opts: {
   for (let dayNum = period.start; dayNum <= period.end; dayNum++) {
     const raw = byDay.get(dayNum);
     if (!raw) {
-      issues.push({ code: "missing_day", message: `Missing day ${dayNum}.` });
+      issues.push({ code: "missing_day", message: `Missing day ${dayNum} — filled with placeholders.` });
+      const filled = padTopics([], [], topicsPerDay, dayNum, domainIds);
+      filled.topics.forEach((t) => {
+        localSeen.add(normalizeTopic(t));
+        newTopics.push(t);
+      });
+      fixedDays.push({
+        day: dayNum,
+        id: "",
+        topics: filled.topics,
+        domains: filled.domains,
+      });
       continue;
     }
+
     if (raw.topics.length !== topicsPerDay) {
       issues.push({
         code: "topics_per_day",
         message: `Day ${dayNum}: expected ${topicsPerDay} topics, got ${raw.topics.length}.`,
       });
     }
-    const topics = raw.topics.map((t) => t.trim());
-    const domains = (raw.domains || []).map((d) => d.trim());
-    topics.forEach((t, i) => {
+
+    const filled = padTopics(
+      raw.topics,
+      raw.domains || [],
+      topicsPerDay,
+      dayNum,
+      domainIds,
+    );
+    if (filled.padded) {
+      issues.push({
+        code: "topics_padded",
+        message: `Day ${dayNum}: padded missing topics with placeholders.`,
+      });
+    }
+
+    filled.topics.forEach((t, i) => {
       const words = wordCount(t);
       if (words < 2 || words > 10) {
         issues.push({
@@ -156,21 +300,55 @@ export function validatePeriodDays(opts: {
       }
     });
 
-    const tagged = topics.map((t, i) => {
-      const d = domains[i];
-      if (d && domainIds.includes(d)) return d;
-      return classifyDomain(t, domainIds);
-    });
-
     fixedDays.push({
       day: dayNum,
-      id: "", // filled by caller with planId
-      topics,
-      domains: tagged,
+      id: "",
+      topics: filled.topics,
+      domains: filled.domains,
     });
   }
 
   return { issues, fixedDays, newTopics };
+}
+
+/** Guarantee every day 1..totalDays exists after generation. */
+export function ensureContiguousDays(opts: {
+  days: PlanDay[];
+  totalDays: number;
+  topicsPerDay: number;
+  domainIds: string[];
+  planId: string;
+}): PlanDay[] {
+  const { totalDays, topicsPerDay, domainIds, planId } = opts;
+  const byDay = new Map(opts.days.map((d) => [d.day, d]));
+  const out: PlanDay[] = [];
+  for (let dayNum = 1; dayNum <= totalDays; dayNum++) {
+    const existing = byDay.get(dayNum);
+    if (existing) {
+      const filled = padTopics(
+        existing.topics,
+        existing.domains || [],
+        topicsPerDay,
+        dayNum,
+        domainIds,
+      );
+      out.push({
+        ...existing,
+        id: existing.id || `${planId}:${dayNum}`,
+        topics: filled.topics,
+        domains: filled.domains,
+      });
+      continue;
+    }
+    const filled = padTopics([], [], topicsPerDay, dayNum, domainIds);
+    out.push({
+      day: dayNum,
+      id: `${planId}:${dayNum}`,
+      topics: filled.topics,
+      domains: filled.domains,
+    });
+  }
+  return out;
 }
 
 /** Simple keyword fallback when the model returns an unknown domain. */
@@ -209,26 +387,36 @@ export async function parseJsonWithRepair<T>(
     return tryParse(raw);
   } catch (first) {
     const msg = first instanceof Error ? first.message : String(first);
-    // Local sanitize may already be enough if the first attempt used a weak path;
-    // give the model the sanitized blob so it isn't fighting fences/prose.
     const seed = sanitizeJsonText(raw);
-    const repaired = await repair(msg, seed || raw);
+    let repaired: string;
+    try {
+      repaired = await repair(msg, seed || raw);
+    } catch {
+      throw new ContentError(
+        `Could not parse the AI response as JSON (${msg}). Try again.`,
+      );
+    }
     try {
       return tryParse(repaired);
     } catch (second) {
-      const detail = second instanceof Error ? second.message : "JSON repair failed.";
-      throw new ContentError(
-        `Could not parse the AI response as JSON (${detail}). Try again.`,
-      );
+      // One more local pass in case the repair model added fences/prose
+      // but left fixable comma issues.
+      try {
+        return tryParse(sanitizeJsonText(repaired));
+      } catch {
+        const detail = second instanceof Error ? second.message : "JSON repair failed.";
+        throw new ContentError(
+          `Could not parse the AI response as JSON (${detail}). Try again.`,
+        );
+      }
     }
   }
 }
 
 const PLAN_SYSTEM = `You are a senior curriculum designer who builds daily technical learning plans for working engineers.
 Every topic you write names one specific, teachable concept that someone can study in a single sitting and be quizzed on afterward.
-You reply with a single strict JSON object and nothing else: no markdown fences, no prose, no commentary before or after.`;
-
-const REPAIR_SYSTEM = `You repair malformed JSON. You return only the corrected JSON object, preserving as much of the original content as possible.`;
+Never put double-quote characters inside label, theme, or topic text — use plain words only (write RPC not "RPC").
+When a structured tool is available, call it. Otherwise reply with a single strict JSON object and nothing else.`;
 
 function domainCatalog(draft: BuilderDraft): string {
   return draft.domains
@@ -403,9 +591,20 @@ export async function generatePlan(opts: GeneratePlanOptions): Promise<Plan> {
   }
 
   progress.days.sort((a, b) => a.day - b.day);
+  progress.days = ensureContiguousDays({
+    days: progress.days,
+    totalDays: draft.totalDays,
+    topicsPerDay: draft.topicsPerDay,
+    domainIds,
+    planId,
+  });
+  const hasPlaceholders = progress.days.some((d) =>
+    d.topics.some((t) => /needs review/i.test(t)),
+  );
+
   progress.phase = "done";
-  progress.message = progress.failedPeriods.length
-    ? `Done with ${progress.failedPeriods.length} period(s) needing review`
+  progress.message = progress.failedPeriods.length || hasPlaceholders
+    ? `Done — ${draft.totalDays} days ready; review any placeholder topics`
     : "Generation complete";
   emit();
 
@@ -436,7 +635,7 @@ export async function generatePlan(opts: GeneratePlanOptions): Promise<Plan> {
     periodScopes,
     days: progress.days,
     meta,
-    status: progress.failedPeriods.length ? "draft" : "ready",
+    status: progress.failedPeriods.length || hasPlaceholders ? "draft" : "ready",
   };
 }
 
@@ -466,34 +665,32 @@ Rules
 - Match the grouping preference: weekly means ~7-day periods, monthly ~30, quarterly ~90.
 - Themes must show progression — foundations first, then things that depend on them, then applied or advanced work.
 - domainMix lists the domain ids that period should draw from, ordered by how much time they get. Respect the emphasis levels above across the plan as a whole.
-
-Return exactly this shape:
-{"periods":[{"label":"Week 1","theme":"one-line theme","start":1,"end":7,"domainMix":["distributed-sys","databases"]}]}
+- Do not use double-quote characters inside label or theme text.
 ${priorErrors?.length ? `\nYour previous outline was rejected:\n${priorErrors.join("\n")}\nReturn a corrected outline.` : ""}`;
 
-  const raw = await chat({
+  const parsed = await chatStructured({
     system: PLAN_SYSTEM,
     prompt,
-    maxTokens: 2500,
-    temperature: 0.3,
+    maxTokens: 3500,
+    temperature: 0.2,
     signal,
     kind: "plan",
-  });
-  return parseJsonWithRepair(raw, outlineSchema, async (error, bad) => {
-    return chat({
-      system: REPAIR_SYSTEM,
-      prompt: `Fix this into valid JSON matching {"periods":[{"label":"string","theme":"string","start":1,"end":7,"domainMix":["id"]}]}.
-domainMix is optional. Use double quotes only. No trailing commas. No markdown fences.
+    schema: outlineSchema,
+    structured: {
+      name: "submit_outline",
+      description: "Submit the learning-plan outline periods.",
+      schema: OUTLINE_JSON_SCHEMA as unknown as Record<string, unknown>,
+    },
+    parse: parseJsonWithRepair,
+    repairPrompt: (error, bad) =>
+      `Fix this into valid JSON matching {"periods":[{"label":"string","theme":"string","start":1,"end":7,"domainMix":["id"]}]}.
+domainMix is optional. Use double quotes only for JSON syntax — never inside string values. No trailing commas. No markdown.
 Parser error: ${error}
 Broken input:
 ${bad.slice(0, 6000)}
 Return corrected JSON only.`,
-      maxTokens: 2500,
-      temperature: 0,
-      signal,
-      kind: "plan",
-    });
-  }).then((v) => v.periods);
+  });
+  return parsed.periods;
 }
 
 async function fetchPeriodDays(opts: {
@@ -506,14 +703,14 @@ async function fetchPeriodDays(opts: {
 }): Promise<Array<{ day: number; topics: string[]; domains?: string[] }>> {
   const { draft, meta, period, topicsSoFar, violations, signal } = opts;
   const dayCount = period.end - period.start + 1;
-  const maxTokens = Math.min(8000, 600 + dayCount * draft.topicsPerDay * 60);
+  const maxTokens = Math.min(8000, Math.max(2000, 800 + dayCount * draft.topicsPerDay * 80));
   const pending = (meta.mustInclude || []).filter(
     (m) => !topicsSoFar.some((t) => normalizeTopic(t).includes(normalizeTopic(m))),
   );
 
   const prompt = `Generate the daily topics for one period of an existing plan.
 
-Period: "${period.label}", days ${period.start}–${period.end} (${dayCount} days)
+Period: ${period.label}, days ${period.start}-${period.end} (${dayCount} days)
 Theme: ${period.theme}
 Plan goal: ${meta.goal}
 Learner level: ${meta.level || "unspecified"}
@@ -523,12 +720,13 @@ ${domainCatalog(draft)}
 ${period.domainMix?.length ? `\nThis period should draw mainly from, in order of emphasis: ${period.domainMix.join(", ")}` : ""}
 
 Topic rules
-- Exactly ${dayCount} day objects, numbered ${period.start} through ${period.end}, in order.
+- Exactly ${dayCount} day objects, numbered with ABSOLUTE day numbers ${period.start} through ${period.end} (not 1..${dayCount}).
 - Exactly ${draft.topicsPerDay} topics per day, each 2–10 words.
 - Each topic names one specific mechanism, technique, or concept — something you could write a quiz question about.
-- No filler or scaffolding topics. Never emit "Review", "Recap", "Catch-up", "Rest day", "Practice session", "Introduction to X", "Overview of X", "Deep dive into X", or "X basics".
+- No filler or scaffolding topics. Never emit Review, Recap, Catch-up, Rest day, Practice session, Introduction to X, Overview of X, Deep dive into X, or X basics.
 - No duplicates or near-duplicates of anything already covered. Rephrasing an earlier topic counts as a duplicate.
 - Within the period, order topics so prerequisites come before whatever depends on them.
+- Do not use double-quote characters inside topic text. Prefer parentheses for acronyms, e.g. Remote Procedure Call (RPC).
 ${pending.length ? `\nStill unplaced must-include topics — work these in here if this period is a sensible home for them:\n${pending.map((m) => `- ${m}`).join("\n")}` : ""}
 ${meta.exclusions?.length ? `\nNever cover these subjects, including their sub-topics:\n${meta.exclusions.map((e) => `- ${e}`).join("\n")}` : ""}
 
@@ -536,34 +734,31 @@ Already covered
 ${topicIndex(topicsSoFar)}
 
 Expected granularity — match this level of specificity, but do not reuse these topics:
-{"days":[
-  {"day":8,"topics":["Raft leader election and terms","Write-ahead log fsync tradeoffs"],"domains":["distributed-sys","databases"]},
-  {"day":9,"topics":["Quorum reads during network partition","Hinted handoff in Dynamo-style stores"],"domains":["distributed-sys","databases"]}
-]}
+day 8 topics: Raft leader election and terms; Write-ahead log fsync tradeoffs
+day 9 topics: Quorum reads during network partition; Hinted handoff in Dynamo-style stores
 ${violations?.length ? `\nYour previous attempt was rejected:\n${violations.map((v) => v.message).join("\n")}\nFix every one of these.` : ""}`;
 
-  const raw = await chat({
+  const parsed = await chatStructured({
     system: PLAN_SYSTEM,
     prompt,
     maxTokens,
-    temperature: 0.4,
+    temperature: 0.3,
     signal,
     kind: "plan",
-  });
-  const parsed = await parseJsonWithRepair(raw, periodDaysSchema, async (error, bad) => {
-    return chat({
-      system: REPAIR_SYSTEM,
-      prompt: `Fix this into valid JSON matching {"days":[{"day":1,"topics":["Topic A"],"domains":["ai-ml"]}]}.
-domains is optional. Use double quotes only. No trailing commas. No markdown fences.
+    schema: periodDaysSchema,
+    structured: {
+      name: "submit_period_days",
+      description: "Submit the daily topics for this period.",
+      schema: PERIOD_DAYS_JSON_SCHEMA as unknown as Record<string, unknown>,
+    },
+    parse: parseJsonWithRepair,
+    repairPrompt: (error, bad) =>
+      `Fix this into valid JSON matching {"days":[{"day":1,"topics":["Topic A"],"domains":["ai-ml"]}]}.
+domains is optional. Use double quotes only for JSON syntax — never inside topic strings. No trailing commas. No markdown.
 Parser error: ${error}
 Broken input:
 ${bad.slice(0, 8000)}
 Return corrected JSON only.`,
-      maxTokens,
-      temperature: 0,
-      signal,
-      kind: "plan",
-    });
   });
   return parsed.days;
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import {
+  ensureContiguousDays,
   normalizeTopic,
   parseJsonWithRepair,
   topicIndex,
@@ -60,6 +61,58 @@ describe("period day validation", () => {
     const codes = issues.map((i) => i.code);
     expect(codes).toContain("exclusion");
     expect(codes).toContain("duplicate");
+  });
+
+  it("remaps relative 1..N day numbers onto the absolute period range", () => {
+    const { fixedDays, issues } = validatePeriodDays({
+      period: { label: "W2", theme: "Core", start: 8, end: 14 },
+      topicsPerDay: 2,
+      exclusions: [],
+      seenTopics: new Set(),
+      domainIds: ["distributed-sys"],
+      days: Array.from({ length: 7 }, (_, i) => ({
+        day: i + 1,
+        topics: [`Relative topic alpha ${i + 1}`, `Relative topic beta ${i + 1}`],
+        domains: ["distributed-sys", "distributed-sys"],
+      })),
+    });
+    expect(fixedDays.map((d) => d.day)).toEqual([8, 9, 10, 11, 12, 13, 14]);
+    expect(issues.filter((i) => i.code === "missing_day")).toHaveLength(0);
+  });
+
+  it("fills missing days and short topic lists so the period stays contiguous", () => {
+    const { fixedDays, issues } = validatePeriodDays({
+      period: { label: "W1", theme: "Foundations", start: 1, end: 7 },
+      topicsPerDay: 2,
+      exclusions: [],
+      seenTopics: new Set(),
+      domainIds: ["distributed-sys"],
+      days: [
+        { day: 1, topics: ["Characteristics of distributed systems", "Remote Procedure Call RPC"], domains: ["distributed-sys", "distributed-sys"] },
+        { day: 2, topics: ["Distributed concurrency control"], domains: ["distributed-sys"] },
+        { day: 4, topics: ["Network"], domains: ["distributed-sys"] },
+      ],
+    });
+    expect(fixedDays).toHaveLength(7);
+    expect(fixedDays.every((d) => d.topics.length === 2)).toBe(true);
+    expect(fixedDays.find((d) => d.day === 4)!.topics[0]).toMatch(/core concepts/i);
+    expect(fixedDays.find((d) => d.day === 3)!.topics[0]).toMatch(/needs review/i);
+    expect(issues.some((i) => i.code === "missing_day" || i.code === "topics_padded" || i.code === "topics_per_day")).toBe(true);
+  });
+
+  it("ensureContiguousDays backfills gaps across the whole plan", () => {
+    const days = ensureContiguousDays({
+      days: [
+        { id: "p:1", day: 1, topics: ["Alpha topic one", "Beta topic one"], domains: ["distributed-sys", "distributed-sys"] },
+        { id: "p:8", day: 8, topics: ["Alpha topic eight", "Beta topic eight"], domains: ["distributed-sys", "distributed-sys"] },
+      ],
+      totalDays: 10,
+      topicsPerDay: 2,
+      domainIds: ["distributed-sys"],
+      planId: "p",
+    });
+    expect(days.map((d) => d.day)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(days.every((d) => d.topics.length === 2)).toBe(true);
   });
 
   it("a valid 90-day × 2-topic uniqueness check over synthetic data", () => {

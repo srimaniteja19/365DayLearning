@@ -16,19 +16,25 @@ export const ollamaProvider: Provider = {
     if (req.system) messages.push({ role: "system", content: req.system });
     messages.push({ role: "user", content: req.prompt });
 
+    const body: Record<string, unknown> = {
+      model: cfg.model,
+      stream: false,
+      options: {
+        num_predict: req.maxTokens,
+        temperature: req.temperature,
+      },
+      messages,
+    };
+    // Structured plan/domain calls: force JSON (schema when available).
+    if (req.structured) {
+      body.format = req.structured.schema || "json";
+    }
+
     const res = await fetchWithRetry(`${base}/api/chat`, {
       method: "POST",
       signal: req.signal,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: cfg.model,
-        stream: false,
-        options: {
-          num_predict: req.maxTokens,
-          temperature: req.temperature,
-        },
-        messages,
-      }),
+      body: JSON.stringify(body),
     });
 
     const raw = await res.text();
