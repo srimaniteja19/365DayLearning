@@ -128,4 +128,10 @@ export const Icon = {
       <rect x="3" y="3" width="18" height="7" rx="1.5" /><rect x="3" y="13" width="8" height="8" rx="1.5" /><rect x="14" y="13" width="7" height="8" rx="1.5" />
     </svg>
   ),
+  Path: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <circle cx="6" cy="6" r="2.5" /><circle cx="18" cy="12" r="2.5" /><circle cx="6" cy="18" r="2.5" />
+      <path d="M8.2 7.6 15.8 11M15.8 13 8.2 16.4" />
+    </svg>
+  ),
 };

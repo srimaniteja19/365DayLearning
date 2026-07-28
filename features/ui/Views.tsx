@@ -1285,8 +1285,95 @@ export function DomainLegend({ tally, active, setActive, accent }) {
 }
 
 /* ============================== CONSOLE VIEW ============================== */
+const CONSOLE_LAYOUT_KEY = "dualtrack:console-layout";
+const CONSOLE_LAYOUTS = [
+  { key: "list", label: "List", hint: "Classic day rows", Icon: Icon.List },
+  { key: "bento", label: "Bento", hint: "Soft tile grid", Icon: Icon.LayoutDashboard },
+  { key: "timeline", label: "Mission", hint: "Vertical briefing spine", Icon: Icon.Path },
+];
+
+function readConsoleLayout() {
+  if (typeof window === "undefined") return "bento";
+  try {
+    const raw = window.localStorage.getItem(CONSOLE_LAYOUT_KEY);
+    if (raw === "list" || raw === "bento" || raw === "timeline") return raw;
+  } catch {
+    // best-effort only
+  }
+  return "bento";
+}
+
+function DayDetailBody({
+  day,
+  campaign,
+  progress,
+  onToggle,
+  notes,
+  setNote,
+  getRelated,
+  onJumpDay,
+  onOpenTool,
+  refs,
+  setRef,
+}) {
+  return (
+    <>
+      {day.topics.map((t, i) => {
+        const isDone = !!(progress[day.id] && progress[day.id][i]);
+        return (
+          <label key={i} className={classNames("topic-line", isDone && "topic-line-done")}>
+            <input
+              type="checkbox"
+              checked={isDone}
+              onChange={() => onToggle(day, i, campaign)}
+            />
+            <span className="topic-checkbox">
+              {isDone && <Icon.Check size={11} />}
+            </span>
+            <span className="topic-text">{t}</span>
+            <DomainTag domain={day.domains[i]} />
+          </label>
+        );
+      })}
+      <NoteEditor
+        value={notes[day.id] || ""}
+        onChange={(v) => setNote(day.id, v)}
+        dayNum={day.day}
+      />
+      <div className="day-tools">
+        <button type="button" className="tool-btn" onClick={() => onOpenTool("quiz", day)}>
+          <Icon.Target size={12} /> Quiz me
+        </button>
+        <button type="button" className="tool-btn" onClick={() => onOpenTool("notes", day)}>
+          <Icon.Book size={12} /> Generate notes
+        </button>
+        <button type="button" className="tool-btn" onClick={() => onOpenTool("linkedin", day)}>
+          <Icon.Send size={12} /> Draft post
+        </button>
+      </div>
+      <ReferenceBlock
+        data={refs[day.id]}
+        onClear={() => setRef(day.id, null)}
+        onRegenerate={() => onOpenTool("notes", day)}
+      />
+      <RelatedDays related={getRelated(day)} onJump={onJumpDay} />
+    </>
+  );
+}
+
 export function ConsoleView({ campaign, days, progress, onToggle, expandedDay, setExpandedDay, topicsDoneCount, isDayComplete, jumpTarget, notes, setNote, getRelated, onJumpDay, onOpenTool, query, refs, setRef }) {
   const listRef = useRef(null);
+  const [layout, setLayoutState] = useState(readConsoleLayout);
+
+  const setLayout = useCallback((next) => {
+    setLayoutState(next);
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(CONSOLE_LAYOUT_KEY, next);
+    } catch {
+      // best-effort only
+    }
+  }, []);
 
   useEffect(() => {
     if (jumpTarget && listRef.current) {
@@ -1295,99 +1382,388 @@ export function ConsoleView({ campaign, days, progress, onToggle, expandedDay, s
     }
   }, []);
 
+  const dayProps = {
+    campaign,
+    progress,
+    onToggle,
+    notes,
+    setNote,
+    getRelated,
+    onJumpDay,
+    onOpenTool,
+    query,
+    refs,
+    setRef,
+  };
+
   return (
-    <div className="console-view" ref={listRef}>
-      {days.length === 0 && <EmptyState />}
-      {days.map((day) => {
-        const done = topicsDoneCount(day);
-        const complete = isDayComplete(day);
-        const isExpanded = expandedDay === day.id;
-        const isCurrent = jumpTarget && jumpTarget.id === day.id;
-        return (
-          <div
-            key={day.id}
-            data-day-id={day.id}
-            className={classNames(
-              "day-row",
-              complete && "day-row-complete",
-              isExpanded && "day-row-expanded",
-              isCurrent && !complete && "day-row-current"
-            )}
-            style={{ "--accent": campaign.accent }}
-          >
+    <div className="console-shell">
+      <div className="console-layout-bar" role="tablist" aria-label="Console layout">
+        {CONSOLE_LAYOUTS.map((opt) => {
+          const LayoutIcon = opt.Icon;
+          const active = layout === opt.key;
+          return (
             <button
-              className="day-row-header"
-              onClick={() => setExpandedDay(isExpanded ? null : day.id)}
+              key={opt.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              title={opt.hint}
+              className={classNames("console-layout-btn", active && "console-layout-btn-active")}
+              onClick={() => setLayout(opt.key)}
             >
-              <span className="day-num">
-                {complete ? <Icon.Check size={13} /> : <span className="day-num-text">{String(day.day).padStart(3, "0")}</span>}
-              </span>
-              <span className="day-row-topics-preview">
-                {day.topics.map((t, i) => (
-                  <span key={i} className={classNames("topic-chip-mini", progress[day.id] && progress[day.id][i] && "topic-chip-mini-done")}>
-                    <DomainDot domain={day.domains[i]} />
-                    {t}
-                  </span>
-                ))}
-              </span>
-              <span className="day-row-right">
-                {query && query.trim() && (notes[day.id] || "").toLowerCase().includes(query.trim().toLowerCase()) && (
-                  <span className="note-match" title="Matched inside your notes">note</span>
-                )}
-                {notes[day.id] && (
-                  <span className="note-flag" title="This day has notes"><Icon.Note size={12} /></span>
-                )}
-                {isCurrent && !complete && <span className="current-pill">CURRENT</span>}
-                <span className="day-row-frac">{done}/{day.topics.length}</span>
-                <Icon.Chevron size={14} className={classNames("chev", isExpanded && "chev-open")} />
-              </span>
+              <LayoutIcon size={13} />
+              <span>{opt.label}</span>
             </button>
-            {isExpanded && (
-              <div className="day-row-body">
-                {day.topics.map((t, i) => {
-                  const isDone = !!(progress[day.id] && progress[day.id][i]);
-                  return (
-                    <label key={i} className={classNames("topic-line", isDone && "topic-line-done")}>
-                      <input
-                        type="checkbox"
-                        checked={isDone}
-                        onChange={() => onToggle(day, i, campaign)}
-                      />
-                      <span className="topic-checkbox">
-                        {isDone && <Icon.Check size={11} />}
-                      </span>
-                      <span className="topic-text">{t}</span>
-                      <DomainTag domain={day.domains[i]} />
-                    </label>
-                  );
-                })}
-                <NoteEditor
-                  value={notes[day.id] || ""}
-                  onChange={(v) => setNote(day.id, v)}
-                  dayNum={day.day}
-                />
-                <div className="day-tools">
-                  <button className="tool-btn" onClick={() => onOpenTool("quiz", day)}>
-                    <Icon.Target size={12} /> Quiz me
-                  </button>
-                  <button className="tool-btn" onClick={() => onOpenTool("notes", day)}>
-                    <Icon.Book size={12} /> Generate notes
-                  </button>
-                  <button className="tool-btn" onClick={() => onOpenTool("linkedin", day)}>
-                    <Icon.Send size={12} /> Draft post
-                  </button>
-                </div>
-                <ReferenceBlock
-                  data={refs[day.id]}
-                  onClear={() => setRef(day.id, null)}
-                  onRegenerate={() => onOpenTool("notes", day)}
-                />
-                <RelatedDays related={getRelated(day)} onJump={onJumpDay} />
-              </div>
+          );
+        })}
+      </div>
+
+      <div
+        className={classNames(
+          "console-view",
+          layout === "list" && "console-list",
+          layout === "bento" && "console-bento",
+          layout === "timeline" && "console-timeline",
+        )}
+        ref={listRef}
+      >
+        {days.length === 0 && <EmptyState />}
+        {days.map((day, idx) => {
+          const shared = {
+            day,
+            done: topicsDoneCount(day),
+            complete: isDayComplete(day),
+            isExpanded: expandedDay === day.id,
+            onToggleExpand: () => setExpandedDay(expandedDay === day.id ? null : day.id),
+            isCurrent: !!(jumpTarget && jumpTarget.id === day.id),
+            ...dayProps,
+          };
+          if (layout === "list") return <DayRow key={day.id} {...shared} />;
+          if (layout === "timeline") return <DayMission key={day.id} {...shared} side={idx % 2 === 0 ? "left" : "right"} />;
+          return <DayTile key={day.id} {...shared} />;
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DayRow({
+  day,
+  campaign,
+  progress,
+  onToggle,
+  isExpanded,
+  onToggleExpand,
+  done,
+  complete,
+  isCurrent,
+  notes,
+  setNote,
+  getRelated,
+  onJumpDay,
+  onOpenTool,
+  query,
+  refs,
+  setRef,
+}) {
+  const noteMatch =
+    query &&
+    query.trim() &&
+    (notes[day.id] || "").toLowerCase().includes(query.trim().toLowerCase());
+
+  return (
+    <div
+      data-day-id={day.id}
+      className={classNames(
+        "day-row",
+        complete && "day-row-complete",
+        isExpanded && "day-row-expanded",
+        isCurrent && !complete && "day-row-current",
+      )}
+      style={{ "--accent": campaign.accent }}
+    >
+      <button
+        type="button"
+        className="day-row-header"
+        onClick={onToggleExpand}
+        aria-expanded={isExpanded}
+      >
+        <span className="day-num">
+          {complete ? <Icon.Check size={13} /> : <span className="day-num-text">{String(day.day).padStart(3, "0")}</span>}
+        </span>
+        <span className="day-row-topics-preview">
+          {day.topics.map((t, i) => (
+            <span
+              key={i}
+              className={classNames(
+                "topic-chip-mini",
+                progress[day.id] && progress[day.id][i] && "topic-chip-mini-done",
+              )}
+            >
+              <DomainDot domain={day.domains[i]} />
+              {t}
+            </span>
+          ))}
+        </span>
+        <span className="day-row-right">
+          {noteMatch && (
+            <span className="note-match" title="Matched inside your notes">note</span>
+          )}
+          {notes[day.id] && (
+            <span className="note-flag" title="This day has notes"><Icon.Note size={12} /></span>
+          )}
+          {isCurrent && !complete && <span className="current-pill">Today</span>}
+          <span className="day-row-frac">{done}/{day.topics.length}</span>
+          <Icon.Chevron size={14} className={classNames("chev", isExpanded && "chev-open")} />
+        </span>
+      </button>
+      {isExpanded && (
+        <div className="day-row-body">
+          <DayDetailBody
+            day={day}
+            campaign={campaign}
+            progress={progress}
+            onToggle={onToggle}
+            notes={notes}
+            setNote={setNote}
+            getRelated={getRelated}
+            onJumpDay={onJumpDay}
+            onOpenTool={onOpenTool}
+            refs={refs}
+            setRef={setRef}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DayTile({
+  day,
+  campaign,
+  progress,
+  onToggle,
+  isExpanded,
+  onToggleExpand,
+  done,
+  complete,
+  isCurrent,
+  notes,
+  setNote,
+  getRelated,
+  onJumpDay,
+  onOpenTool,
+  query,
+  refs,
+  setRef,
+}) {
+  const colorA = useDomainColor(day.domains?.[0] || "systems-eng");
+  const colorB = useDomainColor(day.domains?.[1] || day.domains?.[0] || "systems-eng");
+  const total = day.topics.length || 1;
+  const pct = Math.round((done / total) * 100);
+  const previewTopics = day.topics.slice(0, 2);
+  const extraCount = Math.max(0, day.topics.length - 2);
+  const noteMatch =
+    query &&
+    query.trim() &&
+    (notes[day.id] || "").toLowerCase().includes(query.trim().toLowerCase());
+
+  return (
+    <article
+      data-day-id={day.id}
+      className={classNames(
+        "day-tile",
+        complete && "day-tile-complete",
+        isExpanded && "day-tile-expanded",
+        isCurrent && !complete && "day-tile-current",
+      )}
+      style={{
+        "--accent": campaign.accent,
+        "--tile-a": colorA,
+        "--tile-b": colorB,
+      }}
+    >
+      <div className="day-tile-glow" aria-hidden="true" />
+
+      <button
+        type="button"
+        className="day-tile-face"
+        onClick={onToggleExpand}
+        aria-expanded={isExpanded}
+      >
+        <div className="day-tile-top">
+          <span className={classNames("day-tile-num", complete && "day-tile-num-done", isCurrent && !complete && "day-tile-num-current")}>
+            {isCurrent && !complete && <span className="day-tile-live" aria-hidden="true" />}
+            {complete ? (
+              <Icon.Check size={14} />
+            ) : (
+              <span className="day-num-text">{String(day.day).padStart(3, "0")}</span>
             )}
+          </span>
+          <div className="day-tile-meta">
+            {noteMatch && (
+              <span className="note-match" title="Matched inside your notes">
+                note
+              </span>
+            )}
+            {notes[day.id] && (
+              <span className="note-flag day-tile-note" title="This day has notes">
+                <Icon.Note size={12} />
+              </span>
+            )}
+            {isCurrent && !complete && <span className="current-pill">Today</span>}
+            <span className="day-tile-frac">
+              {done}/{day.topics.length}
+            </span>
           </div>
-        );
-      })}
+        </div>
+
+        <ul className="day-tile-topics">
+          {previewTopics.map((t, i) => {
+            const topicDone = !!(progress[day.id] && progress[day.id][i]);
+            return (
+              <li
+                key={i}
+                className={classNames("day-tile-topic", topicDone && "day-tile-topic-done")}
+              >
+                <DomainDot domain={day.domains[i]} />
+                <span>{t}</span>
+              </li>
+            );
+          })}
+          {extraCount > 0 && <li className="day-tile-more">+{extraCount} more</li>}
+        </ul>
+
+        <div className="day-tile-progress" aria-hidden="true">
+          <div className="day-tile-progress-fill" style={{ width: `${pct}%` }} />
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div className="day-tile-body">
+          <DayDetailBody
+            day={day}
+            campaign={campaign}
+            progress={progress}
+            onToggle={onToggle}
+            notes={notes}
+            setNote={setNote}
+            getRelated={getRelated}
+            onJumpDay={onJumpDay}
+            onOpenTool={onOpenTool}
+            refs={refs}
+            setRef={setRef}
+          />
+        </div>
+      )}
+    </article>
+  );
+}
+
+function DayMission({
+  day,
+  campaign,
+  progress,
+  onToggle,
+  isExpanded,
+  onToggleExpand,
+  done,
+  complete,
+  isCurrent,
+  notes,
+  setNote,
+  getRelated,
+  onJumpDay,
+  onOpenTool,
+  query,
+  refs,
+  setRef,
+  side,
+}) {
+  const colorA = useDomainColor(day.domains?.[0] || "systems-eng");
+  const colorB = useDomainColor(day.domains?.[1] || day.domains?.[0] || "systems-eng");
+  const total = day.topics.length || 1;
+  const pct = Math.round((done / total) * 100);
+  const noteMatch =
+    query &&
+    query.trim() &&
+    (notes[day.id] || "").toLowerCase().includes(query.trim().toLowerCase());
+
+  return (
+    <div
+      data-day-id={day.id}
+      className={classNames(
+        "mission-node",
+        `mission-node-${side}`,
+        complete && "mission-node-complete",
+        isExpanded && "mission-node-expanded",
+        isCurrent && !complete && "mission-node-current",
+      )}
+      style={{
+        "--accent": campaign.accent,
+        "--tile-a": colorA,
+        "--tile-b": colorB,
+      }}
+    >
+      <div className="mission-rail" aria-hidden="true">
+        <span className={classNames("mission-dot", complete && "mission-dot-done", isCurrent && !complete && "mission-dot-live")}>
+          {complete ? <Icon.Check size={11} /> : String(day.day)}
+        </span>
+      </div>
+
+      <article className="mission-card">
+        <button
+          type="button"
+          className="mission-card-face"
+          onClick={onToggleExpand}
+          aria-expanded={isExpanded}
+        >
+          <div className="mission-card-top">
+            <span className="mission-card-label">Day {String(day.day).padStart(3, "0")}</span>
+            <div className="mission-card-meta">
+              {noteMatch && <span className="note-match">note</span>}
+              {notes[day.id] && (
+                <span className="note-flag" title="This day has notes"><Icon.Note size={12} /></span>
+              )}
+              {isCurrent && !complete && <span className="current-pill">Today</span>}
+              <span className="mission-card-frac">{done}/{day.topics.length}</span>
+            </div>
+          </div>
+          <ul className="mission-card-topics">
+            {day.topics.map((t, i) => {
+              const topicDone = !!(progress[day.id] && progress[day.id][i]);
+              return (
+                <li key={i} className={classNames("mission-card-topic", topicDone && "mission-card-topic-done")}>
+                  <DomainDot domain={day.domains[i]} />
+                  <span>{t}</span>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="mission-card-progress" aria-hidden="true">
+            <div className="mission-card-progress-fill" style={{ width: `${pct}%` }} />
+          </div>
+        </button>
+
+        {isExpanded && (
+          <div className="mission-card-body">
+            <DayDetailBody
+              day={day}
+              campaign={campaign}
+              progress={progress}
+              onToggle={onToggle}
+              notes={notes}
+              setNote={setNote}
+              getRelated={getRelated}
+              onJumpDay={onJumpDay}
+              onOpenTool={onOpenTool}
+              refs={refs}
+              setRef={setRef}
+            />
+          </div>
+        )}
+      </article>
     </div>
   );
 }
