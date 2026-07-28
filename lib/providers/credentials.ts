@@ -5,6 +5,7 @@ import {
 } from "@/lib/providers/types";
 import {
   OPENROUTER_DEFAULT_MODEL,
+  clearSessionPreferredModel,
   openrouterProvider,
 } from "@/lib/providers/openrouter";
 
@@ -34,6 +35,8 @@ export function getCredentials(): CredentialsState {
 }
 
 export function setCredentials(partial: Partial<CredentialsState>): CredentialsState {
+  const modelChanged =
+    partial.model !== undefined && partial.model !== memory.model;
   memory = {
     ...memory,
     ...partial,
@@ -41,6 +44,7 @@ export function setCredentials(partial: Partial<CredentialsState>): CredentialsS
     providerId: "openrouter",
   };
   if (!memory.baseUrl) memory.baseUrl = openrouterProvider.defaultBaseUrl;
+  if (modelChanged) clearSessionPreferredModel();
   if (memory.remember) {
     persistRemembered();
   } else {

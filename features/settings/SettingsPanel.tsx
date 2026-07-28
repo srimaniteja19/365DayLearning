@@ -154,7 +154,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             ? "Checking OpenRouter availability…"
             : modelsError ||
               (tier === "free"
-                ? "Free models are capped (~50 requests/day on OpenRouter). Hit the limit? Switch to Paid, or add credits at openrouter.ai."
+                ? "Free models failover automatically to other free models, then cheap paid ones if needed. Daily free caps (~50/day) skip straight to paid."
                 : "Top OpenRouter models by usage and frontier quality. Paste any OpenRouter id if you need something else.")}
         </div>
       </div>

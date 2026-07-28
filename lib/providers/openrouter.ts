@@ -108,6 +108,114 @@ export function isFreeModel(m: {
   return (m.promptPrice ?? 1) === 0 && (m.completionPrice ?? 1) === 0;
 }
 
+/** Cheap/popular paid models used only after free options fail. */
+export const OPENROUTER_PAID_FAILOVER: readonly string[] = [
+  "deepseek/deepseek-v4-flash",
+  "xiaomi/mimo-v2.5",
+  "tencent/hy3",
+  "deepseek/deepseek-v4-pro",
+  "stepfun/step-3.7-flash",
+  "moonshotai/kimi-k3",
+  "z-ai/glm-5.2",
+  "minimax/minimax-m3",
+];
+
+export function isFreeModelId(id: string): boolean {
+  return isFreeModel({ id });
+}
+
+/**
+ * Ordered failover candidates for a primary model.
+ * Free primary → other free → cheap paid.
+ * Paid primary → that model, then other cheap paid (no free downgrade).
+ * If this session already landed on a paid sticky model after free failures,
+ * skip re-probing free models on every subsequent call.
+ */
+export function buildModelFailoverChain(
+  primary: string,
+  opts?: { sessionPreferred?: string | null },
+): string[] {
+  const preferred = opts?.sessionPreferred?.trim() || "";
+  const out: string[] = [];
+  const push = (id: string) => {
+    if (id && !out.includes(id)) out.push(id);
+  };
+
+  if (isFreeModelId(primary)) {
+    if (preferred && !isFreeModelId(preferred)) {
+      push(preferred);
+      for (const id of OPENROUTER_PAID_FAILOVER) push(id);
+      return out;
+    }
+
+    push(primary);
+    for (const id of OPENROUTER_TOP_FREE) push(id);
+    if (preferred) {
+      // Move sticky free success near the front (after primary).
+      const rest = out.filter((id) => id !== preferred && id !== primary);
+      out.length = 0;
+      push(primary);
+      push(preferred);
+      for (const id of rest) push(id);
+    }
+    for (const id of OPENROUTER_PAID_FAILOVER) push(id);
+    return out;
+  }
+
+  push(primary);
+  if (preferred) push(preferred);
+  for (const id of OPENROUTER_PAID_FAILOVER) push(id);
+  return out;
+}
+
+/** Account-wide free daily caps won't clear by switching :free models. */
+export function shouldSkipRemainingFreeModels(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err || "");
+  return /free-models-per-day|free-model daily limit|free model requests per day/i.test(msg);
+}
+
+export function isFailoverWorthyError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  // Never rotate keys / auth failures across models.
+  if (err.name === "AuthError") return false;
+  if (err.name === "AbortError") return false;
+  if (err instanceof DOMException && err.name === "AbortError") return false;
+
+  const code = "code" in err ? String((err as { code?: string }).code || "") : "";
+  if (code === "auth" || code === "subscription") return false;
+
+  // Rate limits, quota on a specific free model, empty/bad content, HTTP 5xx-ish.
+  if (
+    code === "rate_limit" ||
+    code === "quota" ||
+    code === "content" ||
+    code === "network" ||
+    code === "http"
+  ) {
+    return true;
+  }
+
+  const msg = err.message || "";
+  return /rate limit|unavailable|overloaded|timeout|empty response|not found|no endpoints|provider returned error/i.test(
+    msg,
+  );
+}
+
+/** Last model that succeeded after failover this tab session. */
+let sessionPreferredModel: string | null = null;
+
+export function getSessionPreferredModel(): string | null {
+  return sessionPreferredModel;
+}
+
+export function setSessionPreferredModel(model: string | null): void {
+  sessionPreferredModel = model;
+}
+
+export function clearSessionPreferredModel(): void {
+  sessionPreferredModel = null;
+}
+
 export type ModelCategoryGroup = {
   category: ModelCategory;
   label: string;

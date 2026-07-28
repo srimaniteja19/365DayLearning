@@ -1,7 +1,19 @@
 import { getProvider } from "@/lib/providers/index";
 import { getCredentials } from "@/lib/providers/credentials";
 import type { ChatRequest, StructuredSchema } from "@/lib/providers/types";
-import { AuthError, ProviderError } from "@/lib/providers/errors";
+import {
+  AuthError,
+  ProviderError,
+  formatAiError,
+} from "@/lib/providers/errors";
+import {
+  buildModelFailoverChain,
+  getSessionPreferredModel,
+  isFailoverWorthyError,
+  isFreeModelId,
+  setSessionPreferredModel,
+  shouldSkipRemainingFreeModels,
+} from "@/lib/providers/openrouter";
 import type { ZodType } from "zod";
 
 export type ChatKind = "plan" | "action";
@@ -14,8 +26,15 @@ export function willUseManagedAi(): boolean {
   return false;
 }
 
+export {
+  getSessionPreferredModel,
+  clearSessionPreferredModel,
+} from "@/lib/providers/openrouter";
+
 /**
  * Chat through OpenRouter using the key from Settings.
+ * If the selected model is free (or fails), tries other free models, then
+ * cheap paid models. Account-wide free daily caps skip remaining free models.
  */
 export async function chat(
   req: Omit<ChatRequest, "prompt"> & { prompt: string; kind?: ChatKind },
@@ -27,21 +46,57 @@ export async function chat(
     throw new AuthError("Add your OpenRouter API key in Settings.");
   }
 
-  return provider.chat(
-    {
-      system: req.system,
-      prompt: req.prompt,
-      maxTokens: req.maxTokens,
-      temperature: req.temperature,
-      signal: req.signal,
-      structured: req.structured,
-    },
-    {
-      apiKey: creds.apiKey,
-      model: creds.model || provider.models[0],
-      baseUrl: creds.baseUrl || provider.defaultBaseUrl,
-    },
-  );
+  const primary = creds.model || provider.models[0];
+  const chain = buildModelFailoverChain(primary, {
+    sessionPreferred: getSessionPreferredModel(),
+  });
+
+  let lastError: unknown;
+  let skipFree = false;
+
+  for (const model of chain) {
+    if (skipFree && isFreeModelId(model)) continue;
+    if (req.signal?.aborted) {
+      throw req.signal.reason ?? new DOMException("Aborted", "AbortError");
+    }
+
+    try {
+      const text = await provider.chat(
+        {
+          system: req.system,
+          prompt: req.prompt,
+          maxTokens: req.maxTokens,
+          temperature: req.temperature,
+          signal: req.signal,
+          structured: req.structured,
+        },
+        {
+          apiKey: creds.apiKey,
+          model,
+          baseUrl: creds.baseUrl || provider.defaultBaseUrl,
+        },
+      );
+      if (model !== primary) {
+        setSessionPreferredModel(model);
+      }
+      return text;
+    } catch (err) {
+      lastError = err;
+      if (err instanceof DOMException && err.name === "AbortError") throw err;
+      if (err instanceof AuthError) throw err;
+      if (!isFailoverWorthyError(err)) throw err;
+
+      if (shouldSkipRemainingFreeModels(err)) {
+        skipFree = true;
+      }
+    }
+  }
+
+  if (lastError instanceof ProviderError) throw lastError;
+  if (lastError instanceof Error) {
+    throw new ProviderError(formatAiError(lastError), "http");
+  }
+  throw new ProviderError("All OpenRouter model fallbacks failed.", "http");
 }
 
 /** @deprecated Prefer `chat` — kept for call sites during migration. */
@@ -121,7 +176,7 @@ export async function testConnection(): Promise<{
     return {
       ok: true,
       latencyMs: Math.round(performance.now() - started),
-      model: creds.model || provider.models[0],
+      model: getSessionPreferredModel() || creds.model || provider.models[0],
       sample: text.slice(0, 80),
     };
   } catch (err) {

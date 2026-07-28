@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
+import { RateLimitError } from "@/lib/providers/errors";
 import {
   OPENROUTER_DEFAULT_MODEL,
   OPENROUTER_FRONTIER,
+  OPENROUTER_PAID_FAILOVER,
   OPENROUTER_TOP_FREE,
   OPENROUTER_TOP_USAGE,
   buildModelCatalog,
+  buildModelFailoverChain,
   groupModelsByCategory,
+  isFailoverWorthyError,
   isFreeModel,
+  shouldSkipRemainingFreeModels,
   vendorFromModelId,
 } from "@/lib/providers/openrouter";
 
@@ -54,5 +59,44 @@ describe("openrouter model catalog helpers", () => {
     );
     expect(OPENROUTER_TOP_FREE).toContain("openrouter/free");
     expect(vendorFromModelId("xiaomi/mimo-v2.5")).toBe("xiaomi");
+  });
+});
+
+describe("model failover chain", () => {
+  it("for a free primary tries other free models before paid", () => {
+    const chain = buildModelFailoverChain("openrouter/free");
+    expect(chain[0]).toBe("openrouter/free");
+    const firstPaid = chain.findIndex((id) =>
+      (OPENROUTER_PAID_FAILOVER as readonly string[]).includes(id),
+    );
+    expect(firstPaid).toBeGreaterThan(1);
+    expect(
+      chain.slice(0, firstPaid).every((id) => id.endsWith(":free") || id === "openrouter/free"),
+    ).toBe(true);
+    expect(chain).toContain("deepseek/deepseek-v4-flash");
+  });
+
+  it("skips free probing once session sticky is a paid model", () => {
+    const chain = buildModelFailoverChain("openrouter/free", {
+      sessionPreferred: "deepseek/deepseek-v4-flash",
+    });
+    expect(chain[0]).toBe("deepseek/deepseek-v4-flash");
+    expect(chain.some((id) => id.endsWith(":free") || id === "openrouter/free")).toBe(false);
+  });
+
+  it("does not downgrade a paid primary to free models", () => {
+    const chain = buildModelFailoverChain("deepseek/deepseek-v4-flash");
+    expect(chain[0]).toBe("deepseek/deepseek-v4-flash");
+    expect(chain.every((id) => !id.endsWith(":free") && id !== "openrouter/free")).toBe(true);
+  });
+
+  it("detects free daily caps and failover-worthy errors", () => {
+    expect(
+      shouldSkipRemainingFreeModels(
+        new RateLimitError("Rate limit exceeded: free-models-per-day. Add 10 credits"),
+      ),
+    ).toBe(true);
+    expect(isFailoverWorthyError(new RateLimitError("slow down"))).toBe(true);
+    expect(isFailoverWorthyError(new Error("API key is invalid"))).toBe(false);
   });
 });
