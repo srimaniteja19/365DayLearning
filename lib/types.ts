@@ -185,3 +185,4 @@ export const SCHEMA_VERSION = 3;
 
 export const BUILTIN_365_ID = "builtin-365";
 export const BUILTIN_45_ID = "builtin-45";
+export const BUILTIN_30_MIND_ID = "builtin-30-mind";

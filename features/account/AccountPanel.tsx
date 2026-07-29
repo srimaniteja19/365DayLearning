@@ -64,7 +64,7 @@ export function AccountPanel({
         <div className="account-sync">
           <Icon.Cloud size={15} />
           <span>
-            Last synced from this device: <strong>{lastSyncedLabel || "not yet"}</strong>
+            Last synced this session: <strong>{lastSyncedLabel || "not yet"}</strong>
           </span>
         </div>
 

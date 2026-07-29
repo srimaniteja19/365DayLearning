@@ -24,10 +24,9 @@ export const users = pgTable("users", {
 });
 
 /**
- * The entire client `AppSnapshot` (meta + plans + userdata) serialized as
- * JSON, one row per user. This mirrors what's already stored in
- * IndexedDB/localStorage so sync can reuse the existing snapshot shape
- * without a relational rewrite of plans/progress/notes/srs/learned.
+ * The entire client `AppSnapshot` (meta + plans + userdata) as JSON, one row
+ * per user. Neon is the source of truth for learning data; the shape matches
+ * the former client-side cache so sync stays a single document put/get.
  */
 export const userState = pgTable("user_state", {
   userId: uuid("user_id")

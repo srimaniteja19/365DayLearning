@@ -183,7 +183,7 @@ export function PlanEditor({ plan, onChange, onSave, onBack }: Props) {
                         className="settings-input"
                         value={regenInstruction}
                         onChange={(e) => setRegenInstruction(e.target.value)}
-                        placeholder='e.g. make this more about Postgres internals'
+                        placeholder='e.g. more about habit formation, or swap in a worked example'
                         autoFocus
                       />
                       <div className="panel-actions">

@@ -28,18 +28,39 @@ export const DOMAIN_PALETTES: Record<PaletteMode, Record<string, string>> = {
     "databases": "#6EE7B7", "infra-cloud": "#60A5FA", "data-eng": "#F472B6",
     "distributed-sys": "#FB923C", "security": "#EF4444", "observability": "#A3E635",
     "perf": "#FACC15", "systems-eng": "#94A3B8",
+    "psychology": "#F9A8D4", "cognitive-sci": "#E9D5FF", "behavioral-econ": "#FCD34D",
+    "economics": "#86EFAC", "history": "#FDBA74", "philosophy": "#C4B5FD",
+    "languages": "#7DD3FC", "literature": "#FDA4AF", "writing": "#A5B4FC",
+    "arts": "#F0ABFC", "music": "#67E8F9", "biology": "#4ADE80",
+    "physics": "#93C5FD", "math": "#FDE68A", "health": "#6EE7B7",
+    "business": "#FCA5A5", "law-civics": "#D4D4D8", "geography": "#A3E635",
+    "sociology": "#F9A8D4", "communication": "#A5F3FC",
   },
   light: {
     "ai-ml": "#B4730A", "backend-node": "#0E8C7F", "frontend": "#7C3AED",
     "databases": "#10855F", "infra-cloud": "#1D4ED8", "data-eng": "#BE185D",
     "distributed-sys": "#C2410C", "security": "#B91C1C", "observability": "#4D7C0F",
     "perf": "#A16207", "systems-eng": "#4B5563",
+    "psychology": "#BE185D", "cognitive-sci": "#7E22CE", "behavioral-econ": "#A16207",
+    "economics": "#15803D", "history": "#C2410C", "philosophy": "#6D28D9",
+    "languages": "#0369A1", "literature": "#BE123C", "writing": "#4338CA",
+    "arts": "#A21CAF", "music": "#0E7490", "biology": "#15803D",
+    "physics": "#1D4ED8", "math": "#A16207", "health": "#0F766E",
+    "business": "#B91C1C", "law-civics": "#52525B", "geography": "#4D7C0F",
+    "sociology": "#9D174D", "communication": "#0E7490",
   },
   muted: {
     "ai-ml": "#C4A052", "backend-node": "#5FA89C", "frontend": "#9A8CBF",
     "databases": "#74A88A", "infra-cloud": "#7B94BF", "data-eng": "#B98BA0",
     "distributed-sys": "#C08F6B", "security": "#BE7A7A", "observability": "#9AAE72",
     "perf": "#C0AE6A", "systems-eng": "#8C9199",
+    "psychology": "#C49AA8", "cognitive-sci": "#B0A0C4", "behavioral-econ": "#C4B06A",
+    "economics": "#7AA88A", "history": "#C08F6B", "philosophy": "#A08CBF",
+    "languages": "#7B94BF", "literature": "#BE8A8A", "writing": "#8C8CBF",
+    "arts": "#B98BBF", "music": "#5FA8B8", "biology": "#74A88A",
+    "physics": "#7B94BF", "math": "#C0AE6A", "health": "#5FA89C",
+    "business": "#BE7A7A", "law-civics": "#8C9199", "geography": "#9AAE72",
+    "sociology": "#C49AA8", "communication": "#5FA8B8",
   },
 };
 
@@ -50,8 +71,43 @@ const FONT_STACKS = {
   grotesk: "var(--font-host), var(--font-space), sans-serif",
 };
 
-/** Default dashboard + landing theme. */
+/** Default dashboard theme (user-selectable). Homepage uses LANDING_THEME instead. */
 export const DEFAULT_THEME_KEY: ThemeKey = "signal";
+
+/**
+ * Fixed public homepage skin — same for every visitor, ignores account theme.
+ * Cool steel paper + electric briefing blue + flare coral. Sharp neo-brutal edges.
+ */
+export const LANDING_THEME: ThemeDef = {
+  name: "Briefing",
+  mode: "light",
+  palette: "light",
+  effects: true,
+  swatch: ["#D5DEE8", "#2554F2", "#FF4D6A"],
+  accents: { main: "#2554F2", sprint: "#FF4D6A" },
+  display: FONT_STACKS.grotesk,
+  radius: { card: "0px", ctl: "0px", pill: "0px", bar: "0px" },
+  grid: { color: "rgba(37,84,242,0.1)", size: "28px", scan: "0.18" },
+  c: {
+    bg: "#D5DEE8",
+    panel: "#F4F7FB",
+    panel2: "#C0CBD8",
+    blur: "rgba(213,222,232,0.92)",
+    text: "#0B1220",
+    dim: "#3D4A5C",
+    faint: "#5C6B7E",
+    border: "rgba(11,18,32,0.2)",
+    borderSoft: "rgba(11,18,32,0.1)",
+    borderHover: "rgba(11,18,32,0.36)",
+    track: "rgba(11,18,32,0.12)",
+    onAccent: "#FFFFFF",
+    onAccentSoft: "rgba(255,255,255,0.9)",
+    ok: "#0F7A4A",
+    warn: "#C97800",
+    err: "#E11D48",
+    info: "#2554F2",
+  },
+};
 
 /**
  * Ten field-manual skins — distinct moods, not soft SaaS pastels.

@@ -1363,23 +1363,11 @@ export function DomainLegend({ tally, active, setActive }) {
 }
 
 /* ============================== CONSOLE VIEW ============================== */
-const CONSOLE_LAYOUT_KEY = "dualtrack:console-layout";
 const CONSOLE_LAYOUTS = [
   { key: "list", label: "List", hint: "Dense day rows", Icon: Icon.List },
   { key: "bento", label: "Index", hint: "Asymmetric day cards", Icon: Icon.LayoutDashboard },
   { key: "timeline", label: "Spine", hint: "Alternating mission spine", Icon: Icon.Path },
 ];
-
-function readConsoleLayout() {
-  if (typeof window === "undefined") return "bento";
-  try {
-    const raw = window.localStorage.getItem(CONSOLE_LAYOUT_KEY);
-    if (raw === "list" || raw === "bento" || raw === "timeline") return raw;
-  } catch {
-    // best-effort only
-  }
-  return "bento";
-}
 
 function DayDetailBody({
   day,
@@ -1460,17 +1448,7 @@ function DayDetailBody({
 
 export function ConsoleView({ campaign, days, progress, onToggle, expandedDay, setExpandedDay, topicsDoneCount, isDayComplete, jumpTarget, notes, setNote, getRelated, onJumpDay, onOpenTool, onCaptureToKit, query, refs, setRef }) {
   const listRef = useRef(null);
-  const [layout, setLayoutState] = useState(readConsoleLayout);
-
-  const setLayout = useCallback((next) => {
-    setLayoutState(next);
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(CONSOLE_LAYOUT_KEY, next);
-    } catch {
-      // best-effort only
-    }
-  }, []);
+  const [layout, setLayout] = useState("bento");
 
   useEffect(() => {
     if (jumpTarget && listRef.current) {
@@ -1920,7 +1898,7 @@ function NoteEditor({ value, onChange, dayNum }) {
         className="note-input"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="What clicked, what didn't. Links, gotchas, code to revisit, questions for your team…"
+        placeholder="What clicked, what didn't. Links, gotchas, examples to revisit, open questions…"
         spellCheck="true"
       />
     </div>

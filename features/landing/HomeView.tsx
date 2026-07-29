@@ -139,13 +139,9 @@ export function HomeView({
 
       {/* 1. Hero */}
       <section className="landing-hero" aria-labelledby="landing-hero-title">
-        <div className="landing-hero-stage" aria-hidden="true">
-          <span className="landing-shape landing-shape-a" />
-          <span className="landing-shape landing-shape-b" />
-          <span className="landing-shape landing-shape-c" />
-        </div>
+        <div className="landing-hero-mesh" aria-hidden="true" />
         <div className="landing-hero-copy">
-          <span className="landing-hero-kicker">Field ops</span>
+          <span className="landing-hero-kicker">Briefing · Field ops</span>
           <p className="landing-brand-hero">REFRAINLY</p>
           {hasCampaign ? (
             <>
@@ -154,8 +150,7 @@ export function HomeView({
               </h1>
               <p className="landing-hero-lead">
                 Continue <strong>{summary.name}</strong> — {summary.daysComplete} of{" "}
-                {summary.totalDays} days done. Field Ops learning console for multi-plan daily
-                campaigns.
+                {summary.totalDays} days done.
               </p>
               <div className="landing-hero-actions">
                 <button type="button" className="landing-cta" onClick={onGoDashboard}>
@@ -172,11 +167,14 @@ export function HomeView({
                 Field Ops for daily learning campaigns
               </h1>
               <p className="landing-hero-lead">
-                Not a flashcard app. Not a course platform. Not a habit tracker. A{" "}
-                <strong>campaign runner</strong> for structured self-study in any subject —
-                psychology, economics, history, languages, music, tech — day-by-day plans, real
-                memory, and a Field Kit for everything off-plan.
+                A <strong>campaign runner</strong> for any subject — day-by-day plans, real memory,
+                and a Field Kit for everything off-plan.
               </p>
+              <div className="landing-hero-subjects" aria-hidden="true">
+                {["Psychology", "Economics", "History", "Languages", "Music", "Tech"].map((s) => (
+                  <span key={s} className="landing-hero-chip">{s}</span>
+                ))}
+              </div>
               <div className="landing-hero-actions">
                 <button type="button" className="landing-cta" onClick={startAccount}>
                   Create free account
@@ -192,6 +190,61 @@ export function HomeView({
               <p className="landing-hero-fine">Free Recruit tier · sign in required · syncs across devices</p>
             </>
           )}
+        </div>
+
+        <div className="landing-hero-viz" aria-hidden="true">
+          <div className="landing-viz-board">
+            <div className="landing-viz-top">
+              <span className="landing-viz-op">OPERATION MINDFIELD</span>
+              <span className="landing-viz-live">
+                <span className="landing-viz-live-dot" />
+                LIVE
+              </span>
+            </div>
+            <div className="landing-viz-progress">
+              <div className="landing-viz-progress-meta">
+                <span>Day 12 / 30</span>
+                <span>40%</span>
+              </div>
+              <div className="landing-viz-bar">
+                <span className="landing-viz-bar-fill" />
+              </div>
+            </div>
+            <ul className="landing-viz-days">
+              <li className="landing-viz-day is-done">
+                <span className="landing-viz-day-n">10</span>
+                <span className="landing-viz-day-t">Deliberate practice</span>
+                <span className="landing-viz-check" />
+              </li>
+              <li className="landing-viz-day is-done">
+                <span className="landing-viz-day-n">11</span>
+                <span className="landing-viz-day-t">Spaced repetition</span>
+                <span className="landing-viz-check" />
+              </li>
+              <li className="landing-viz-day is-active">
+                <span className="landing-viz-day-n">12</span>
+                <span className="landing-viz-day-t">Retrieval practice</span>
+                <span className="landing-viz-now">NOW</span>
+              </li>
+              <li className="landing-viz-day">
+                <span className="landing-viz-day-n">13</span>
+                <span className="landing-viz-day-t">Metacognition</span>
+              </li>
+            </ul>
+          </div>
+          <div className="landing-viz-kit">
+            <span className="landing-viz-kit-label">Field Kit</span>
+            <div className="landing-viz-slip landing-viz-slip-a">
+              Loss aversion ≠ risk aversion
+            </div>
+            <div className="landing-viz-slip landing-viz-slip-b">
+              Link · Kahneman ch. 26
+            </div>
+            <div className="landing-viz-slip landing-viz-slip-c">
+              Rabbit hole → keep
+            </div>
+          </div>
+          <span className="landing-viz-stamp">DAY 12</span>
         </div>
       </section>
 
@@ -569,8 +622,8 @@ export function HomeView({
               {hasCampaign ? "Add a campaign" : "Start your first campaign"}
             </h2>
             <p className="landing-picker-lead">
-              Example campaigns are tech-flavored starters. Build a custom plan for any subject —
-              psychology, economics, history, and beyond — when you&apos;re ready.
+              Start with an example — psychology &amp; decision science, a year of systems depth, or an AI
+              sprint — or build a custom plan for any subject.
             </p>
           </div>
           <div className="landing-picker-grid">
@@ -634,10 +687,15 @@ export function HomeView({
           <button type="button" className="landing-footer-link" onClick={onOpenAccount}>
             {accountLabel ? "Account" : "Sign in"}
           </button>
+          <a className="landing-footer-link" href="/privacy">
+            Privacy
+          </a>
+          <a className="landing-footer-link" href="/terms">
+            Terms
+          </a>
         </nav>
         <p className="landing-footer-legal">
-          Privacy Policy and Terms of Service pages are not published yet — no email waitlist or
-          payment collection on this page until they are.
+          Paid checkout is not live yet. See Privacy and Terms for how accounts and data work today.
         </p>
       </footer>
     </div>

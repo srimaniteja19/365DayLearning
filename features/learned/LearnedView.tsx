@@ -45,38 +45,6 @@ const MONTH_FULL = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
-const AUTO_INSIGHT_KEY = "dualtrack:learned-auto-insight";
-const CHRONO_KEY = "dualtrack:learned-chrono";
-
-function readStoredChrono(): LearnedChronoFilter {
-  if (typeof window === "undefined") return EMPTY_CHRONO_FILTER;
-  try {
-    const raw = window.localStorage.getItem(CHRONO_KEY);
-    if (!raw) return EMPTY_CHRONO_FILTER;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return EMPTY_CHRONO_FILTER;
-    return {
-      year: typeof parsed.year === "number" ? parsed.year : null,
-      month: typeof parsed.month === "number" ? parsed.month : null,
-      day: typeof parsed.day === "number" ? parsed.day : null,
-    };
-  } catch {
-    return EMPTY_CHRONO_FILTER;
-  }
-}
-
-function readStoredAutoInsight(): boolean {
-  if (typeof window === "undefined") return true;
-  try {
-    const raw = window.localStorage.getItem(AUTO_INSIGHT_KEY);
-    if (raw === "0") return false;
-    if (raw === "1") return true;
-  } catch {
-    /* default */
-  }
-  return true;
-}
-
 function sourceProviderLabel(provider: string): string {
   if (provider === "youtube-captions") return "YouTube captions";
   if (provider === "jina") return "article text";
@@ -372,7 +340,6 @@ export function LearnedView({
   const setQuery = typeof onLensQueryChange === "function" ? onLensQueryChange : setLocalQuery;
   const kitLens = typeof onLensQueryChange === "function";
   const [chrono, setChrono] = useState<LearnedChronoFilter>(EMPTY_CHRONO_FILTER);
-  const [prefsReady, setPrefsReady] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState(null);
@@ -387,31 +354,6 @@ export function LearnedView({
   const toggleTag = (tag) => {
     setTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
   };
-
-  // Restore polish + chrono prefs after mount (SSR-safe).
-  useEffect(() => {
-    setAutoInsight(readStoredAutoInsight());
-    setChrono(readStoredChrono());
-    setPrefsReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (!prefsReady) return;
-    try {
-      window.localStorage.setItem(AUTO_INSIGHT_KEY, autoInsight ? "1" : "0");
-    } catch {
-      /* best-effort */
-    }
-  }, [autoInsight, prefsReady]);
-
-  useEffect(() => {
-    if (!prefsReady) return;
-    try {
-      window.localStorage.setItem(CHRONO_KEY, JSON.stringify(chrono));
-    } catch {
-      /* best-effort */
-    }
-  }, [chrono, prefsReady]);
 
   // On This Day (or other deep-links) → jump Chrono to that date.
   useEffect(() => {

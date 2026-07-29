@@ -282,7 +282,7 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
               className="settings-input"
               value={draft.name}
               onChange={(e) => patch({ name: e.target.value })}
-              placeholder="OPERATION CUSTOMSTACK"
+              placeholder="OPERATION ATLAS"
               autoFocus
             />
           </div>
@@ -292,7 +292,7 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
               className="settings-input"
               value={draft.subtitle}
               onChange={(e) => patch({ subtitle: e.target.value })}
-              placeholder="90-day backend depth campaign"
+              placeholder="90-day decision science campaign"
             />
           </div>
           <div className="gen-field">

@@ -5,8 +5,7 @@ Multi-plan learning campaigns for any subject: progress, spaced repetition, note
 ## Stack
 
 - **Next.js 16** (App Router) + React 19 + TypeScript
-- Persistence via **IndexedDB** (`idb-keyval`) with **localStorage** fallback
-- Accounts + cloud sync: **Neon Postgres** (via Vercel's database integration) + **Auth.js v5** (credentials)
+- Learning data persistence: **Neon Postgres** (Auth.js session required)
 - BYOK via OpenRouter (paste your key + model in Settings)
 
 ## Setup
@@ -20,9 +19,9 @@ Open **Settings** in the top bar and paste your OpenRouter key at runtime.
 
 ## Accounts + cloud sync
 
-An account is **required** to use Refrainly (campaigns, Field Kit, progress). Sign-in syncs the
-entire snapshot (plans, progress, notes, SRS, and the Learned journal) to Postgres per account
-so it follows you across devices.
+An account is **required** to use Refrainly (campaigns, Field Kit, progress). Sign-in loads and
+saves the entire snapshot (plans, progress, notes, SRS, and the Learned journal) in Neon Postgres
+per account so it follows you across devices.
 
 1. **Create the database** — in the Vercel dashboard: *Storage → Create Database → Neon (Postgres)*.
    Connect it to this project so `DATABASE_URL` is added to your Vercel env vars automatically.
@@ -36,9 +35,9 @@ so it follows you across devices.
    ```bash
    npm run db:push
    ```
-4. Run the app — create an account or sign in from the landing page or top bar. First sign-in
-   pulls any existing cloud snapshot for that account (or seeds the cloud with local data if
-   present), then keeps pushing on every save.
+4. Run the app — create an account or sign in from the landing page or top bar. On sign-in the
+   app pulls your cloud snapshot (or starts empty and seeds Neon on first save), then pushes on
+   every change. Any leftover pre-Neon browser caches are cleared after a successful pull.
 
 Without `DATABASE_URL`/`AUTH_SECRET` set, sign-in/sign-up calls fail gracefully (503) — auth must
 be configured for the app to be usable beyond the landing page.
@@ -73,40 +72,36 @@ npm run db:studio    # browse the database with Drizzle Studio
 
 ## Features
 
-- New accounts start empty; **"OPERATION LONGHAUL"** (365-day) and **"OPERATION FASTBURN"** (45-day)
-  are offered as opt-in example plans (added as-is, no AI needed) rather than auto-assigned
+- New accounts start empty; example campaigns (**OPERATION MINDFIELD** 30-day psychology,
+  **OPERATION LONGHAUL** 365-day systems, **OPERATION FASTBURN** 45-day AI) are opt-in
+  (added as-is, no AI needed) rather than auto-assigned
 - Custom plans from the builder; plan generation (outline → periods), edit-before-save, cancel/resume
 - Multi-plan switcher; delete purges that plan’s progress/notes/refs/srs
 - **Other things I learned** — calendar journal with markdown notes, rich links, and AI insights
 - **Bookmarks** — save articles, YouTube/Vimeo, docs, and repos with compact link previews when available
 - **Accounts + cloud sync** (Neon Postgres + Auth.js) — required to use the app; syncs across devices
 - **Subscriptions** — Recruit (free OpenRouter BYOK) is live; Operator/Architect managed AI is planned (checkout not connected)
-- Themes (10) via CSS custom properties — Signal, Folio, Afterburn, Chlorophyll, Oxide, Ion, Cinnabar, Halide, Voltaic, Marina
+- Themes (10) via CSS custom properties for the **dashboard** — Signal, Folio, Afterburn, Chlorophyll, Oxide, Ion, Cinnabar, Halide, Voltaic, Marina. The **homepage** always uses a fixed **Briefing** skin (steel paper + electric blue + flare coral), independent of account theme.
 - Export: notes markdown, full backup, **plan-only share**
 - Import: plan share adds a plan; full backup asks **merge** or **replace**
 
 ## AI keys (BYOK)
 
 - Default: key stays **in memory** only (cleared when the tab closes)
-- Optional: “Remember this key on this device” → `dualtrack:credentials` in localStorage
+- Optional: “Remember this key on this device” → browser localStorage only (never written to Neon)
 - Exports never include credentials
-- **Forget key** clears memory + storage
+- **Forget key** clears memory + that local remember flag
 
 ## Persistence
 
-Storage keys keep the legacy `dualtrack:` prefix so existing local data still loads.
-
-| Key | Contents |
-|-----|----------|
-| `dualtrack:meta` | schema version, active plan, theme |
-| `dualtrack:plans` | plan definitions |
-| `dualtrack:userdata` | progress, notes, refs, srs, log, learned |
-| `dualtrack:credentials` | opt-in remembered provider key |
+Campaigns, progress, notes, SRS, Field Kit, theme, and font live in **Neon** (`user_state` via `/api/state`).
+UI chrome (console layout, Field Kit filters, page) is session-only and is not persisted.
+Optional BYOK “remember key” is the only intentional localStorage use.
 
 ## Manual checklist
 
-- Fresh browser/storage: app opens to the "Start your first campaign" example picker, not a plan
+- Fresh signed-in account: empty workspace + example plan picker (not an auto-assigned plan)
 - Generate a 30-day plan with OpenRouter
 - Cancel generation midway, then resume
 - Switch all ten themes on builder + progress screens (esp. Afterburn & Voltaic)
-- Reload: plans, progress, and theme survive; API key is gone unless “remember” was ticked
+- Reload while signed in: plans, progress, and theme come back from Neon; API key is gone unless “remember” was ticked

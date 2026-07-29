@@ -13,10 +13,7 @@ import React, {
 } from "react";
 import { useSession } from "next-auth/react";
 import {
-  hasStorage,
-  loadAppSnapshot,
-  saveAppSnapshot,
-  clearUserData,
+  purgeLocalAppData,
 } from "@/lib/storage";
 import { pullCloudSnapshot, pushCloudSnapshot } from "@/lib/cloudSync";
 import {
@@ -24,8 +21,10 @@ import {
   scopesForPlan,
   createBuiltin365,
   createBuiltin45,
+  createBuiltin30Mind,
+  createBuiltinById,
 } from "@/data/builtinPlans";
-import { DOMAIN_PALETTES, THEMES, resolveThemeKey, DEFAULT_THEME_KEY, hexToRgba, themeVars } from "@/theme/themes";
+import { DOMAIN_PALETTES, THEMES, LANDING_THEME, resolveThemeKey, DEFAULT_THEME_KEY, hexToRgba, themeVars } from "@/theme/themes";
 import {
   DEFAULT_FONT_KEY,
   FONT_PACKS,
@@ -44,7 +43,6 @@ import { accentForPlan } from "@/lib/accents";
 import { purgePlanUserData } from "@/lib/migration";
 import {
   BUILTIN_365_ID,
-  BUILTIN_45_ID,
   SCHEMA_VERSION,
 } from "@/lib/types";
 import { hydrateCredentialsFromStorage } from "@/lib/providers/credentials";
@@ -86,8 +84,15 @@ import {
   seedPreviewFromUrl,
 } from "@/lib/bookmarks";
 
-const PAGE_KEY = "dualtrack:page";
-const KIT_TAB_KEY = "dualtrack:kit-tab";
+const emptyUserSnapshot = () => ({
+  progress: {},
+  notes: {},
+  refs: {},
+  srs: {},
+  log: [],
+  learned: {},
+  bookmarks: [],
+});
 
 export default function DualTrackConsole() {
   const [plans, setPlans] = useState({});
@@ -113,39 +118,18 @@ export default function DualTrackConsole() {
   const [saveStatus, setSaveStatus] = useState("loading");
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmDeletePlanId, setConfirmDeletePlanId] = useState(null);
-  /**
-   * Top-level page (Home / Dashboard / Field Kit). Always start as "home" so SSR
-   * and the first client paint match — localStorage is applied in an effect below.
-   */
-  const [page, setPageState] = useState("home");
-  const setPage = useCallback((next) => {
-    setPageState(next);
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(PAGE_KEY, next);
-    } catch {
-      // best-effort only
-    }
-  }, []);
-  /** Field Kit tab — notes vs bookmarks. Independent of campaign plans. */
-  const [kitTab, setKitTabState] = useState("learned");
-  const setKitTab = useCallback((next) => {
-    setKitTabState(next);
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(KIT_TAB_KEY, next);
-    } catch {
-      // best-effort only
-    }
-  }, []);
+  /** True after Neon hydrate finishes for the signed-in user (gates cloud autosave). */
+  const [cloudReady, setCloudReady] = useState(false);
+  /** Top-level page (Home / Dashboard / Field Kit). Session-only — Neon holds learning data. */
+  const [page, setPage] = useState("home");
+  /** Field Kit tab — notes vs bookmarks. */
+  const [kitTab, setKitTab] = useState("learned");
 
   const toastTimer = useRef(null);
   const saveTimer = useRef(null);
-  const didLoad = useRef(false);
-  const storageOk = useRef(false);
+  const hydrateGen = useRef(0);
   const { data: session, status: sessionStatus } = useSession();
   const cloudUserId = session?.user?.id || null;
-  const cloudSyncedFor = useRef(null);
   const pendingAuthAction = useRef(null);
 
   /** Gate plan/kit/dashboard actions behind sign-in. */
@@ -267,22 +251,43 @@ export default function DualTrackConsole() {
     hydrateCredentialsFromStorage();
   }, []);
 
-  // Restore remembered page after mount (avoids hydration mismatch).
   // Clear legacy guest-mode flag if present.
   useEffect(() => {
     try {
       window.localStorage.removeItem("dualtrack:guest");
-      const savedPage = window.localStorage.getItem(PAGE_KEY);
-      if (savedPage === "dashboard" || savedPage === "home" || savedPage === "kit") {
-        setPageState(savedPage);
-      }
-      const savedKit = window.localStorage.getItem(KIT_TAB_KEY);
-      if (savedKit === "learned" || savedKit === "bookmarks") {
-        setKitTabState(savedKit);
-      }
+      window.localStorage.removeItem("dualtrack:page");
+      window.localStorage.removeItem("dualtrack:kit-tab");
     } catch {
       // best-effort only
     }
+  }, []);
+
+  const resetWorkspace = useCallback(() => {
+    setPlans({});
+    setActivePlanId(BUILTIN_365_ID);
+    setProgress({});
+    setNotes({});
+    setRefs({});
+    setSrs({});
+    setLog([]);
+    setLearned({});
+    setBookmarks([]);
+    setThemeKey(DEFAULT_THEME_KEY);
+    setFontKey(DEFAULT_FONT_KEY);
+  }, []);
+
+  const applyCloudSnapshot = useCallback((snap) => {
+    setPlans(snap.plans || {});
+    setActivePlanId(snap.meta?.activePlanId || BUILTIN_365_ID);
+    setProgress(snap.userdata?.progress || {});
+    setNotes(snap.userdata?.notes || {});
+    setRefs(snap.userdata?.refs || {});
+    setSrs(snap.userdata?.srs || {});
+    setLog(snap.userdata?.log || []);
+    setLearned(snap.userdata?.learned || {});
+    setBookmarks(sanitizeBookmarks(snap.userdata?.bookmarks));
+    if (snap.meta?.themeKey) setThemeKey(resolveThemeKey(snap.meta.themeKey));
+    if (snap.meta?.fontKey) setFontKey(resolveFontKey(snap.meta.fontKey));
   }, []);
 
   // Unsigned users stay on the landing page — no guest dashboard/kit.
@@ -291,7 +296,7 @@ export default function DualTrackConsole() {
     if (!cloudUserId && (page === "dashboard" || page === "kit")) {
       setPage("home");
     }
-  }, [sessionStatus, cloudUserId, page, setPage]);
+  }, [sessionStatus, cloudUserId, page]);
 
   // Migrate legacy in-dashboard Learned/Bookmarks tabs → Field Kit page.
   useEffect(() => {
@@ -301,97 +306,54 @@ export default function DualTrackConsole() {
     openKit(tab);
   }, [view, openKit]);
 
+  // Neon is the source of truth — load/save account snapshots from Postgres only.
   useEffect(() => {
+    if (sessionStatus === "loading") return;
+    const gen = ++hydrateGen.current;
+    setCloudReady(false);
+
+    if (!cloudUserId) {
+      resetWorkspace();
+      setSaveStatus("off");
+      return;
+    }
+
     let cancelled = false;
     (async () => {
-      const ok = await hasStorage();
-      storageOk.current = ok;
-      if (!ok) {
-        if (!cancelled) {
-          didLoad.current = true;
-          setSaveStatus("off");
-        }
+      setSaveStatus("loading");
+      resetWorkspace();
+      const result = await pullCloudSnapshot();
+      if (cancelled || gen !== hydrateGen.current) return;
+      if (result.ok && result.snapshot) {
+        applyCloudSnapshot(result.snapshot);
+        fireToast("Synced from your account");
+      } else if (!result.ok) {
+        setSaveStatus("error");
         return;
       }
-      const snap = await loadAppSnapshot();
-      if (cancelled) return;
-      if (snap) {
-        setPlans(snap.plans);
-        setActivePlanId(snap.meta.activePlanId);
-        setProgress(snap.userdata.progress);
-        setNotes(snap.userdata.notes);
-        setRefs(snap.userdata.refs);
-        setSrs(snap.userdata.srs);
-        setLog(snap.userdata.log);
-        setLearned(snap.userdata.learned || {});
-        setBookmarks(sanitizeBookmarks(snap.userdata.bookmarks));
-        if (snap.meta.themeKey) {
-          setThemeKey(resolveThemeKey(snap.meta.themeKey));
-        }
-        if (snap.meta.fontKey) {
-          setFontKey(resolveFontKey(snap.meta.fontKey));
-        }
-      }
-      didLoad.current = true;
+      setCloudReady(true);
       setSaveStatus("idle");
+      purgeLocalAppData().catch(() => {});
     })();
+
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  // Pull the account's cloud snapshot once per sign-in. If the account has
-  // no cloud data yet (first sign-in from any device), seed it from
-  // whatever is already loaded locally.
-  useEffect(() => {
-    if (!didLoad.current) return;
-    if (!cloudUserId) return;
-    if (cloudSyncedFor.current === cloudUserId) return;
-    cloudSyncedFor.current = cloudUserId;
-    (async () => {
-      const result = await pullCloudSnapshot();
-      if (!result.ok) return;
-      if (result.snapshot) {
-        const snap = result.snapshot;
-        setPlans(snap.plans);
-        setActivePlanId(snap.meta.activePlanId);
-        setProgress(snap.userdata.progress || {});
-        setNotes(snap.userdata.notes || {});
-        setRefs(snap.userdata.refs || {});
-        setSrs(snap.userdata.srs || {});
-        setLog(snap.userdata.log || []);
-        setLearned(snap.userdata.learned || {});
-        setBookmarks(sanitizeBookmarks(snap.userdata.bookmarks));
-        if (snap.meta.themeKey) setThemeKey(resolveThemeKey(snap.meta.themeKey));
-        if (snap.meta.fontKey) setFontKey(resolveFontKey(snap.meta.fontKey));
-        if (storageOk.current) await saveAppSnapshot(snap);
-        fireToast("Synced from your account");
-      } else {
-        await pushCloudSnapshot(buildSnapshot());
-      }
-    })();
-  }, [cloudUserId, fireToast, buildSnapshot]);
+  }, [sessionStatus, cloudUserId, resetWorkspace, applyCloudSnapshot, fireToast]);
 
   useEffect(() => {
-    if (!cloudUserId) cloudSyncedFor.current = null;
-  }, [cloudUserId]);
-
-  useEffect(() => {
-    if (!didLoad.current) return;
-    if (!storageOk.current) return;
+    if (!cloudReady || !cloudUserId) return;
     setSaveStatus("saving");
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      const snapshot = buildSnapshot();
-      const ok = await saveAppSnapshot(snapshot);
+      const ok = await pushCloudSnapshot(buildSnapshot());
       setSaveStatus(ok ? "saved" : "error");
       if (ok) setTimeout(() => setSaveStatus((cur) => (cur === "saved" ? "idle" : cur)), 1600);
-      if (cloudUserId) pushCloudSnapshot(snapshot);
     }, 700);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [progress, notes, refs, srs, log, learned, bookmarks, themeKey, fontKey, plans, activePlanId, cloudUserId, buildSnapshot]);
+  }, [progress, notes, refs, srs, log, learned, bookmarks, themeKey, fontKey, plans, activePlanId, cloudUserId, cloudReady, buildSnapshot]);
 
   useEffect(() => {
     if (!campaign) return;
@@ -554,7 +516,6 @@ export default function DualTrackConsole() {
     setLog([]);
     setLearned({});
     setBookmarks([]);
-    await clearUserData();
     if (cloudUserId) {
       pushCloudSnapshot({
         meta: {
@@ -568,7 +529,7 @@ export default function DualTrackConsole() {
           updatedAt: Date.now(),
         },
         plans,
-        userdata: { progress: {}, notes: {}, refs: {}, srs: {}, log: [], learned: {}, bookmarks: [] },
+        userdata: emptyUserSnapshot(),
       });
     }
     setConfirmReset(false);
@@ -615,10 +576,13 @@ export default function DualTrackConsole() {
     fireToast("Plan deleted", "xp");
   }, [plans, activePlanId, progress, notes, refs, srs, log, learned, bookmarks, fireToast]);
 
-  // "OPERATION LONGHAUL"/"OPERATION FASTBURN" are curated example curricula,
-  // not auto-assigned to every account — offered as opt-in starting points.
+  // Curated example curricula — opt-in starters (tech + non-tech), not auto-assigned.
   const examplePlans = useMemo(
     () => [
+      {
+        ...createBuiltin30Mind(),
+        blurb: "A 30-day sprint through habits, bias, learning science, and decision-making — any learner, not just engineers.",
+      },
       {
         ...createBuiltin365(),
         blurb: "A full year of backend, infra, and systems depth — quarters, months, and weeks mapped out for you.",
@@ -634,7 +598,8 @@ export default function DualTrackConsole() {
   const addExamplePlan = useCallback((planId) => {
     setPlans((prev) => {
       if (prev[planId]) return { ...prev, [planId]: { ...prev[planId], hidden: false } };
-      const plan = planId === BUILTIN_45_ID ? createBuiltin45() : createBuiltin365();
+      const plan = createBuiltinById(planId);
+      if (!plan) return prev;
       return { ...prev, [plan.id]: plan };
     });
     setActivePlanId(planId);
@@ -930,7 +895,7 @@ export default function DualTrackConsole() {
   );
 
   if (saveStatus === "loading") {
-    // Always the same shell during hydrate — `page` is restored from localStorage
+    // Same hydrate shell until Neon snapshot (or signed-out landing) is ready.
     // after mount, so branching here would flash or rematch incorrectly.
     return (
       <div className="app-root" style={rootStyle}>
@@ -986,9 +951,10 @@ export default function DualTrackConsole() {
           totalDays: globalStats.totalDaysAll,
         }
       : null;
-    // Landing inherits the active theme so it matches Field Ops / dashboard look.
-    const homeTheme = theme;
-    const homeStyle = { ...themeVars(homeTheme), ...fontVars(fontPack) };
+    // Fixed Briefing skin — same for every visitor; dashboard themes stay personal.
+    const homeTheme = LANDING_THEME;
+    const homeFont = FONT_PACKS.archivo;
+    const homeStyle = { ...themeVars(homeTheme), ...fontVars(homeFont) };
     return (
       <div
         className={classNames(

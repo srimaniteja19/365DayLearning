@@ -2,9 +2,11 @@ import type { Plan, PlanDay, PlanPeriod, PlanRequest } from "@/lib/types";
 import {
   BUILTIN_365_ID,
   BUILTIN_45_ID,
+  BUILTIN_30_MIND_ID,
 } from "@/lib/types";
 import DAYS_365_RAW from "@/data/days-365.json";
 import DAYS_45_RAW from "@/data/days-45.json";
+import DAYS_30_MIND_RAW from "@/data/days-30-mind.json";
 
 function remapDays(raw: Array<{ day: number; id: string; topics: string[]; domains: string[] }>, planId: string): PlanDay[] {
   return raw.map((d) => ({
@@ -100,10 +102,45 @@ export function createBuiltin45(): Plan {
   };
 }
 
+const WEEKS_30_MIND: PlanPeriod[] = [
+  { label: "Week 1", sub: "Attention & bias", start: 1, end: 7 },
+  { label: "Week 2", sub: "Motivation & practice", start: 8, end: 14 },
+  { label: "Week 3", sub: "Emotion & social", start: 15, end: 21 },
+  { label: "Week 4", sub: "Decisions & transfer", start: 22, end: 30 },
+];
+
+export function createBuiltin30Mind(): Plan {
+  return {
+    id: BUILTIN_30_MIND_ID,
+    name: "OPERATION MINDFIELD",
+    subtitle: "30-Day Psychology & Decision Science Sprint",
+    builtin: true,
+    createdAt: 0,
+    totalDays: 30,
+    topicsPerDay: 2,
+    accentRole: "sprint",
+    periodScopes: [
+      { key: "all", label: "All days", periods: [] },
+      { key: "week", label: "Week", periods: WEEKS_30_MIND },
+    ],
+    days: remapDays(DAYS_30_MIND_RAW as PlanDay[], BUILTIN_30_MIND_ID),
+    meta: { ...emptyMeta, totalDays: 30, topicsPerDay: 2, grouping: "weekly" },
+    status: "ready",
+  };
+}
+
+export function createBuiltinById(planId: string): Plan | null {
+  if (planId === BUILTIN_365_ID) return createBuiltin365();
+  if (planId === BUILTIN_45_ID) return createBuiltin45();
+  if (planId === BUILTIN_30_MIND_ID) return createBuiltin30Mind();
+  return null;
+}
+
 export function seedBuiltinPlans(): Record<string, Plan> {
   const a = createBuiltin365();
   const b = createBuiltin45();
-  return { [a.id]: a, [b.id]: b };
+  const c = createBuiltin30Mind();
+  return { [a.id]: a, [b.id]: b, [c.id]: c };
 }
 
 export function scopesForPlan(plan: Plan): Array<{ key: string; label: string }> {

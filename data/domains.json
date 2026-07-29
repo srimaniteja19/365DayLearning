@@ -1,35 +1,34 @@
 {
-  "ai-ml": {
-    "label": "AI / ML"
-  },
-  "backend-node": {
-    "label": "Node / Nest"
-  },
-  "frontend": {
-    "label": "Frontend"
-  },
-  "databases": {
-    "label": "Databases"
-  },
-  "infra-cloud": {
-    "label": "Cloud / Infra"
-  },
-  "data-eng": {
-    "label": "Data Eng"
-  },
-  "distributed-sys": {
-    "label": "Distributed Sys"
-  },
-  "security": {
-    "label": "Security"
-  },
-  "observability": {
-    "label": "Observability"
-  },
-  "perf": {
-    "label": "Performance"
-  },
-  "systems-eng": {
-    "label": "Systems Eng"
-  }
+  "ai-ml": { "label": "AI / ML" },
+  "backend-node": { "label": "Node / Nest" },
+  "frontend": { "label": "Frontend" },
+  "databases": { "label": "Databases" },
+  "infra-cloud": { "label": "Cloud / Infra" },
+  "data-eng": { "label": "Data Eng" },
+  "distributed-sys": { "label": "Distributed Sys" },
+  "security": { "label": "Security" },
+  "observability": { "label": "Observability" },
+  "perf": { "label": "Performance" },
+  "systems-eng": { "label": "Systems Eng" },
+
+  "psychology": { "label": "Psychology" },
+  "cognitive-sci": { "label": "Cognitive Science" },
+  "behavioral-econ": { "label": "Behavioral Econ" },
+  "economics": { "label": "Economics" },
+  "history": { "label": "History" },
+  "philosophy": { "label": "Philosophy" },
+  "languages": { "label": "Languages" },
+  "literature": { "label": "Literature" },
+  "writing": { "label": "Writing" },
+  "arts": { "label": "Arts" },
+  "music": { "label": "Music" },
+  "biology": { "label": "Biology" },
+  "physics": { "label": "Physics" },
+  "math": { "label": "Math" },
+  "health": { "label": "Health" },
+  "business": { "label": "Business" },
+  "law-civics": { "label": "Law / Civics" },
+  "geography": { "label": "Geography" },
+  "sociology": { "label": "Sociology" },
+  "communication": { "label": "Communication" }
 }

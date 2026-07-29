@@ -14,11 +14,11 @@ export function Bone({
   return <span className={classNames("ops-bone", className)} style={style} aria-hidden="true" />;
 }
 
-/** Full-app shell while IndexedDB / snapshot hydrate. */
+/** Full-app shell while the account snapshot loads from Neon. */
 export function AppHydrateSkeleton() {
   return (
     <div className="hydrate-shell" role="status" aria-live="polite" aria-busy="true">
-      <span className="sr-only">Restoring your Field Ops progress…</span>
+      <span className="sr-only">Loading your Field Ops account…</span>
 
       <header className="hydrate-topbar">
         <div className="hydrate-brand">
@@ -71,7 +71,7 @@ export function AppHydrateSkeleton() {
 
       <div className="hydrate-status">
         <span className="hydrate-status-dot" />
-        Restoring progress…
+        Loading account…
       </div>
     </div>
   );

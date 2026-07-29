@@ -4,6 +4,9 @@ export type CloudPullResult =
   | { ok: true; snapshot: AppSnapshot | null; updatedAt: string | null }
   | { ok: false; error: string };
 
+/** Session-only — last successful pull/push from this browser tab. */
+let lastSyncedAt: number | null = null;
+
 export async function pullCloudSnapshot(): Promise<CloudPullResult> {
   try {
     const res = await fetch("/api/state", { method: "GET" });
@@ -34,32 +37,12 @@ export async function pushCloudSnapshot(snapshot: AppSnapshot): Promise<boolean>
   }
 }
 
-const LAST_SYNC_KEY = "dualtrack:lastSync";
-
-/**
- * Sync timestamps live in raw localStorage (not the synced snapshot itself)
- * since "last synced from this device" is inherently per-browser-profile —
- * exactly what localStorage already gives us for free.
- */
 function recordSyncNow(): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
-  } catch {
-    // best-effort only
-  }
+  lastSyncedAt = Date.now();
 }
 
 export function getLastSyncedAt(): number | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(LAST_SYNC_KEY);
-    if (!raw) return null;
-    const ts = Number(raw);
-    return Number.isFinite(ts) ? ts : null;
-  } catch {
-    return null;
-  }
+  return lastSyncedAt;
 }
 
 export function formatAgo(ts: number): string {
