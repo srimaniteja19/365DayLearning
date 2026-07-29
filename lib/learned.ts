@@ -75,9 +75,6 @@ export function sanitizeLearned(raw: unknown): LearnedMap {
   return out;
 }
 
-const BARE_URL_RE = /https?:\/\/[^\s<>'"\]]+/gi;
-const MD_LINK_RE = /\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/gi;
-
 /** Friendly label for a URL (YouTube, host, etc.). */
 export function linkLabelForUrl(url: string): string {
   if (extractYoutubeId(url)) return "YouTube";
@@ -107,14 +104,25 @@ export function extractUrlsFromText(text: string): string[] {
     out.push(n);
   };
 
-  MD_LINK_RE.lastIndex = 0;
+  const md = /\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/gi;
   let m: RegExpExecArray | null;
-  while ((m = MD_LINK_RE.exec(text)) !== null) add(m[2]);
+  while ((m = md.exec(text)) !== null) add(m[2]);
 
-  BARE_URL_RE.lastIndex = 0;
-  while ((m = BARE_URL_RE.exec(text)) !== null) add(m[0]);
+  const bare = /https?:\/\/[^\s<>'"\]]+/gi;
+  while ((m = bare.exec(text)) !== null) add(m[0]);
 
   return out;
+}
+
+/** Drop bare URLs and markdown links so notes read clean next to embeds. */
+export function stripLinkMarkup(text: string): string {
+  return String(text || "")
+    .replace(/\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/gi, "")
+    .replace(/https?:\/\/[^\s<>'"\]]+/gi, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 /**

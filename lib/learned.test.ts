@@ -8,6 +8,7 @@ import {
   linkLabelForUrl,
   sanitizeLearned,
   sortedLearnedDays,
+  stripLinkMarkup,
   urlFromPaste,
 } from "@/lib/learned";
 
@@ -81,5 +82,15 @@ describe("learned helpers", () => {
       cursor: "hello https://x.com".length,
     });
     expect(insertAtSelection("", 0, 0, "https://x.com").next).toBe("https://x.com");
+  });
+
+  it("stripLinkMarkup removes bare and markdown links", () => {
+    expect(stripLinkMarkup("Watch [YouTube](https://youtu.be/abc) then notes")).toBe(
+      "Watch then notes",
+    );
+    expect(stripLinkMarkup("https://youtu.be/abc")).toBe("");
+    expect(stripLinkMarkup("Idea one\n\nhttps://example.com\n\nIdea two")).toBe(
+      "Idea one\n\nIdea two",
+    );
   });
 });

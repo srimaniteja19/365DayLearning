@@ -14,11 +14,16 @@ import {
   insertAtSelection,
   linkLabelForUrl,
   sortedLearnedDays,
+  stripLinkMarkup,
   urlFromPaste,
 } from "@/lib/learned";
 import {
+  extractVimeoId,
+  extractYoutubeId,
   hostnameOf,
   seedPreviewFromUrl,
+  vimeoEmbedUrl,
+  youtubeEmbedUrl,
 } from "@/lib/bookmarks";
 import { MiniMarkdown } from "@/features/ui/Views";
 
@@ -49,9 +54,153 @@ function bentoSize(item, index) {
 }
 
 function snippet(text, max = 140) {
-  const t = String(text || "").replace(/\s+/g, " ").trim();
+  const t = stripLinkMarkup(text || "").replace(/\s+/g, " ").trim();
   if (t.length <= max) return t;
   return t.slice(0, max).replace(/\s+\S*$/, "") + "…";
+}
+
+function LearnedLinkEmbed({ url, compact = false }) {
+  const seed = useMemo(() => seedPreviewFromUrl(url), [url]);
+  const [preview, setPreview] = useState(seed);
+  const yt = extractYoutubeId(url);
+  const vim = extractVimeoId(url);
+  const label = preview.title || preview.siteName || linkLabelForUrl(url);
+  const host = preview.siteName || hostnameOf(url);
+
+  useEffect(() => {
+    setPreview(seed);
+    const ac = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch("/api/bookmarks/preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+          signal: ac.signal,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.preview) return;
+        setPreview((prev) => ({ ...prev, ...data.preview }));
+      } catch {
+        /* keep seed */
+      }
+    })();
+    return () => ac.abort();
+  }, [url, seed]);
+
+  if (compact) {
+    return (
+      <span className="learned-embed learned-embed-compact">
+        {preview.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            className="learned-embed-thumb"
+            src={preview.image}
+            alt=""
+            loading="lazy"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <span className="learned-embed-thumb learned-embed-thumb-empty" aria-hidden="true" />
+        )}
+        <span className="learned-embed-compact-copy">
+          <span className="learned-embed-kicker">{yt ? "YouTube" : vim ? "Vimeo" : host}</span>
+          <span className="learned-embed-title">{label}</span>
+        </span>
+        {(yt || vim) && <span className="learned-embed-play" aria-hidden="true" />}
+      </span>
+    );
+  }
+
+  if (yt) {
+    return (
+      <div className="learned-embed">
+        <div className="learned-embed-frame">
+          <iframe
+            title={label}
+            src={youtubeEmbedUrl(yt)}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        </div>
+        <a
+          className="learned-embed-cap"
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span>{label}</span>
+          <span className="learned-embed-cap-host">YouTube · open</span>
+        </a>
+      </div>
+    );
+  }
+
+  if (vim) {
+    return (
+      <div className="learned-embed">
+        <div className="learned-embed-frame">
+          <iframe
+            title={label}
+            src={vimeoEmbedUrl(vim)}
+            allow="autoplay; fullscreen; picture-in-picture"
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        </div>
+        <a
+          className="learned-embed-cap"
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span>{label}</span>
+          <span className="learned-embed-cap-host">Vimeo · open</span>
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <a
+      className="learned-embed learned-embed-card"
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {preview.image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          className="learned-embed-card-media"
+          src={preview.image}
+          alt=""
+          loading="lazy"
+          referrerPolicy="no-referrer"
+        />
+      ) : preview.favicon ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          className="learned-embed-favicon"
+          src={preview.favicon}
+          alt=""
+          loading="lazy"
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <span className="learned-embed-mark" aria-hidden="true" />
+      )}
+      <span className="learned-embed-card-copy">
+        <span className="learned-embed-title">{label}</span>
+        <span className="learned-embed-kicker">{host}</span>
+      </span>
+    </a>
+  );
 }
 
 async function generateEnrichment(title, body) {
@@ -505,6 +654,15 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
                     const open = expandedId === item.id;
                     const tone = SLIP_TONES[(dayColorOffsets[dayIdx] + index) % SLIP_TONES.length];
                     const size = open ? "lg" : bentoSize(item, index);
+                    const urls = extractUrlsFromText(item.body || "");
+                    const noteText = stripLinkMarkup(item.body || "");
+                    const snip = noteText
+                      ? snippet(noteText)
+                      : item.insight
+                        ? snippet(item.insight, 100)
+                        : urls.length
+                          ? ""
+                          : "Open slip";
                     return (
                       <article
                         key={item.id}
@@ -513,6 +671,7 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
                           `sticky-${tone}`,
                           `bento-${size}`,
                           open && "sticky-note-open",
+                          urls.length > 0 && "sticky-note-has-embed",
                         )}
                         style={{ "--slip-tilt": open ? "0deg" : slipTilt(item.id) }}
                       >
@@ -525,10 +684,11 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
                           <span className="sticky-tape" aria-hidden="true" />
                           <span className="sticky-pin" aria-hidden="true" />
                           <span className="sticky-note-title">{item.title}</span>
-                          {!open && (
-                            <span className="sticky-note-snip">
-                              {snippet(item.body) || (item.insight ? snippet(item.insight, 100) : "Open slip")}
-                            </span>
+                          {!open && urls[0] && (
+                            <LearnedLinkEmbed url={urls[0]} compact />
+                          )}
+                          {!open && snip && (
+                            <span className="sticky-note-snip">{snip}</span>
                           )}
                           {!open && item.insight && (
                             <span className="sticky-insight-chip">summary</span>
@@ -537,9 +697,16 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
 
                         {open && (
                           <div className="sticky-note-body">
-                            {item.body.trim() ? (
+                            {urls.length > 0 && (
+                              <div className="learned-embed-stack">
+                                {urls.map((url) => (
+                                  <LearnedLinkEmbed key={url} url={url} />
+                                ))}
+                              </div>
+                            )}
+                            {noteText ? (
                               <div className="sticky-notes-block">
-                                <MiniMarkdown text={item.body} />
+                                <MiniMarkdown text={noteText} />
                               </div>
                             ) : null}
                             {item.insight ? (
@@ -552,7 +719,7 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
                                 ))}
                               </div>
                             ) : (
-                              !item.body.trim() && (
+                              !noteText && urls.length === 0 && (
                                 <p className="sticky-empty">No notes yet — add a summary to flesh this out.</p>
                               )
                             )}
