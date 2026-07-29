@@ -145,3 +145,148 @@ export function insertAtSelection(
     cursor: before.length + chunk.length,
   };
 }
+
+export type LearnedChronoFilter = {
+  year: number | null;
+  month: number | null;
+  day: number | null;
+};
+
+export const EMPTY_CHRONO_FILTER: LearnedChronoFilter = {
+  year: null,
+  month: null,
+  day: null,
+};
+
+export function parseLearnedDateParts(
+  key: string,
+): { year: number; month: number; day: number } | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+  if (!m) return null;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  if (!year || month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return { year, month, day };
+}
+
+export function matchesChronoFilter(date: string, filter: LearnedChronoFilter): boolean {
+  const parts = parseLearnedDateParts(date);
+  if (!parts) return false;
+  if (filter.year != null && parts.year !== filter.year) return false;
+  if (filter.month != null && parts.month !== filter.month) return false;
+  if (filter.day != null && parts.day !== filter.day) return false;
+  return true;
+}
+
+export function isChronoFilterActive(filter: LearnedChronoFilter): boolean {
+  return filter.year != null || filter.month != null || filter.day != null;
+}
+
+export type LearnedChronoDay = { day: number; date: string; count: number };
+export type LearnedChronoMonth = { month: number; count: number; days: LearnedChronoDay[] };
+export type LearnedChronoYear = { year: number; count: number; months: LearnedChronoMonth[] };
+
+export type LearnedChronoIndex = {
+  years: LearnedChronoYear[];
+  /** Month totals across the current year scope (or all years). */
+  months: LearnedChronoMonth[];
+  total: number;
+};
+
+/** Archive index: years → months → days with slip counts. */
+export function buildLearnedChronoIndex(
+  learned: LearnedMap | undefined | null,
+  scopeYear: number | null = null,
+): LearnedChronoIndex {
+  const yearMap = new Map<number, Map<number, Map<number, { date: string; count: number }>>>();
+  let total = 0;
+
+  for (const [date, items] of Object.entries(learned || {})) {
+    const parts = parseLearnedDateParts(date);
+    if (!parts || !Array.isArray(items) || items.length === 0) continue;
+    const n = items.length;
+    total += n;
+    if (!yearMap.has(parts.year)) yearMap.set(parts.year, new Map());
+    const months = yearMap.get(parts.year)!;
+    if (!months.has(parts.month)) months.set(parts.month, new Map());
+    const days = months.get(parts.month)!;
+    const prev = days.get(parts.day);
+    days.set(parts.day, { date, count: (prev?.count || 0) + n });
+  }
+
+  const years: LearnedChronoYear[] = [...yearMap.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .map(([year, monthsMap]) => {
+      const months: LearnedChronoMonth[] = [...monthsMap.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([month, daysMap]) => {
+          const days: LearnedChronoDay[] = [...daysMap.entries()]
+            .sort((a, b) => b[0] - a[0])
+            .map(([day, info]) => ({ day, date: info.date, count: info.count }));
+          return {
+            month,
+            count: days.reduce((s, d) => s + d.count, 0),
+            days,
+          };
+        });
+      return {
+        year,
+        count: months.reduce((s, m) => s + m.count, 0),
+        months,
+      };
+    });
+
+  const months: LearnedChronoMonth[] = [];
+  for (let month = 1; month <= 12; month++) {
+    const fromYears = years
+      .filter((y) => scopeYear == null || y.year === scopeYear)
+      .flatMap((y) => y.months.filter((m) => m.month === month));
+    if (!fromYears.length) {
+      months.push({ month, count: 0, days: [] });
+      continue;
+    }
+    const dayMap = new Map<number, LearnedChronoDay>();
+    for (const m of fromYears) {
+      for (const d of m.days) {
+        const prev = dayMap.get(d.day);
+        if (!prev) {
+          dayMap.set(d.day, { ...d });
+        } else {
+          dayMap.set(d.day, {
+            day: d.day,
+            count: prev.count + d.count,
+            date: d.date > prev.date ? d.date : prev.date,
+          });
+        }
+      }
+    }
+    const days = [...dayMap.values()].sort((a, b) => b.day - a.day);
+    months.push({
+      month,
+      count: days.reduce((s, d) => s + d.count, 0),
+      days,
+    });
+  }
+
+  return { years, months, total };
+}
+
+export function formatChronoFilterLabel(filter: LearnedChronoFilter): string {
+  if (!isChronoFilterActive(filter)) return "All time";
+  const months = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+  if (filter.year != null && filter.month != null && filter.day != null) {
+    const key = `${filter.year}-${String(filter.month).padStart(2, "0")}-${String(filter.day).padStart(2, "0")}`;
+    return formatLearnedDate(key);
+  }
+  if (filter.year != null && filter.month != null) {
+    return `${months[filter.month - 1]} ${filter.year}`;
+  }
+  if (filter.year != null) return String(filter.year);
+  if (filter.month != null) return months[filter.month - 1];
+  if (filter.day != null) return `Day ${filter.day}`;
+  return "All time";
+}

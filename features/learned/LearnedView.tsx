@@ -7,15 +7,21 @@ import { classNames } from "@/lib/classNames";
 import { callClaude } from "@/lib/claude-client";
 import { formatAiError } from "@/lib/providers/errors";
 import {
+  buildLearnedChronoIndex,
   createLearnedId,
   dateKey,
+  EMPTY_CHRONO_FILTER,
   extractUrlsFromText,
+  formatChronoFilterLabel,
   formatLearnedDate,
   insertAtSelection,
+  isChronoFilterActive,
   linkLabelForUrl,
+  matchesChronoFilter,
   sortedLearnedDays,
   stripLinkMarkup,
   urlFromPaste,
+  type LearnedChronoFilter,
 } from "@/lib/learned";
 import {
   extractVimeoId,
@@ -29,6 +35,14 @@ import { formatSourcesForPrompt } from "@/lib/sourceContentShared";
 import { MiniMarkdown } from "@/features/ui/Views";
 
 const SLIP_TONES = ["lemon", "coral", "mint", "sky", "blush", "butter", "lilac", "seafoam"];
+const MONTH_TICKETS = [
+  "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+  "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
+];
+const MONTH_FULL = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 const BENTO_SIZES = ["sm", "md", "wide", "tall", "lg"];
 
 function hashStr(s) {
@@ -297,6 +311,7 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const [query, setQuery] = useState("");
+  const [chrono, setChrono] = useState<LearnedChronoFilter>(EMPTY_CHRONO_FILTER);
   const [expandedId, setExpandedId] = useState(null);
   const [insightBusy, setInsightBusy] = useState(null);
   const [linkPreviews, setLinkPreviews] = useState({});
@@ -367,22 +382,98 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
     });
   };
 
+  const chronoIndex = useMemo(
+    () => buildLearnedChronoIndex(learned, chrono.year),
+    [learned, chrono.year],
+  );
+
+  const todayParts = useMemo(() => {
+    const [y, m, d] = today.split("-").map(Number);
+    return { year: y, month: m, day: d };
+  }, [today]);
+
   const days = useMemo(() => {
     const all = sortedLearnedDays(learned);
     const q = query.trim().toLowerCase();
-    if (!q) return all;
-    return all
+    const filtered = all
+      .filter(({ date: d }) => matchesChronoFilter(d, chrono))
       .map(({ date: d, items }) => ({
         date: d,
-        items: items.filter(
-          (it) =>
-            it.title.toLowerCase().includes(q) ||
-            it.body.toLowerCase().includes(q) ||
-            (it.insight || "").toLowerCase().includes(q),
-        ),
+        items: q
+          ? items.filter(
+              (it) =>
+                it.title.toLowerCase().includes(q) ||
+                it.body.toLowerCase().includes(q) ||
+                (it.insight || "").toLowerCase().includes(q),
+            )
+          : items,
       }))
       .filter((g) => g.items.length > 0);
-  }, [learned, query]);
+    return filtered;
+  }, [learned, query, chrono]);
+
+  const visibleSlipCount = useMemo(
+    () => days.reduce((n, d) => n + d.items.length, 0),
+    [days],
+  );
+
+  const activeMonthBucket = useMemo(() => {
+    if (chrono.month == null) return null;
+    return chronoIndex.months.find((m) => m.month === chrono.month) || null;
+  }, [chrono.month, chronoIndex.months]);
+
+  const maxMonthCount = useMemo(
+    () => Math.max(1, ...chronoIndex.months.map((m) => m.count)),
+    [chronoIndex.months],
+  );
+
+  const setChronoYear = (year: number) => {
+    setChrono((prev) => {
+      if (prev.year === year && prev.month == null && prev.day == null) {
+        return EMPTY_CHRONO_FILTER;
+      }
+      return { year, month: null, day: null };
+    });
+  };
+
+  const setChronoMonth = (month: number) => {
+    setChrono((prev) => {
+      if (prev.month === month && prev.day == null) {
+        return { year: prev.year, month: null, day: null };
+      }
+      let year = prev.year;
+      if (year == null) {
+        const hit = chronoIndex.years.find((y) => y.months.some((m) => m.month === month && m.count > 0));
+        year = hit?.year ?? todayParts.year;
+      }
+      return { year, month, day: null };
+    });
+  };
+
+  const setChronoDay = (day: number, dateStr?: string) => {
+    setChrono((prev) => {
+      if (prev.day === day) {
+        return { year: prev.year, month: prev.month, day: null };
+      }
+      if (dateStr) {
+        const [y, m, d] = dateStr.split("-").map(Number);
+        return { year: y, month: m, day: d };
+      }
+      return {
+        year: prev.year ?? todayParts.year,
+        month: prev.month ?? todayParts.month,
+        day,
+      };
+    });
+  };
+
+  const jumpAll = () => setChrono(EMPTY_CHRONO_FILTER);
+  const jumpToday = () =>
+    setChrono({ year: todayParts.year, month: todayParts.month, day: todayParts.day });
+  const jumpThisMonth = () =>
+    setChrono({ year: todayParts.year, month: todayParts.month, day: null });
+
+  const chronoActive = isChronoFilterActive(chrono);
 
   const dayColorOffsets = useMemo(
     () => days.map((_, i) => days.slice(0, i).reduce((n, day) => n + day.items.length, 0)),
@@ -648,17 +739,173 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
         </div>
       </div>
 
+      {totalCount > 0 && (
+        <section className="learned-chrono" aria-label="Filter by date">
+          <div className="learned-chrono-glow" aria-hidden="true" />
+          <div className="learned-chrono-head">
+            <div className="learned-chrono-brand">
+              <span className="learned-chrono-stamp">Chrono index</span>
+              <span className="learned-chrono-readout" aria-live="polite">
+                <span className="learned-chrono-readout-label">Window</span>
+                <strong>{formatChronoFilterLabel(chrono)}</strong>
+                <span className="learned-chrono-readout-count">
+                  {String(visibleSlipCount).padStart(2, "0")} slips
+                </span>
+              </span>
+            </div>
+            <div className="learned-chrono-jumps" role="group" aria-label="Quick ranges">
+              <button
+                type="button"
+                className={classNames("learned-chrono-jump", !chronoActive && "is-on")}
+                onClick={jumpAll}
+              >
+                All time
+              </button>
+              <button
+                type="button"
+                className={classNames(
+                  "learned-chrono-jump",
+                  chrono.year === todayParts.year &&
+                    chrono.month === todayParts.month &&
+                    chrono.day == null &&
+                    "is-on",
+                )}
+                onClick={jumpThisMonth}
+              >
+                This month
+              </button>
+              <button
+                type="button"
+                className={classNames(
+                  "learned-chrono-jump learned-chrono-jump-now",
+                  chrono.year === todayParts.year &&
+                    chrono.month === todayParts.month &&
+                    chrono.day === todayParts.day &&
+                    "is-on",
+                )}
+                onClick={jumpToday}
+              >
+                Today
+              </button>
+              {chronoActive && (
+                <button type="button" className="learned-chrono-clear" onClick={jumpAll}>
+                  <Icon.X size={12} /> Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          {chronoIndex.years.length > 0 && (
+            <div className="learned-chrono-years" role="list" aria-label="Years">
+              {chronoIndex.years.map((y) => {
+                const on = chrono.year === y.year;
+                return (
+                  <button
+                    key={y.year}
+                    type="button"
+                    role="listitem"
+                    className={classNames("learned-year-stamp", on && "is-on")}
+                    aria-pressed={on}
+                    onClick={() => setChronoYear(y.year)}
+                  >
+                    <span className="learned-year-num">{y.year}</span>
+                    <span className="learned-year-meta">
+                      <span className="learned-year-count">{y.count}</span>
+                      <span className="learned-year-unit">slips</span>
+                    </span>
+                    <span className="learned-year-serration" aria-hidden="true" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="learned-chrono-months" role="list" aria-label="Months">
+            {chronoIndex.months.map((m) => {
+              const on = chrono.month === m.month;
+              const empty = m.count === 0;
+              const heat = empty ? 0 : Math.max(0.18, m.count / maxMonthCount);
+              return (
+                <button
+                  key={m.month}
+                  type="button"
+                  role="listitem"
+                  className={classNames(
+                    "learned-month-ticket",
+                    on && "is-on",
+                    empty && "is-empty",
+                  )}
+                  disabled={empty}
+                  aria-pressed={on}
+                  aria-label={`${MONTH_FULL[m.month - 1]}${m.count ? `, ${m.count} slips` : ", empty"}`}
+                  style={{ "--heat": String(heat) }}
+                  onClick={() => setChronoMonth(m.month)}
+                >
+                  <span className="learned-month-perf" aria-hidden="true" />
+                  <span className="learned-month-code">{MONTH_TICKETS[m.month - 1]}</span>
+                  <span className="learned-month-heat" aria-hidden="true">
+                    <span style={{ height: `${Math.round(heat * 100)}%` }} />
+                  </span>
+                  <span className="learned-month-count">{empty ? "—" : m.count}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {chrono.month != null && activeMonthBucket && activeMonthBucket.days.length > 0 && (
+            <div className="learned-chrono-days" aria-label={`Days in ${MONTH_FULL[chrono.month - 1]}`}>
+              <div className="learned-chrono-days-label">
+                <span>Day punches</span>
+                <span className="learned-chrono-days-month">{MONTH_FULL[chrono.month - 1]}</span>
+              </div>
+              <div className="learned-chrono-days-rail" role="list">
+                {activeMonthBucket.days.map((d) => {
+                  const on = chrono.day === d.day;
+                  return (
+                    <button
+                      key={d.date}
+                      type="button"
+                      role="listitem"
+                      className={classNames("learned-day-punch", on && "is-on")}
+                      aria-pressed={on}
+                      onClick={() => setChronoDay(d.day, d.date)}
+                    >
+                      <span className="learned-day-punch-num">{String(d.day).padStart(2, "0")}</span>
+                      <span className="learned-day-punch-count">{d.count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
       {days.length === 0 && (
         <div className="learned-empty">
           <span className="learned-empty-mark" aria-hidden="true" />
           <div className="learned-empty-title">
-            {query.trim() ? "No slips match that search" : "Board is clear"}
+            {query.trim() || chronoActive ? "No slips in this window" : "Board is clear"}
           </div>
           <p className="learned-empty-copy">
-            {query.trim()
-              ? "Try another term, or clear the search to see everything."
+            {query.trim() || chronoActive
+              ? "Widen the chrono window, clear filters, or try another search term."
               : "Log the first rabbit hole — a talk, a doc, a hallway tip — and it lands here as a slip."}
           </p>
+          {(query.trim() || chronoActive) && (
+            <div className="learned-empty-actions">
+              {chronoActive && (
+                <button type="button" className="learned-chrono-clear" onClick={jumpAll}>
+                  Clear date filter
+                </button>
+              )}
+              {query.trim() && (
+                <button type="button" className="learned-chrono-clear" onClick={() => setQuery("")}>
+                  Clear search
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 

@@ -250,33 +250,40 @@ export function TopBar({
   badgeTotal,
   onGoHome,
   onOpenPricing,
+  kitTab = null,
+  learnedCount = 0,
+  bookmarkCount = 0,
+  onOpenKit,
+  onOpenCampaign,
 }) {
   const pct = stats.need ? Math.min(100, Math.round((stats.into / stats.need) * 100)) : 0;
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [opsOpen, setOpsOpen] = useState(false);
+  const opsRef = useRef(null);
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!opsOpen) return;
     const onKey = (e) => {
-      if (e.key === "Escape") setMenuOpen(false);
+      if (e.key === "Escape") setOpsOpen(false);
     };
-    const onResize = () => {
-      if (window.matchMedia("(min-width: 861px)").matches) setMenuOpen(false);
+    const onPointer = (e) => {
+      if (opsRef.current && !opsRef.current.contains(e.target)) setOpsOpen(false);
     };
     document.addEventListener("keydown", onKey);
-    window.addEventListener("resize", onResize);
+    document.addEventListener("pointerdown", onPointer);
     return () => {
       document.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", onResize);
+      document.removeEventListener("pointerdown", onPointer);
     };
-  }, [menuOpen]);
+  }, [opsOpen]);
 
-  const runAndClose = (fn) => () => {
-    setMenuOpen(false);
+  const go = (fn) => () => {
+    setOpsOpen(false);
+    setConfirmReset(false);
     fn?.();
   };
 
   return (
-    <header className={classNames("topbar", menuOpen && "topbar-menu-open")}>
+    <header className={classNames("topbar", opsOpen && "topbar-ops-open")}>
       <div className="topbar-row">
         <div className="topbar-left">
           <button className="brand brand-btn" onClick={onGoHome} type="button" aria-label="Back to landing">
@@ -286,71 +293,53 @@ export function TopBar({
               <span className="brand-text">REFRAIN<span className="brand-accent">LY</span></span>
             </span>
           </button>
-        </div>
 
-        <div className="topbar-mobile-tray" aria-hidden={false}>
-          <SaveIndicator status={saveStatus} compact />
-          <div className="topbar-mobile-level" title={`${stats.rank} · Level ${stats.level}`}>
-            <span className="level-badge">LV {stats.level}</span>
-            <div className="xp-bar-mini" aria-hidden="true">
-              <div className="xp-bar-mini-fill" style={{ width: pct + "%" }} />
-            </div>
-          </div>
-          <button
-            type="button"
-            className="topbar-menu-btn"
-            aria-expanded={menuOpen}
-            aria-controls="topbar-panel"
-            onClick={() => setMenuOpen((v) => !v)}
-          >
-            {menuOpen ? <Icon.X size={18} /> : <Icon.Menu size={18} />}
-            <span className="sr-only">{menuOpen ? "Close menu" : "Open menu"}</span>
-          </button>
-        </div>
+          {onOpenKit && (
+            <nav className="topbar-cluster topbar-cluster-kit" aria-label="Field kit">
+              <span className="topbar-cluster-tag" aria-hidden="true">Kit</span>
+              <Tip content="Off-plan field notes — independent of any campaign." stamp="LOG" tone="mint" side="bottom">
+                <button
+                  type="button"
+                  className={classNames("topbar-item", kitTab === "learned" && "topbar-item-active")}
+                  aria-pressed={kitTab === "learned"}
+                  onClick={() => onOpenKit("learned")}
+                >
+                  <Icon.Note size={13} />
+                  <span className="topbar-item-label">Notes</span>
+                  <span className="topbar-kit-count">{learnedCount}</span>
+                </button>
+              </Tip>
+              <Tip content="Pinned refs — videos, articles, docs outside the plan." stamp="REF" tone="violet" side="bottom">
+                <button
+                  type="button"
+                  className={classNames(
+                    "topbar-item",
+                    kitTab === "bookmarks" && "topbar-item-active topbar-item-refs",
+                  )}
+                  aria-pressed={kitTab === "bookmarks"}
+                  onClick={() => onOpenKit("bookmarks")}
+                >
+                  <Icon.Link size={13} />
+                  <span className="topbar-item-label">Refs</span>
+                  <span className="topbar-kit-count">{bookmarkCount}</span>
+                </button>
+              </Tip>
+            </nav>
+          )}
 
-        <div
-          id="topbar-panel"
-          className={classNames("topbar-right", menuOpen && "topbar-right-open")}
-        >
-          <nav className="topbar-cluster" aria-label="Workspace">
-            <button className="topbar-item" type="button" onClick={runAndClose(onNewPlan)}>
-              <Icon.Target size={13} />
-              <span className="topbar-item-label">New</span>
-            </button>
-            <Tip content="OpenRouter model + API key. Your key stays on this device." stamp="AI" tone="sky" side="bottom">
-              <button className="topbar-item" type="button" onClick={runAndClose(onOpenSettings)}>
-                <Icon.Cloud size={13} />
-                <span className="topbar-item-label">AI</span>
-              </button>
-            </Tip>
-            <button className="topbar-item" type="button" onClick={runAndClose(onOpenPricing)}>
-              <Icon.Sparkle size={13} />
-              <span className="topbar-item-label">Plans</span>
-            </button>
-            <button className="topbar-item" type="button" onClick={runAndClose(onOpenData)}>
-              <Icon.Download size={13} />
-              <span className="topbar-item-label">Data</span>
-            </button>
+          {kitTab && onOpenCampaign && (
             <button
-              className={classNames("topbar-item", accountLabel && "topbar-item-active")}
               type="button"
-              onClick={runAndClose(onOpenAccount)}
+              className="topbar-deck-btn"
+              onClick={onOpenCampaign}
             >
-              <Icon.User size={13} />
-              <span className="topbar-item-label">{accountLabel ? "Account" : "Sign in"}</span>
+              <Icon.LayoutDashboard size={13} />
+              <span>Deck</span>
             </button>
-            <Tip content={`${badgeCount} of ${badgeTotal} Field Ops badges unlocked.`} stamp="MEDAL" tone="lemon" side="bottom">
-              <button
-                className="topbar-item"
-                type="button"
-                onClick={runAndClose(onOpenBadges)}
-              >
-                <Icon.Medal size={13} />
-                <span>{badgeCount}/{badgeTotal}</span>
-              </button>
-            </Tip>
-          </nav>
+          )}
+        </div>
 
+        <div className="topbar-right">
           <div className="topbar-cluster topbar-cluster-look" aria-label="Appearance">
             <ThemePicker themeKey={themeKey} setThemeKey={setThemeKey} />
             <FontPicker fontKey={fontKey} setFontKey={setFontKey} />
@@ -359,7 +348,7 @@ export function TopBar({
           <div className="topbar-cluster topbar-cluster-status" aria-label="Progress">
             <SaveIndicator status={saveStatus} compact />
             {noteCount > 0 && (
-              <div className="topbar-item topbar-item-static" title={`${noteCount} days with notes`}>
+              <div className="topbar-item topbar-item-static topbar-day-notes" title={`${noteCount} days with notes`}>
                 <Icon.Note size={13} />
                 <span>{noteCount}</span>
               </div>
@@ -377,23 +366,132 @@ export function TopBar({
               <span className="topbar-xp">{stats.into}/{stats.need}</span>
               <span className="topbar-xp-total">{stats.xp.toLocaleString()} XP</span>
             </div>
-            {confirmReset ? (
-              <div className="reset-confirm">
-                <span>Erase all?</span>
-                <button className="reset-yes" type="button" onClick={runAndClose(onReset)}>Erase</button>
-                <button className="reset-no" type="button" onClick={() => setConfirmReset(false)}>Keep</button>
+          </div>
+
+          <div className="topbar-ops" ref={opsRef}>
+            <button
+              type="button"
+              className={classNames("topbar-ops-trigger", opsOpen && "is-on")}
+              aria-expanded={opsOpen}
+              aria-controls="topbar-ops-panel"
+              onClick={() => setOpsOpen((v) => !v)}
+            >
+              {opsOpen ? <Icon.X size={15} /> : <Icon.Menu size={15} />}
+              <span className="topbar-ops-trigger-label">Ops</span>
+            </button>
+
+            {opsOpen && (
+              <div id="topbar-ops-panel" className="topbar-ops-panel" role="menu">
+                <div className="topbar-ops-head">
+                  <span className="topbar-ops-stamp">Ops manual</span>
+                  <span className="topbar-ops-head-meta">Station · kit · awards</span>
+                </div>
+
+                <div className="topbar-ops-section">
+                  <div className="topbar-ops-label">Navigate</div>
+                  {onOpenCampaign && (
+                    <button type="button" role="menuitem" className="topbar-ops-item" onClick={go(onOpenCampaign)}>
+                      <Icon.LayoutDashboard size={14} />
+                      <span>Campaign deck</span>
+                    </button>
+                  )}
+                  {onOpenKit && (
+                    <>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className={classNames("topbar-ops-item", kitTab === "learned" && "is-on")}
+                        onClick={go(() => onOpenKit("learned"))}
+                      >
+                        <Icon.Note size={14} />
+                        <span>Field notes</span>
+                        <span className="topbar-ops-meta">{learnedCount}</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className={classNames("topbar-ops-item", kitTab === "bookmarks" && "is-on")}
+                        onClick={go(() => onOpenKit("bookmarks"))}
+                      >
+                        <Icon.Link size={14} />
+                        <span>Bookmarks</span>
+                        <span className="topbar-ops-meta">{bookmarkCount}</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                <div className="topbar-ops-section">
+                  <div className="topbar-ops-label">Station</div>
+                  <button type="button" role="menuitem" className="topbar-ops-item" onClick={go(onNewPlan)}>
+                    <Icon.Target size={14} />
+                    <span>New plan</span>
+                  </button>
+                  <button type="button" role="menuitem" className="topbar-ops-item" onClick={go(onOpenSettings)}>
+                    <Icon.Cloud size={14} />
+                    <span>AI settings</span>
+                  </button>
+                  <button type="button" role="menuitem" className="topbar-ops-item" onClick={go(onOpenPricing)}>
+                    <Icon.Sparkle size={14} />
+                    <span>Pricing plans</span>
+                  </button>
+                  <button type="button" role="menuitem" className="topbar-ops-item" onClick={go(onOpenData)}>
+                    <Icon.Download size={14} />
+                    <span>Data & export</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={classNames("topbar-ops-item", accountLabel && "is-on")}
+                    onClick={go(onOpenAccount)}
+                  >
+                    <Icon.User size={14} />
+                    <span>{accountLabel ? "Account" : "Sign in"}</span>
+                  </button>
+                </div>
+
+                <div className="topbar-ops-section">
+                  <div className="topbar-ops-label">Awards</div>
+                  <button type="button" role="menuitem" className="topbar-ops-item" onClick={go(onOpenBadges)}>
+                    <Icon.Medal size={14} />
+                    <span>Badges</span>
+                    <span className="topbar-ops-meta">{badgeCount}/{badgeTotal}</span>
+                  </button>
+                </div>
+
+                <div className="topbar-ops-section topbar-ops-look-mobile" aria-label="Appearance">
+                  <div className="topbar-ops-label">Look</div>
+                  <div className="topbar-ops-look-row">
+                    <ThemePicker themeKey={themeKey} setThemeKey={setThemeKey} />
+                    <FontPicker fontKey={fontKey} setFontKey={setFontKey} />
+                  </div>
+                </div>
+
+                <div className="topbar-ops-section topbar-ops-danger">
+                  <div className="topbar-ops-label">Danger</div>
+                  {confirmReset ? (
+                    <div className="topbar-ops-confirm">
+                      <span>Erase all local data?</span>
+                      <button type="button" className="topbar-ops-confirm-yes" onClick={go(onReset)}>
+                        Erase
+                      </button>
+                      <button type="button" className="topbar-ops-confirm-no" onClick={() => setConfirmReset(false)}>
+                        Keep
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="topbar-ops-item topbar-ops-item-danger"
+                      onClick={() => setConfirmReset(true)}
+                    >
+                      <Icon.Rotate size={14} />
+                      <span>Reset device data</span>
+                    </button>
+                  )}
+                </div>
               </div>
-            ) : (
-              <Tip content="Wipe progress, notes, and review queue for every plan on this device." stamp="RESET" tone="coral" side="bottom">
-                <button
-                  className="topbar-item topbar-item-icon reset-btn"
-                  type="button"
-                  onClick={() => setConfirmReset(true)}
-                >
-                  <Icon.Rotate size={13} />
-                  <span className="topbar-reset-label">Reset</span>
-                </button>
-              </Tip>
             )}
           </div>
         </div>
@@ -557,15 +655,15 @@ const LANDING_FEATURES = [
     id: "journal",
     tone: "ink",
     icon: Icon.Note,
-    title: "Other things I learned",
-    copy: "Field notes for tangents — an evidence board of slips, markdown, and AI summaries.",
+    title: "Field kit · notes",
+    copy: "Off-plan field notes in the navbar Field Kit — slips, chrono filters, and grounded AI summaries.",
   },
   {
     id: "clips",
     tone: "blue",
     icon: Icon.Link,
-    title: "Bookmarks",
-    copy: "Save articles, videos, and docs — compact link previews when metadata is available.",
+    title: "Field kit · bookmarks",
+    copy: "Pinned videos and articles in Field Kit — separate from every campaign, always one click away.",
   },
   {
     id: "onthisday",
@@ -629,6 +727,9 @@ export function HomeView({
   onRequireAuth,
   onGoDashboard,
   onOpenPricing,
+  onOpenKit,
+  learnedCount = 0,
+  bookmarkCount = 0,
 }) {
   const [started, setStarted] = useState(false);
   const [showAllFeatures, setShowAllFeatures] = useState(false);
@@ -656,6 +757,20 @@ export function HomeView({
           <span className="landing-brand-text">REFRAINLY</span>
         </div>
         <div className="landing-nav-actions">
+          {onOpenKit && (
+            <button
+              type="button"
+              className="landing-nav-link landing-nav-kit"
+              onClick={() => onOpenKit("learned")}
+            >
+              Field kit
+              {(learnedCount > 0 || bookmarkCount > 0) && (
+                <span className="landing-nav-kit-count">
+                  {learnedCount + bookmarkCount}
+                </span>
+              )}
+            </button>
+          )}
           {hasCampaign && (
             <button type="button" className="landing-nav-link landing-nav-dash" onClick={onGoDashboard}>
               Dashboard
@@ -1222,8 +1337,6 @@ export function ViewTabs({ view, setView, dueCount }) {
   ];
   const secondary = [
     { key: "weekly", label: "Weekly", icon: Icon.Calendar, stamp: "7D", tone: "lemon", tip: "Last seven days of clears, notes, and open questions." },
-    { key: "learned", label: "Learned", icon: Icon.Note, stamp: "LOG", tone: "mint", tip: "Archive of what you actually absorbed — searchable field notes." },
-    { key: "bookmarks", label: "Bookmarks", icon: Icon.Link, stamp: "REF", tone: "violet", tip: "Stash articles, docs, and videos beside the campaign." },
     { key: "log", label: "Analytics", icon: Icon.List, stamp: "STATS", tone: "ink", tip: "Completion, streaks, and domain coverage for this plan." },
   ];
   const renderTab = (t, secondaryTone = false) => (
@@ -1248,6 +1361,79 @@ export function ViewTabs({ view, setView, dueCount }) {
       <span className="view-tabs-divider" aria-hidden="true" />
       {secondary.map((t) => renderTab(t, true))}
     </div>
+  );
+}
+
+/* ============================== FIELD KIT ============================== */
+export function FieldKitChrome({
+  tab,
+  setTab,
+  learnedCount,
+  bookmarkCount,
+  hasCampaign,
+  onBackToCampaign,
+  accent,
+}) {
+  return (
+    <section className="field-kit" style={{ "--accent": accent }} aria-label="Field kit">
+      <div className="field-kit-glow" aria-hidden="true" />
+      <div className="field-kit-mast">
+        <div className="field-kit-copy">
+          <span className="field-kit-stamp">Field kit</span>
+          <h2 className="field-kit-title">
+            Off-plan
+            <span className="field-kit-title-accent"> inventory</span>
+          </h2>
+          <p className="field-kit-lead">
+            Notes and bookmarks live outside every campaign — rabbit holes, talks, and refs that
+            don&apos;t belong on a day card.
+          </p>
+        </div>
+        <div className="field-kit-meter" aria-hidden="true">
+          <div className="field-kit-meter-cell">
+            <span className="field-kit-meter-val">{String(learnedCount).padStart(2, "0")}</span>
+            <span className="field-kit-meter-label">Notes</span>
+          </div>
+          <div className="field-kit-meter-cell field-kit-meter-cell-accent">
+            <span className="field-kit-meter-val">{String(bookmarkCount).padStart(2, "0")}</span>
+            <span className="field-kit-meter-label">Refs</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="field-kit-rail">
+        <div className="field-kit-tabs" role="tablist" aria-label="Field kit sections">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "learned"}
+            className={classNames("field-kit-tab", tab === "learned" && "is-on")}
+            onClick={() => setTab("learned")}
+          >
+            <span className="field-kit-tab-stamp">LOG</span>
+            <span className="field-kit-tab-label">Field notes</span>
+            <span className="field-kit-tab-count">{learnedCount}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "bookmarks"}
+            className={classNames("field-kit-tab field-kit-tab-refs", tab === "bookmarks" && "is-on")}
+            onClick={() => setTab("bookmarks")}
+          >
+            <span className="field-kit-tab-stamp">REF</span>
+            <span className="field-kit-tab-label">Bookmarks</span>
+            <span className="field-kit-tab-count">{bookmarkCount}</span>
+          </button>
+        </div>
+        {hasCampaign && (
+          <button type="button" className="field-kit-back" onClick={onBackToCampaign}>
+            <Icon.Chevron size={14} style={{ transform: "rotate(180deg)" }} />
+            Campaign deck
+          </button>
+        )}
+      </div>
+    </section>
   );
 }
 

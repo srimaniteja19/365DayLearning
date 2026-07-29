@@ -50,7 +50,7 @@ import {
 import { hydrateCredentialsFromStorage } from "@/lib/providers/credentials";
 import { computeBadges } from "@/lib/achievements";
 import { findOnThisDayMemory } from "@/lib/onThisDay";
-import { dateKey } from "@/lib/learned";
+import { countLearned, dateKey } from "@/lib/learned";
 
 import {
   BackgroundFX,
@@ -71,6 +71,7 @@ import {
   Footer,
   HomeView,
   OnThisDayCard,
+  FieldKitChrome,
 } from "@/features/ui/Views";
 import { LearnedView } from "@/features/learned/LearnedView";
 import { BookmarksView } from "@/features/bookmarks/BookmarksView";
@@ -78,6 +79,7 @@ import { sanitizeBookmarks } from "@/lib/bookmarks";
 
 const GUEST_MODE_KEY = "dualtrack:guest";
 const PAGE_KEY = "dualtrack:page";
+const KIT_TAB_KEY = "dualtrack:kit-tab";
 
 export default function DualTrackConsole() {
   const [plans, setPlans] = useState({});
@@ -104,8 +106,8 @@ export default function DualTrackConsole() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmDeletePlanId, setConfirmDeletePlanId] = useState(null);
   /**
-   * Top-level page (Home vs Dashboard). Always start as "home" so SSR and the
-   * first client paint match — localStorage is applied in an effect below.
+   * Top-level page (Home / Dashboard / Field Kit). Always start as "home" so SSR
+   * and the first client paint match — localStorage is applied in an effect below.
    */
   const [page, setPageState] = useState("home");
   const setPage = useCallback((next) => {
@@ -117,6 +119,24 @@ export default function DualTrackConsole() {
       // best-effort only
     }
   }, []);
+  /** Field Kit tab — notes vs bookmarks. Independent of campaign plans. */
+  const [kitTab, setKitTabState] = useState("learned");
+  const setKitTab = useCallback((next) => {
+    setKitTabState(next);
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(KIT_TAB_KEY, next);
+    } catch {
+      // best-effort only
+    }
+  }, []);
+  const openKit = useCallback(
+    (tab = "learned") => {
+      setKitTab(tab === "bookmarks" ? "bookmarks" : "learned");
+      setPage("kit");
+    },
+    [setKitTab, setPage],
+  );
   const toastTimer = useRef(null);
   const saveTimer = useRef(null);
   const didLoad = useRef(false);
@@ -232,8 +252,12 @@ export default function DualTrackConsole() {
   useEffect(() => {
     try {
       const savedPage = window.localStorage.getItem(PAGE_KEY);
-      if (savedPage === "dashboard" || savedPage === "home") {
+      if (savedPage === "dashboard" || savedPage === "home" || savedPage === "kit") {
         setPageState(savedPage);
+      }
+      const savedKit = window.localStorage.getItem(KIT_TAB_KEY);
+      if (savedKit === "learned" || savedKit === "bookmarks") {
+        setKitTabState(savedKit);
       }
       if (window.localStorage.getItem(GUEST_MODE_KEY) === "1") {
         setGuestMode(true);
@@ -242,6 +266,14 @@ export default function DualTrackConsole() {
       // best-effort only
     }
   }, []);
+
+  // Migrate legacy in-dashboard Learned/Bookmarks tabs → Field Kit page.
+  useEffect(() => {
+    if (view !== "learned" && view !== "bookmarks") return;
+    const tab = view;
+    setView("console");
+    openKit(tab);
+  }, [view, openKit]);
 
   useEffect(() => {
     let cancelled = false;
@@ -795,11 +827,42 @@ export default function DualTrackConsole() {
     );
   }
 
-  // Dashboard only exists once there's an active campaign to show — otherwise
-  // always fall back to Home (e.g. stale "dashboard" page from before a reset).
+  // Dashboard needs a campaign; Field Kit does not (off-plan side channel).
   const onDashboard = page === "dashboard" && !!campaign;
+  const onKit = page === "kit";
+  const learnedCount = countLearned(learned);
+  const bookmarkCount = Array.isArray(bookmarks) ? bookmarks.length : 0;
+  const kitAccent = campaign?.accent || theme.accents?.main || "var(--accent)";
 
-  if (!onDashboard) {
+  const topBarShared = {
+    stats: globalStats,
+    onOpenData: () => setModal({ kind: "export" }),
+    onOpenSettings: () => setModal({ kind: "settings" }),
+    onOpenAccount: () => setModal({ kind: "account" }),
+    accountLabel: session?.user?.email || null,
+    onNewPlan: () => setModal({ kind: "builder" }),
+    themeKey,
+    setThemeKey,
+    fontKey,
+    setFontKey,
+    saveStatus,
+    noteCount: Object.keys(notes).length,
+    confirmReset,
+    setConfirmReset,
+    onReset: handleReset,
+    onOpenBadges: () => setModal({ kind: "badges" }),
+    badgeCount: badgeStatuses.filter((s) => s.unlocked).length,
+    badgeTotal: badgeStatuses.length,
+    onGoHome: () => setPage("home"),
+    onOpenPricing: () => setModal({ kind: "pricing" }),
+    kitTab: onKit ? kitTab : null,
+    learnedCount,
+    bookmarkCount,
+    onOpenKit: openKit,
+    onOpenCampaign: campaign ? () => setPage("dashboard") : undefined,
+  };
+
+  if (!onDashboard && !onKit) {
     const homeSummary = campaign
       ? {
           name: campaign.name,
@@ -836,6 +899,9 @@ export default function DualTrackConsole() {
           accountLabel={session?.user?.email || null}
           onRequireAuth={requireAuth}
           onGoDashboard={() => setPage("dashboard")}
+          onOpenKit={openKit}
+          learnedCount={learnedCount}
+          bookmarkCount={bookmarkCount}
         />
         {modal && (
           <ModalHost
@@ -874,6 +940,86 @@ export default function DualTrackConsole() {
     );
   }
 
+  if (onKit) {
+    return (
+      <ThemeCtx.Provider value={{ theme, domainColors }}>
+        <div
+          className={classNames(
+            "app-root",
+            "kit-root",
+            theme.mode === "light" && "is-light",
+            !theme.effects && "no-fx",
+          )}
+          style={rootStyle}
+        >
+          <BackgroundFX accent={kitAccent} effects={theme.effects} />
+          <TopBar {...topBarShared} />
+          <FieldKitChrome
+            tab={kitTab}
+            setTab={setKitTab}
+            learnedCount={learnedCount}
+            bookmarkCount={bookmarkCount}
+            hasCampaign={!!campaign}
+            onBackToCampaign={() => setPage("dashboard")}
+            accent={kitAccent}
+          />
+          {kitTab === "learned" ? (
+            <LearnedView
+              learned={learned}
+              onAdd={addLearned}
+              onUpdate={updateLearned}
+              onRemove={removeLearned}
+              accent={kitAccent}
+              fireToast={fireToast}
+            />
+          ) : (
+            <BookmarksView
+              bookmarks={bookmarks}
+              onAdd={addBookmark}
+              onUpdate={updateBookmark}
+              onRemove={removeBookmark}
+              accent={kitAccent}
+              fireToast={fireToast}
+            />
+          )}
+          {modal && (
+            <ModalHost
+              modal={modal}
+              onClose={() => setModal(null)}
+              notes={notes}
+              refs={refs}
+              setRef={setRef}
+              appendNote={appendNote}
+              progress={progress}
+              srs={srs}
+              log={log}
+              learned={learned}
+              bookmarks={bookmarks}
+              themeKey={themeKey}
+              onImport={applyImport}
+              fireToast={fireToast}
+              plans={plans}
+              activePlanId={activePlanId}
+              badgeStatuses={badgeStatuses}
+              onOpenAccount={() => setModal({ kind: "account" })}
+              onOpenPricing={() => setModal({ kind: "pricing" })}
+              onPlanCreated={(plan) => {
+                setPlans((prev) => ({ ...prev, [plan.id]: plan }));
+                setActivePlanId(plan.id);
+                setScope("all");
+                setView("console");
+                setPage("dashboard");
+                fireToast(`Plan ready · ${plan.totalDays} days`, "day");
+              }}
+            />
+          )}
+          <ToastLayer toast={toast} />
+          <Footer />
+        </div>
+      </ThemeCtx.Provider>
+    );
+  }
+
   const stats = campaignStats[campaign.id];
 
   return (
@@ -887,28 +1033,7 @@ export default function DualTrackConsole() {
         style={rootStyle}
       >
         <BackgroundFX accent={campaign.accent} effects={theme.effects} />
-        <TopBar
-          stats={globalStats}
-          onOpenData={() => setModal({ kind: "export" })}
-          onOpenSettings={() => setModal({ kind: "settings" })}
-          onOpenAccount={() => setModal({ kind: "account" })}
-          accountLabel={session?.user?.email || null}
-          onNewPlan={() => setModal({ kind: "builder" })}
-          themeKey={themeKey}
-          setThemeKey={setThemeKey}
-          fontKey={fontKey}
-          setFontKey={setFontKey}
-          saveStatus={saveStatus}
-          noteCount={Object.keys(notes).length}
-          confirmReset={confirmReset}
-          setConfirmReset={setConfirmReset}
-          onReset={handleReset}
-          onOpenBadges={() => setModal({ kind: "badges" })}
-          badgeCount={badgeStatuses.filter((s) => s.unlocked).length}
-          badgeTotal={badgeStatuses.length}
-          onGoHome={() => setPage("home")}
-          onOpenPricing={() => setModal({ kind: "pricing" })}
-        />
+        <TopBar {...topBarShared} />
         <PlanSwitcher
           active={activePlanId}
           setActive={setActivePlanId}
@@ -1060,26 +1185,6 @@ export default function DualTrackConsole() {
               setView("console");
             }}
             onExport={() => setModal({ kind: "export" })}
-          />
-        )}
-        {view === "learned" && (
-          <LearnedView
-            learned={learned}
-            onAdd={addLearned}
-            onUpdate={updateLearned}
-            onRemove={removeLearned}
-            accent={campaign.accent}
-            fireToast={fireToast}
-          />
-        )}
-        {view === "bookmarks" && (
-          <BookmarksView
-            bookmarks={bookmarks}
-            onAdd={addBookmark}
-            onUpdate={updateBookmark}
-            onRemove={removeBookmark}
-            accent={campaign.accent}
-            fireToast={fireToast}
           />
         )}
         {view === "log" && (

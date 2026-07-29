@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildLearnedChronoIndex,
   countLearned,
   createLearnedId,
   dateKey,
   extractUrlsFromText,
+  formatChronoFilterLabel,
   insertAtSelection,
   linkLabelForUrl,
+  matchesChronoFilter,
   sanitizeLearned,
   sortedLearnedDays,
   stripLinkMarkup,
@@ -92,5 +95,28 @@ describe("learned helpers", () => {
     expect(stripLinkMarkup("Idea one\n\nhttps://example.com\n\nIdea two")).toBe(
       "Idea one\n\nIdea two",
     );
+  });
+
+  it("chrono index and filter drill year → month → day", () => {
+    const learned = {
+      "2026-07-28": [
+        { id: "1", title: "a", body: "", createdAt: 1 },
+        { id: "2", title: "b", body: "", createdAt: 2 },
+      ],
+      "2026-07-01": [{ id: "3", title: "c", body: "", createdAt: 3 }],
+      "2025-12-15": [{ id: "4", title: "d", body: "", createdAt: 4 }],
+    };
+    const index = buildLearnedChronoIndex(learned);
+    expect(index.total).toBe(4);
+    expect(index.years.map((y) => y.year)).toEqual([2026, 2025]);
+    expect(index.months.find((m) => m.month === 7)?.count).toBe(3);
+
+    const scoped = buildLearnedChronoIndex(learned, 2026);
+    expect(scoped.months.find((m) => m.month === 7)?.count).toBe(3);
+    expect(scoped.months.find((m) => m.month === 12)?.count).toBe(0);
+
+    expect(matchesChronoFilter("2026-07-28", { year: 2026, month: 7, day: null })).toBe(true);
+    expect(matchesChronoFilter("2025-12-15", { year: 2026, month: null, day: null })).toBe(false);
+    expect(formatChronoFilterLabel({ year: 2026, month: 7, day: null })).toBe("Jul 2026");
   });
 });
