@@ -1215,12 +1215,6 @@ function PricingPanel({ onClose, onOpenAccount }) {
       )}
 
       {notice && <div className="pricing-notice" role="status">{notice}</div>}
-
-      <div className="pricing-actions">
-        <button className="pricing-close" type="button" onClick={onClose}>
-          Close
-        </button>
-      </div>
     </div>
   );
 }
