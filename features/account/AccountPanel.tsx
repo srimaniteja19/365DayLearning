@@ -26,18 +26,16 @@ function useLastSyncedLabel(active: boolean): string | null {
 export function AccountPanel({
   onClose,
   onAuthenticated,
-  onGuest,
-  showGuestOption,
   onViewPricing,
+  defaultMode = "signup",
 }: {
   onClose: () => void;
   onAuthenticated?: () => void;
-  onGuest?: () => void;
-  showGuestOption?: boolean;
   onViewPricing?: () => void;
+  defaultMode?: Mode;
 }) {
   const { data: session, status } = useSession();
-  const [mode, setMode] = useState<Mode>("signin");
+  const [mode, setMode] = useState<Mode>(defaultMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -130,9 +128,8 @@ export function AccountPanel({
   return (
     <div className="account-panel">
       <p className="account-lead">
-        {showGuestOption
-          ? "Sign in or create a free account to build a plan and sync everywhere — or continue as a guest on this device."
-          : "Create a free account to sync plans, progress, notes, and journal across devices. Local mode still works without one."}
+        Create a free account or sign in to run campaigns, Field Kit, and sync progress across
+        devices.
       </p>
 
       <div className="account-tabs" role="tablist" aria-label="Account mode">
@@ -217,17 +214,6 @@ export function AccountPanel({
           </button>
         </div>
       </form>
-
-      {showGuestOption && (
-        <>
-          <div className="account-or">
-            <span>or</span>
-          </div>
-          <button type="button" className="account-btn account-btn-guest" onClick={onGuest}>
-            Continue as a guest
-          </button>
-        </>
-      )}
 
       {error && (
         <div className="account-error" role="alert">

@@ -60,8 +60,9 @@ const SUGGEST_JSON_SCHEMA = {
   },
 } as const;
 
-const SYSTEM = `You pick learning domains and relative weights for a personal technical study plan.
-Never put double-quote characters inside labels. Prefer a structured tool when available.`;
+const SYSTEM = `You pick learning domains and relative weights for a personal study plan in any subject (psychology, economics, history, languages, sciences, arts, trades, technology, or mixed).
+Never put double-quote characters inside labels. Prefer a structured tool when available.
+Do not force software-engineering domains unless the learner's goal is clearly technical.`;
 
 function knownDomainCatalog(): string {
   return Object.entries(DOMAIN_META)

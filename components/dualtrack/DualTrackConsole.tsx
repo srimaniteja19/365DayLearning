@@ -86,7 +86,6 @@ import {
   seedPreviewFromUrl,
 } from "@/lib/bookmarks";
 
-const GUEST_MODE_KEY = "dualtrack:guest";
 const PAGE_KEY = "dualtrack:page";
 const KIT_TAB_KEY = "dualtrack:kit-tab";
 
@@ -139,50 +138,27 @@ export default function DualTrackConsole() {
       // best-effort only
     }
   }, []);
-  const openKit = useCallback(
-    (tab = "learned") => {
-      setKitTab(tab === "bookmarks" ? "bookmarks" : "learned");
-      setPage("kit");
-    },
-    [setKitTab, setPage],
-  );
-  /** When set, LearnedView jumps Chrono to this YYYY-MM-DD (e.g. On This Day). */
-  const [kitFocusDate, setKitFocusDate] = useState(null);
-  const [kitQuery, setKitQuery] = useState("");
-  const [kitSeed, setKitSeed] = useState(null);
-  const openKitToDate = useCallback(
-    (dateStr) => {
-      setKitFocusDate(dateStr || null);
-      setKitTab("learned");
-      setPage("kit");
-    },
-    [setKitTab, setPage],
-  );
+
   const toastTimer = useRef(null);
   const saveTimer = useRef(null);
   const didLoad = useRef(false);
   const storageOk = useRef(false);
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const cloudUserId = session?.user?.id || null;
   const cloudSyncedFor = useRef(null);
-  /** Guest preference — same SSR-safe pattern as `page`. */
-  const [guestMode, setGuestMode] = useState(false);
   const pendingAuthAction = useRef(null);
 
-  /**
-   * Gate an action (build a custom plan, browse example plans) behind sign-in —
-   * unless the visitor already has a session or has explicitly opted into guest mode.
-   */
+  /** Gate plan/kit/dashboard actions behind sign-in. */
   const requireAuth = useCallback(
     (action) => {
-      if (cloudUserId || guestMode) {
+      if (cloudUserId) {
         action();
         return;
       }
       pendingAuthAction.current = action;
       setModal({ kind: "account", gated: true });
     },
-    [cloudUserId, guestMode],
+    [cloudUserId],
   );
 
   const resolvePendingAuthAction = useCallback(() => {
@@ -196,18 +172,40 @@ export default function DualTrackConsole() {
     resolvePendingAuthAction();
   }, [resolvePendingAuthAction]);
 
-  const handleContinueAsGuest = useCallback(() => {
-    setGuestMode(true);
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.setItem(GUEST_MODE_KEY, "1");
-      } catch {
-        // best-effort only
-      }
-    }
-    setModal(null);
-    resolvePendingAuthAction();
-  }, [resolvePendingAuthAction]);
+  /** Landing CTA — require account, then continue (plan picker / builder). */
+  const startWithAccount = useCallback(
+    (next) => {
+      requireAuth(() => {
+        if (typeof next === "function") next();
+      });
+    },
+    [requireAuth],
+  );
+
+  const openKit = useCallback(
+    (tab = "learned") => {
+      requireAuth(() => {
+        setKitTab(tab === "bookmarks" ? "bookmarks" : "learned");
+        setPage("kit");
+      });
+    },
+    [setKitTab, setPage, requireAuth],
+  );
+
+  /** When set, LearnedView jumps Chrono to this YYYY-MM-DD (e.g. On This Day). */
+  const [kitFocusDate, setKitFocusDate] = useState(null);
+  const [kitQuery, setKitQuery] = useState("");
+  const [kitSeed, setKitSeed] = useState(null);
+  const openKitToDate = useCallback(
+    (dateStr) => {
+      requireAuth(() => {
+        setKitFocusDate(dateStr || null);
+        setKitTab("learned");
+        setPage("kit");
+      });
+    },
+    [setKitTab, setPage, requireAuth],
+  );
 
   const theme = THEMES[resolveThemeKey(themeKey)] || THEMES[DEFAULT_THEME_KEY];
   const fontPack = FONT_PACKS[resolveFontKey(fontKey)] || FONT_PACKS[DEFAULT_FONT_KEY];
@@ -269,9 +267,11 @@ export default function DualTrackConsole() {
     hydrateCredentialsFromStorage();
   }, []);
 
-  // Restore remembered page + guest mode after mount (avoids hydration mismatch).
+  // Restore remembered page after mount (avoids hydration mismatch).
+  // Clear legacy guest-mode flag if present.
   useEffect(() => {
     try {
+      window.localStorage.removeItem("dualtrack:guest");
       const savedPage = window.localStorage.getItem(PAGE_KEY);
       if (savedPage === "dashboard" || savedPage === "home" || savedPage === "kit") {
         setPageState(savedPage);
@@ -280,13 +280,18 @@ export default function DualTrackConsole() {
       if (savedKit === "learned" || savedKit === "bookmarks") {
         setKitTabState(savedKit);
       }
-      if (window.localStorage.getItem(GUEST_MODE_KEY) === "1") {
-        setGuestMode(true);
-      }
     } catch {
       // best-effort only
     }
   }, []);
+
+  // Unsigned users stay on the landing page — no guest dashboard/kit.
+  useEffect(() => {
+    if (sessionStatus === "loading") return;
+    if (!cloudUserId && (page === "dashboard" || page === "kit")) {
+      setPage("home");
+    }
+  }, [sessionStatus, cloudUserId, page, setPage]);
 
   // Migrate legacy in-dashboard Learned/Bookmarks tabs → Field Kit page.
   useEffect(() => {
@@ -981,9 +986,8 @@ export default function DualTrackConsole() {
           totalDays: globalStats.totalDaysAll,
         }
       : null;
-    // Landing always uses Signal so the marketing page reads as one bright
-    // composition — dashboard keeps the user's chosen theme separately.
-    const homeTheme = THEMES[DEFAULT_THEME_KEY];
+    // Landing inherits the active theme so it matches Field Ops / dashboard look.
+    const homeTheme = theme;
     const homeStyle = { ...themeVars(homeTheme), ...fontVars(fontPack) };
     return (
       <div
@@ -1000,12 +1004,13 @@ export default function DualTrackConsole() {
           summary={homeSummary}
           examples={examplePlans}
           onAddExample={addExamplePlan}
-          onOpenBuilder={() => requireAuth(() => setModal({ kind: "builder" }))}
+          onOpenBuilder={() => setModal({ kind: "builder" })}
           onOpenAccount={() => setModal({ kind: "account" })}
           onOpenPricing={() => setModal({ kind: "pricing" })}
           accountLabel={session?.user?.email || null}
           onRequireAuth={requireAuth}
-          onGoDashboard={() => setPage("dashboard")}
+          onStartWithAccount={startWithAccount}
+          onGoDashboard={() => requireAuth(() => setPage("dashboard"))}
           onOpenKit={openKit}
           learnedCount={learnedCount}
           bookmarkCount={bookmarkCount}
@@ -1013,7 +1018,10 @@ export default function DualTrackConsole() {
         {modal && (
           <ModalHost
             modal={modal}
-            onClose={() => setModal(null)}
+            onClose={() => {
+              pendingAuthAction.current = null;
+              setModal(null);
+            }}
             notes={notes}
             refs={refs}
             setRef={setRef}
@@ -1029,7 +1037,6 @@ export default function DualTrackConsole() {
             plans={plans}
             activePlanId={activePlanId}
             onAccountAuthenticated={handleAccountAuthenticated}
-            onAccountGuest={handleContinueAsGuest}
             onOpenAccount={() => setModal({ kind: "account" })}
             onOpenPricing={() => setModal({ kind: "pricing" })}
             onPlanCreated={(plan) => {

@@ -374,7 +374,7 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
                 patch({ goal: e.target.value });
                 if (domainSuggestError) setDomainSuggestError("");
               }}
-              placeholder="Become a Staff-level backend engineer focused on NestJS and distributed systems"
+              placeholder="Build a working knowledge of behavioral economics and decision-making biases over 90 days"
               autoFocus
             />
           </div>
@@ -384,7 +384,7 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
               className="settings-input"
               value={draft.level}
               onChange={(e) => patch({ level: e.target.value })}
-              placeholder="Mid-level, solid NestJS, light AWS"
+              placeholder="Curious beginner — read a few books, no formal coursework"
             />
           </div>
           <div className="gen-field">
@@ -394,7 +394,7 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
               rows={3}
               value={draft.exclusionsText}
               onChange={(e) => patch({ exclusionsText: e.target.value })}
-              placeholder={"Intro to HTML\nBasic Git commands"}
+              placeholder={"Intro survey courses\nTopics I already know cold"}
             />
             <div className="gen-hint">Topics too basic to include.</div>
           </div>
@@ -505,7 +505,7 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
               rows={3}
               value={draft.mustIncludeText}
               onChange={(e) => patch({ mustIncludeText: e.target.value })}
-              placeholder={"DynamoDB single-table design\nNestJS CQRS"}
+              placeholder={"Prospect theory\nCognitive dissonance\nLoss aversion"}
             />
           </div>
           {contentErrors.length > 0 && (

@@ -610,8 +610,9 @@ export function coercePlanAiPayload(data: unknown): unknown {
   return obj;
 }
 
-const PLAN_SYSTEM = `You are a senior curriculum designer who builds daily technical learning plans for working engineers.
+const PLAN_SYSTEM = `You are a senior curriculum designer who builds daily learning plans for motivated adult self-learners in any subject — psychology, economics, history, languages, sciences, arts, trades, technology, or interdisciplinary goals.
 Every topic you write names one specific, teachable concept that someone can study in a single sitting and be quizzed on afterward.
+Match the learner's stated goal and level; do not default to software engineering unless the goal is clearly technical.
 Never put double-quote characters inside label, theme, or topic text — use plain words only (write RPC not "RPC").
 When a structured tool is available, call it. Otherwise reply with a single strict JSON object and nothing else.`;
 

@@ -1,12 +1,12 @@
 # Refrainly
 
-Multi-plan learning campaigns: progress, spaced repetition, notes, themes, custom plan builder, and bring-your-own-key AI.
+Multi-plan learning campaigns for any subject: progress, spaced repetition, notes, themes, custom plan builder, and bring-your-own-key AI.
 
 ## Stack
 
 - **Next.js 16** (App Router) + React 19 + TypeScript
 - Persistence via **IndexedDB** (`idb-keyval`) with **localStorage** fallback
-- Optional accounts + cloud sync: **Neon Postgres** (via Vercel's database integration) + **Auth.js v5** (credentials)
+- Accounts + cloud sync: **Neon Postgres** (via Vercel's database integration) + **Auth.js v5** (credentials)
 - BYOK via OpenRouter (paste your key + model in Settings)
 
 ## Setup
@@ -18,11 +18,11 @@ cp .env.example .env.local
 
 Open **Settings** in the top bar and paste your OpenRouter key at runtime.
 
-## Accounts + cloud sync (optional)
+## Accounts + cloud sync
 
-The app is fully usable with **no account** — everything lives in IndexedDB/localStorage on that
-one device. Signing in adds sync: the entire snapshot (plans, progress, notes, SRS, and the
-Learned journal) is mirrored to Postgres per account so it follows you across devices.
+An account is **required** to use Refrainly (campaigns, Field Kit, progress). Sign-in syncs the
+entire snapshot (plans, progress, notes, SRS, and the Learned journal) to Postgres per account
+so it follows you across devices.
 
 1. **Create the database** — in the Vercel dashboard: *Storage → Create Database → Neon (Postgres)*.
    Connect it to this project so `DATABASE_URL` is added to your Vercel env vars automatically.
@@ -36,12 +36,12 @@ Learned journal) is mirrored to Postgres per account so it follows you across de
    ```bash
    npm run db:push
    ```
-4. Run the app — a **Sign in** button appears in the top bar. Creating an account or signing in
-   pulls any existing cloud snapshot for that account (or seeds the cloud with the current local
-   data on first sign-in), then keeps pushing on every save.
+4. Run the app — create an account or sign in from the landing page or top bar. First sign-in
+   pulls any existing cloud snapshot for that account (or seeds the cloud with local data if
+   present), then keeps pushing on every save.
 
-Without `DATABASE_URL`/`AUTH_SECRET` set, the account button still renders but sign-in/sign-up
-calls fail gracefully (503) and the app behaves exactly as it did before — purely local.
+Without `DATABASE_URL`/`AUTH_SECRET` set, sign-in/sign-up calls fail gracefully (503) — auth must
+be configured for the app to be usable beyond the landing page.
 
 ## Subscriptions
 
@@ -79,7 +79,7 @@ npm run db:studio    # browse the database with Drizzle Studio
 - Multi-plan switcher; delete purges that plan’s progress/notes/refs/srs
 - **Other things I learned** — calendar journal with markdown notes, rich links, and AI insights
 - **Bookmarks** — save articles, YouTube/Vimeo, docs, and repos with compact link previews when available
-- Optional **accounts + cloud sync** (Neon Postgres + Auth.js) — sign in to sync across devices
+- **Accounts + cloud sync** (Neon Postgres + Auth.js) — required to use the app; syncs across devices
 - **Subscriptions** — Recruit (free OpenRouter BYOK) is live; Operator/Architect managed AI is planned (checkout not connected)
 - Themes (10) via CSS custom properties — Signal, Folio, Afterburn, Chlorophyll, Oxide, Ion, Cinnabar, Halide, Voltaic, Marina
 - Export: notes markdown, full backup, **plan-only share**

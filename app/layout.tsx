@@ -86,18 +86,21 @@ const redmono = Red_Hat_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Refrainly | Daily Learning Campaigns",
+  title: "Refrainly | Field Ops Learning Campaigns",
   description:
-    "Refrainly — multi-plan learning campaigns with spaced repetition, notes, custom roadmaps, and bring-your-own-key AI.",
+    "Refrainly is a Field Ops learning console for multi-plan daily campaigns in any subject — psychology, economics, history, languages, tech, and more. Day-by-day plans, spaced repetition, Field Kit, and bring-your-own-key AI. Create a free account to start.",
   applicationName: "Refrainly",
   keywords: [
-    "learning",
-    "engineering",
-    "AI",
-    "systems",
+    "learning campaigns",
     "spaced repetition",
+    "self-directed learning",
+    "study plan",
+    "psychology",
+    "economics",
+    "history",
+    "bring your own AI key",
+    "Field Kit",
     "365 day challenge",
-    "roadmap",
   ],
   appleWebApp: {
     capable: true,

@@ -28,6 +28,8 @@ import { downloadText, copyText } from "@/lib/fileIo";
 import { buildMarkdown } from "@/lib/markdown";
 import { relativeDue, SRS_INTERVALS, DAY_MS, dueList } from "@/lib/srs";
 import { seedBuiltinPlans } from "@/data/builtinPlans";
+import { HomeView } from "@/features/landing/HomeView";
+export { HomeView };
 import { SettingsPanel } from "@/features/settings/SettingsPanel";
 import { AccountPanel } from "@/features/account/AccountPanel";
 import { PlanBuilder } from "@/features/planBuilder/PlanBuilder";
@@ -611,374 +613,7 @@ export function PlanSwitcher({
   );
 }
 
-/* ============================== LANDING PAGE ============================== */
-const LANDING_FEATURES_PRIMARY = [
-  "roadmaps",
-  "multiplan",
-  "xp",
-  "streaks",
-  "srs",
-  "quiz",
-  "journal",
-  "sync",
-];
-
-const LANDING_FEATURES = [
-  {
-    id: "roadmaps",
-    tone: "blue",
-    icon: Icon.Target,
-    title: "Day-by-day roadmaps",
-    copy: "Start from example campaigns or generate a custom plan with outline, periods, and edit-before-save.",
-  },
-  {
-    id: "multiplan",
-    tone: "ink",
-    icon: Icon.LayoutDashboard,
-    title: "Multi-plan campaigns",
-    copy: "Run several learning plans at once and switch between them without losing progress.",
-  },
-  {
-    id: "xp",
-    tone: "pink",
-    icon: Icon.Bolt,
-    title: "XP, levels & ranks",
-    copy: "Earn XP for completed topics, level up, and climb from Recruit toward Architect.",
-  },
-  {
-    id: "streaks",
-    tone: "blue",
-    icon: Icon.Flame,
-    title: "Daily streaks",
-    copy: "Keep a calendar streak alive by showing up and completing today's mission.",
-  },
-  {
-    id: "srs",
-    tone: "ink",
-    icon: Icon.Rotate,
-    title: "Spaced repetition",
-    copy: "Reviews resurface topics on a schedule so you remember them instead of cramming once.",
-  },
-  {
-    id: "quiz",
-    tone: "pink",
-    icon: Icon.Book,
-    title: "AI quiz & study notes",
-    copy: "Generate recall checks and study notes for any day — bring your own key or use a paid plan.",
-  },
-  {
-    id: "linkedin",
-    tone: "blue",
-    icon: Icon.Send,
-    title: "LinkedIn drafts",
-    copy: "Turn a completed day into a shareable post draft without leaving the campaign.",
-  },
-  {
-    id: "journal",
-    tone: "ink",
-    icon: Icon.Note,
-    title: "Field kit · notes",
-    copy: "Off-plan notes in Field Kit — slips, chrono filters, and grounded AI summaries.",
-  },
-  {
-    id: "clips",
-    tone: "blue",
-    icon: Icon.Link,
-    title: "Field kit · bookmarks",
-    copy: "Pinned videos and articles in Field Kit — separate from every campaign, always one click away.",
-  },
-  {
-    id: "onthisday",
-    tone: "blue",
-    icon: Icon.Calendar,
-    title: "On this day",
-    copy: "Resurface completed days and journal entries from weeks or months ago.",
-  },
-  {
-    id: "badges",
-    tone: "ink",
-    icon: Icon.Medal,
-    title: "Badges & milestones",
-    copy: "Achievements unlock automatically from progress, streaks, reviews, and journal activity.",
-  },
-  {
-    id: "themes",
-    tone: "pink",
-    icon: Icon.Grid,
-    title: "Themes & type voices",
-    copy: "Ten visual themes and ten type voices — Space Grotesk, Literata, JetBrains Mono, Archivo, and more.",
-  },
-  {
-    id: "sync",
-    tone: "blue",
-    icon: Icon.Cloud,
-    title: "Accounts & cloud sync",
-    copy: "Sign in to sync plans, progress, notes, and journal across devices — or continue as a guest.",
-  },
-  {
-    id: "byok",
-    tone: "ink",
-    icon: Icon.Terminal,
-    title: "Bring your own OpenRouter key",
-    copy: "Paste an OpenRouter key and pick any model — free forever on your own credits.",
-  },
-  {
-    id: "plans",
-    tone: "pink",
-    icon: Icon.Trophy,
-    title: "Subscription tiers",
-    copy: "Recruit is free OpenRouter BYOK today. Operator and Architect managed AI is planned — checkout not live yet.",
-  },
-  {
-    id: "export",
-    tone: "blue",
-    icon: Icon.Download,
-    title: "Export & import",
-    copy: "Backup everything, share a plan-only file, or merge another backup without starting over.",
-  },
-];
-
-export function HomeView({
-  hasCampaign,
-  summary,
-  examples,
-  onAddExample,
-  onOpenBuilder,
-  onOpenAccount,
-  accountLabel,
-  onRequireAuth,
-  onGoDashboard,
-  onOpenPricing,
-  onOpenKit,
-  learnedCount = 0,
-  bookmarkCount = 0,
-}) {
-  const [started, setStarted] = useState(false);
-  const [showAllFeatures, setShowAllFeatures] = useState(false);
-  const pickerRef = useRef(null);
-
-  useEffect(() => {
-    if (started && pickerRef.current) {
-      pickerRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [started]);
-
-  const handleGetStarted = () => onRequireAuth(() => setStarted(true));
-  const handleBuildCustom = () => onRequireAuth(onOpenBuilder);
-
-  const visibleFeatures = showAllFeatures
-    ? LANDING_FEATURES
-    : LANDING_FEATURES.filter((f) => LANDING_FEATURES_PRIMARY.includes(f.id));
-  const hiddenCount = LANDING_FEATURES.length - LANDING_FEATURES_PRIMARY.length;
-
-  return (
-    <div className="landing">
-      <header className="landing-nav">
-        <div className="landing-brand" aria-label="Refrainly">
-          <span className="landing-brand-mark" aria-hidden="true" />
-          <span className="landing-brand-text">REFRAINLY</span>
-        </div>
-        <div className="landing-nav-actions">
-          {onOpenKit && (
-            <button
-              type="button"
-              className="landing-nav-link landing-nav-kit"
-              onClick={() => onOpenKit("learned")}
-            >
-              Field kit
-              {(learnedCount > 0 || bookmarkCount > 0) && (
-                <span className="landing-nav-kit-count">
-                  {learnedCount + bookmarkCount}
-                </span>
-              )}
-            </button>
-          )}
-          {hasCampaign && (
-            <button type="button" className="landing-nav-link landing-nav-dash" onClick={onGoDashboard}>
-              Dashboard
-            </button>
-          )}
-          <button type="button" className="landing-nav-link" onClick={onOpenPricing}>
-            Plans
-          </button>
-          <button type="button" className="landing-nav-cta" onClick={onOpenAccount}>
-            {accountLabel ? "Account" : "Sign in"}
-          </button>
-        </div>
-      </header>
-
-      <section className="landing-hero" aria-labelledby="landing-hero-title">
-        <div className="landing-hero-stage" aria-hidden="true">
-          <span className="landing-shape landing-shape-a" />
-          <span className="landing-shape landing-shape-b" />
-          <span className="landing-shape landing-shape-c" />
-          <span className="landing-shape landing-shape-d" />
-        </div>
-        <div className="landing-hero-copy">
-          <p className="landing-brand-hero">REFRAINLY</p>
-          {hasCampaign ? (
-            <>
-              <h1 id="landing-hero-title" className="landing-hero-title">
-                Ready for today&apos;s mission?
-              </h1>
-              <p className="landing-hero-lead">
-                Continue <strong>{summary.name}</strong> — {summary.daysComplete} of{" "}
-                {summary.totalDays} days done.
-              </p>
-              <div className="landing-hero-actions">
-                <button type="button" className="landing-cta" onClick={onGoDashboard}>
-                  Go to dashboard
-                </button>
-                <button type="button" className="landing-cta-ghost" onClick={handleGetStarted}>
-                  Add another plan
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <h1 id="landing-hero-title" className="landing-hero-title">
-                Learn something new.
-                <span className="landing-hero-line">Every single day.</span>
-              </h1>
-              <p className="landing-hero-lead">
-                Day-by-day roadmaps, streaks, spaced review, and a journal for the tangents —
-                in one place.
-              </p>
-              <div className="landing-hero-actions">
-                <button type="button" className="landing-cta" onClick={handleGetStarted}>
-                  Get started
-                </button>
-                <button type="button" className="landing-cta-ghost" onClick={handleBuildCustom}>
-                  Build a custom plan
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </section>
-
-      {hasCampaign && summary && (
-        <section className="landing-stats" aria-label="Your progress">
-          <div className="landing-stat" style={{ "--i": 0 }}>
-            <span className="landing-stat-val">{summary.streak}</span>
-            <span className="landing-stat-label">day streak</span>
-          </div>
-          <div className="landing-stat" style={{ "--i": 1 }}>
-            <span className="landing-stat-val">{summary.xp.toLocaleString()}</span>
-            <span className="landing-stat-label">XP</span>
-          </div>
-          <div className="landing-stat" style={{ "--i": 2 }}>
-            <span className="landing-stat-val">LV {summary.level}</span>
-            <span className="landing-stat-label">{summary.rank}</span>
-          </div>
-          <div className="landing-stat" style={{ "--i": 3 }}>
-            <span className="landing-stat-val">
-              {summary.daysComplete}/{summary.totalDays}
-            </span>
-            <span className="landing-stat-label">days</span>
-          </div>
-        </section>
-      )}
-
-      <section className="landing-features" aria-label="Everything included">
-        <div className="landing-features-head">
-          <h2 className="landing-features-title">Everything in Refrainly</h2>
-          <p className="landing-features-lead">
-            Campaigns, memory, AI tools, sync, and themes — one daily learning console.
-          </p>
-        </div>
-        <div className="landing-features-grid">
-          {visibleFeatures.map((f, i) => (
-            <div
-              key={f.id}
-              className={classNames("landing-feature", `landing-feature-${f.tone}`)}
-              style={{ "--i": i }}
-            >
-              <div className="landing-feature-icon" aria-hidden="true">
-                <f.icon size={20} />
-              </div>
-              <div className="landing-feature-body">
-                <h3 className="landing-feature-title">{f.title}</h3>
-                <p className="landing-feature-copy">{f.copy}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-        {!showAllFeatures && hiddenCount > 0 && (
-          <button
-            type="button"
-            className="landing-features-more"
-            onClick={() => setShowAllFeatures(true)}
-          >
-            Field ops kit · +{hiddenCount} more
-          </button>
-        )}
-        {showAllFeatures && (
-          <button
-            type="button"
-            className="landing-features-more"
-            onClick={() => setShowAllFeatures(false)}
-          >
-            Show less
-          </button>
-        )}
-      </section>
-
-      {!started && !hasCampaign && (
-        <section className="landing-band">
-          <div className="landing-band-copy">
-            <h2 className="landing-band-title">Start your first campaign</h2>
-            <p className="landing-band-lead">Sign in, or continue as a guest — your progress saves either way.</p>
-          </div>
-          <button type="button" className="landing-cta landing-cta-band" onClick={handleGetStarted}>
-            Get started
-          </button>
-        </section>
-      )}
-
-      {started && (
-        <section className="landing-picker" ref={pickerRef}>
-          <div className="landing-picker-head">
-            <h2 className="landing-picker-title">
-              {hasCampaign ? "Start a new campaign" : "Pick a starting plan"}
-            </h2>
-            <p className="landing-picker-lead">
-              Add an example plan as-is, or build a custom roadmap around what you want to learn.
-            </p>
-          </div>
-          <div className="landing-picker-grid">
-            {examples.map((p, i) => (
-              <div
-                key={p.id}
-                className={classNames("landing-plan", i % 2 === 0 ? "landing-plan-a" : "landing-plan-b")}
-              >
-                <div className="landing-plan-meta">{p.totalDays} days · example</div>
-                <h3 className="landing-plan-name">{p.name}</h3>
-                <p className="landing-plan-sub">{p.subtitle}</p>
-                {p.blurb && <p className="landing-plan-blurb">{p.blurb}</p>}
-                <button type="button" className="landing-plan-btn" onClick={() => onAddExample(p.id)}>
-                  Add this plan
-                </button>
-              </div>
-            ))}
-          </div>
-          <div className="landing-picker-or">
-            <span>or</span>
-          </div>
-          <button type="button" className="landing-cta-ghost landing-picker-custom" onClick={handleBuildCustom}>
-            Build your own custom plan
-          </button>
-        </section>
-      )}
-
-      <footer className="landing-footer">
-        <span>REFRAINLY</span>
-        <span className="landing-footer-dot" aria-hidden="true" />
-        <span>progress saves automatically</span>
-      </footer>
-    </div>
-  );
-}
+/* ============================== LANDING (re-exported from features/landing) ============================== */
 
 export function CampaignHero({ campaign, stats, progress, onToggle }) {
   const activeDay = stats.activeDay;
@@ -2919,7 +2554,7 @@ function SummaryCard({ label, value, sub, accent, tone = "mint" }) {
 }
 
 /* ============================== MODALS ============================== */
-export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, progress, srs, log, learned, bookmarks, themeKey, onImport, fireToast, plans, activePlanId, onPlanCreated, badgeStatuses, onAccountAuthenticated, onAccountGuest, onOpenPricing, onOpenAccount }) {
+export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, progress, srs, log, learned, bookmarks, themeKey, onImport, fireToast, plans, activePlanId, onPlanCreated, badgeStatuses, onAccountAuthenticated, onOpenPricing, onOpenAccount }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKey);
@@ -2981,10 +2616,9 @@ export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, pro
           {modal.kind === "account" && (
             <AccountPanel
               onClose={onClose}
-              showGuestOption={!!modal.gated}
               onAuthenticated={modal.gated ? onAccountAuthenticated : undefined}
-              onGuest={modal.gated ? onAccountGuest : undefined}
               onViewPricing={onOpenPricing}
+              defaultMode={modal.gated ? "signup" : "signin"}
             />
           )}
           {modal.kind === "badges" && <BadgesPanel statuses={badgeStatuses} onClose={onClose} />}
@@ -3159,8 +2793,8 @@ export function MiniMarkdown({ text }) {
 /* ---------- notes generator ---------- */
 const NOTE_STYLES = [
   { key: "explainer", label: "Explainer", hint: "Concepts plus one worked example" },
-  { key: "code", label: "Code first", hint: "Heavy on annotated code" },
-  { key: "failure", label: "Failure modes", hint: "What breaks in production" },
+  { key: "worked", label: "Worked example", hint: "Heavy on a concrete walkthrough or sample" },
+  { key: "pitfalls", label: "Pitfalls", hint: "Common mistakes and what goes wrong" },
 ];
 
 function NotesGenPanel({ day, existing, onSaveRef, onAppendNote, fireToast }) {
@@ -3171,9 +2805,16 @@ function NotesGenPanel({ day, existing, onSaveRef, onAppendNote, fireToast }) {
   const [err, setErr] = useState("");
 
   const styleBrief = {
-    explainer: "Lead with the mental model, then one worked example, then the gotchas that bite people. Balance prose and example.",
-    code: "Minimise prose. Centre the notes on annotated, realistic code the reader could actually run or adapt. Comment the lines that carry the insight.",
-    failure: "Centre the notes on production failure modes: what goes wrong, the symptoms you would actually observe, how to diagnose it, and how to prevent it.",
+    explainer:
+      "Lead with the mental model, then one worked example, then the gotchas that trip people up. Balance prose and example.",
+    worked:
+      "Minimise preamble. Centre the notes on one concrete walkthrough — a worked problem, annotated sample, short case, timeline, or code block if the topic is code-shaped. Comment the moves that carry the insight.",
+    pitfalls:
+      "Centre the notes on failure modes and misconceptions: what goes wrong, the symptoms you would notice, how to diagnose it, and how to avoid it.",
+    // Legacy keys from older saves
+    code: "Minimise preamble. Centre the notes on one concrete walkthrough — a worked problem, annotated sample, or code if it fits.",
+    failure:
+      "Centre the notes on failure modes and misconceptions: what goes wrong, how to spot it, and how to avoid it.",
   };
 
   const generate = async () => {
@@ -3181,16 +2822,16 @@ function NotesGenPanel({ day, existing, onSaveRef, onAppendNote, fireToast }) {
     setErr("");
     try {
       const topic = day.topics[topicIdx];
-      const prompt = `Write compact study notes on this topic for an experienced full stack engineer who works in TypeScript, Node.js and NestJS on AWS, with React on the front end. They already know the fundamentals, so skip introductory definitions and go straight to the substance.
+      const angle = styleBrief[style] || styleBrief.explainer;
+      const prompt = `Write compact study notes on this topic for a motivated adult learner who already knows the basics of the subject. Skip introductory definitions and go straight to substance. Match the domain of the topic — it could be psychology, economics, history, languages, science, arts, trades, technology, or anything else. Do not assume a software-engineering audience unless the topic itself is clearly about software.
 
 Topic: ${topic}
 
-Style: ${styleBrief[style]}
+Style: ${angle}
 
 Requirements:
-- Use concrete examples. Where the topic is code-shaped, give real code in a fenced block with the language tag, using their stack (TypeScript, Node, NestJS, React, AWS SDK v3) whenever it fits naturally. Do not invent APIs.
-- Where the topic is not code-shaped, such as a consensus protocol or an architectural trade-off, use a concrete worked scenario with real numbers, a short trace of events, or a plain-text diagram instead of forcing code.
-- Include at least one specific gotcha or misconception that trips up competent engineers.
+- Use concrete examples grounded in the topic's real domain (cases, numbers, short scenarios, quotes, diagrams in plain text, or code only when the topic is code-shaped). Do not invent fake citations or APIs.
+- Include at least one specific gotcha or misconception that trips up competent learners in this field.
 - Use markdown with short section headings and bullet lists. Keep the whole thing under 700 words so it reads in about ten minutes.
 - No preamble, no restating the topic name as a title, no closing summary. Start directly with the first section.`;
       const raw = await callClaude(prompt, 2000);
@@ -3312,7 +2953,7 @@ function QuizPanel({ day, note }) {
     setState("loading");
     setErr("");
     try {
-      const prompt = `You are helping a senior software engineer test their recall.
+      const prompt = `You are helping a motivated adult learner test their recall on whatever subject they are studying (it may be psychology, economics, history, languages, science, arts, tech, or anything else — infer from the topics).
 
 Topics studied:
 1. ${day.topics[0]}
@@ -3320,7 +2961,7 @@ ${day.topics[1] ? "2. " + day.topics[1] : ""}
 
 ${note ? "Their own notes:\n" + note.slice(0, 2500) : "They did not save notes."}
 
-Write exactly 5 short recall questions that test genuine understanding of these topics at a senior engineer level. Favour "why" and "when would you" and trade-off questions over definitions. For each, give a concise 2-4 sentence model answer.
+Write exactly 5 short recall questions that test genuine understanding — not trivia. Favour "why", "when would you", compare/contrast, and trade-off questions over definitions. For each, give a concise 2-4 sentence model answer in the same domain as the topics.
 
 Respond with ONLY a JSON array, no preamble and no markdown fences:
 [{"q":"question","a":"model answer"}]`;
@@ -3373,13 +3014,13 @@ function LinkedInPanel({ day, note, fireToast }) {
     setState("loading");
     setErr("");
     try {
-      const prompt = `Write a LinkedIn post for a software engineer who publishes educational technical content.
+      const prompt = `Write a LinkedIn post for someone who shares what they are learning. Infer the field from the topics — it might be psychology, economics, history, languages, science, arts, tech, or anything else. Do not assume they are a software engineer unless the topics clearly are about software.
 
 Topic studied today:
 1. ${day.topics[0]}
 ${day.topics[1] ? "2. " + day.topics[1] : ""}
 
-${note ? "Their own notes to draw from (use these as the substance):\n" + note.slice(0, 3000) : "No notes saved. Write from the topic titles at a senior engineer level."}
+${note ? "Their own notes to draw from (use these as the substance):\n" + note.slice(0, 3000) : "No notes saved. Write from the topic titles at a thoughtful intermediate level for that subject."}
 
 House style rules, follow all of them:
 - Reads in 45 to 60 seconds. Short paragraphs, plenty of line breaks.
@@ -3388,7 +3029,7 @@ House style rules, follow all of them:
 - Never use em dashes anywhere in the post.
 - Teach one concrete idea well rather than listing everything.
 - End with a question that invites replies.
-- Finish with exactly 3 targeted hashtags on their own line.
+- Finish with exactly 3 targeted hashtags on their own line (relevant to the subject).
 - Do not include any external links in the body. If a link would help, end with a line noting the link goes in the first comment.
 
 Pick whichever of the two topics makes the better standalone post. Return only the post text, no commentary.`;
