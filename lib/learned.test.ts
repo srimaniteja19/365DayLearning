@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildKitWeekDigest,
   buildLearnedChronoIndex,
   countLearned,
   createLearnedId,
@@ -52,10 +53,54 @@ describe("learned helpers", () => {
     expect(createLearnedId()).not.toBe(createLearnedId());
   });
 
-  it("countLearned sums items", () => {
-    expect(
-      countLearned({ "2026-07-27": [{ id: "1", title: "a", body: "", createdAt: 1 }] }),
-    ).toBe(1);
+  it("sanitizeLearned keeps allowed tags only", () => {
+    const out = sanitizeLearned({
+      "2026-07-27": [
+        {
+          id: "a",
+          title: "Talk",
+          body: "notes",
+          createdAt: 1,
+          tags: ["talk", "NOPE", "tip", "talk"],
+        },
+      ],
+    });
+    expect(out["2026-07-27"][0].tags).toEqual(["talk", "tip"]);
+  });
+
+  it("buildKitWeekDigest counts recent slips and bookmarks", () => {
+    const now = Date.parse("2026-07-28T12:00:00Z");
+    const digest = buildKitWeekDigest(
+      {
+        "2026-07-27": [
+          {
+            id: "1",
+            title: "Fresh",
+            body: "",
+            createdAt: now - 2 * 24 * 60 * 60 * 1000,
+            tags: ["talk"],
+          },
+        ],
+        "2026-06-01": [
+          {
+            id: "2",
+            title: "Old",
+            body: "",
+            createdAt: now - 40 * 24 * 60 * 60 * 1000,
+            tags: ["paper"],
+          },
+        ],
+      },
+      [
+        { createdAt: now - 1 * 24 * 60 * 60 * 1000 },
+        { createdAt: now - 20 * 24 * 60 * 60 * 1000 },
+      ],
+      now,
+    );
+    expect(digest.slipCount).toBe(1);
+    expect(digest.bookmarkCount).toBe(1);
+    expect(digest.topTags).toEqual([{ tag: "talk", n: 1 }]);
+    expect(digest.recentSlips[0].title).toBe("Fresh");
   });
 
   it("urlFromPaste accepts a single URL token", () => {

@@ -16,8 +16,10 @@ import {
   formatLearnedDate,
   insertAtSelection,
   isChronoFilterActive,
+  LEARNED_TAG_OPTIONS,
   linkLabelForUrl,
   matchesChronoFilter,
+  parseLearnedDateParts,
   sortedLearnedDays,
   stripLinkMarkup,
   urlFromPaste,
@@ -43,6 +45,45 @@ const MONTH_FULL = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+const AUTO_INSIGHT_KEY = "dualtrack:learned-auto-insight";
+const CHRONO_KEY = "dualtrack:learned-chrono";
+
+function readStoredChrono(): LearnedChronoFilter {
+  if (typeof window === "undefined") return EMPTY_CHRONO_FILTER;
+  try {
+    const raw = window.localStorage.getItem(CHRONO_KEY);
+    if (!raw) return EMPTY_CHRONO_FILTER;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return EMPTY_CHRONO_FILTER;
+    return {
+      year: typeof parsed.year === "number" ? parsed.year : null,
+      month: typeof parsed.month === "number" ? parsed.month : null,
+      day: typeof parsed.day === "number" ? parsed.day : null,
+    };
+  } catch {
+    return EMPTY_CHRONO_FILTER;
+  }
+}
+
+function readStoredAutoInsight(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const raw = window.localStorage.getItem(AUTO_INSIGHT_KEY);
+    if (raw === "0") return false;
+    if (raw === "1") return true;
+  } catch {
+    /* default */
+  }
+  return true;
+}
+
+function sourceProviderLabel(provider: string): string {
+  if (provider === "youtube-captions") return "YouTube captions";
+  if (provider === "jina") return "article text";
+  if (provider === "html") return "page text";
+  if (provider === "oembed") return "video title";
+  return "source";
+}
 const BENTO_SIZES = ["sm", "md", "wide", "tall", "lg"];
 
 function hashStr(s) {
@@ -235,18 +276,18 @@ async function fetchLinkedSources(body) {
   }
 }
 
-async function generateEnrichment(title, body) {
-  const sourceBlock = await fetchLinkedSources(body);
+async function generateEnrichment(title, body, sourceBlock = null) {
+  const block = sourceBlock == null ? await fetchLinkedSources(body) : sourceBlock;
   const prompt = `You help clean up a learner's journal entry.
 
 Current title: ${title || "(untitled)"}
 Their notes (markdown):
 ${body || "(no notes — infer from the title alone)"}
 ${
-  sourceBlock
+  block
     ? `
 Source material extracted from linked URLs (primary evidence — captions / page text):
-${sourceBlock}
+${block}
 `
     : ""
 }
@@ -266,7 +307,7 @@ Rules:
 - Do not repeat the word TITLE or SUMMARY anywhere except as the two labels above.`;
 
   const raw = await callClaude(prompt, 1400);
-  return { ...parseEnrichment(raw, title), usedSources: Boolean(sourceBlock) };
+  return { ...parseEnrichment(raw, title), usedSources: Boolean(block) };
 }
 
 function parseEnrichment(raw, fallbackTitle) {
@@ -301,23 +342,100 @@ function formatSummary(text) {
     .join("\n\n");
 }
 
-export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireToast }) {
+export function LearnedView({
+  learned,
+  onAdd,
+  onUpdate,
+  onRemove,
+  accent,
+  fireToast,
+  focusDate = null,
+  onFocusDateConsumed,
+  onOpenBookmarks,
+  lensQuery,
+  onLensQueryChange,
+  kitSeed = null,
+  onKitSeedConsumed,
+  onPinBookmark,
+}) {
   const today = dateKey();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [date, setDate] = useState(today);
+  const [tags, setTags] = useState([]);
   const [preview, setPreview] = useState(false);
   const [autoInsight, setAutoInsight] = useState(true);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
-  const [query, setQuery] = useState("");
+  const [localQuery, setLocalQuery] = useState("");
+  const query = typeof lensQuery === "string" ? lensQuery : localQuery;
+  const setQuery = typeof onLensQueryChange === "function" ? onLensQueryChange : setLocalQuery;
+  const kitLens = typeof onLensQueryChange === "function";
   const [chrono, setChrono] = useState<LearnedChronoFilter>(EMPTY_CHRONO_FILTER);
+  const [prefsReady, setPrefsReady] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState(null);
   const [insightBusy, setInsightBusy] = useState(null);
   const [linkPreviews, setLinkPreviews] = useState({});
+  const [sourceStatus, setSourceStatus] = useState(null);
+  const sourceBlockRef = useRef("");
   const taRef = useRef(null);
 
   const bodyUrls = useMemo(() => extractUrlsFromText(body), [body]);
+
+  const toggleTag = (tag) => {
+    setTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  };
+
+  // Restore polish + chrono prefs after mount (SSR-safe).
+  useEffect(() => {
+    setAutoInsight(readStoredAutoInsight());
+    setChrono(readStoredChrono());
+    setPrefsReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!prefsReady) return;
+    try {
+      window.localStorage.setItem(AUTO_INSIGHT_KEY, autoInsight ? "1" : "0");
+    } catch {
+      /* best-effort */
+    }
+  }, [autoInsight, prefsReady]);
+
+  useEffect(() => {
+    if (!prefsReady) return;
+    try {
+      window.localStorage.setItem(CHRONO_KEY, JSON.stringify(chrono));
+    } catch {
+      /* best-effort */
+    }
+  }, [chrono, prefsReady]);
+
+  // On This Day (or other deep-links) → jump Chrono to that date.
+  useEffect(() => {
+    if (!focusDate) return;
+    const parts = parseLearnedDateParts(focusDate);
+    if (parts) {
+      setChrono({ year: parts.year, month: parts.month, day: parts.day });
+      setExpandedId(null);
+    }
+    onFocusDateConsumed?.();
+  }, [focusDate, onFocusDateConsumed]);
+
+  // Campaign day → Field Kit draft seed.
+  useEffect(() => {
+    if (!kitSeed) return;
+    if (kitSeed.title) setTitle(String(kitSeed.title));
+    if (kitSeed.body) setBody(String(kitSeed.body));
+    if (kitSeed.date && /^\d{4}-\d{2}-\d{2}$/.test(kitSeed.date)) setDate(kitSeed.date);
+    if (Array.isArray(kitSeed.tags)) {
+      setTags(kitSeed.tags.filter((t) => LEARNED_TAG_OPTIONS.includes(t)));
+    }
+    setPreview(false);
+    onKitSeedConsumed?.();
+  }, [kitSeed, onKitSeedConsumed]);
 
   useEffect(() => {
     const el = taRef.current;
@@ -365,6 +483,47 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
     return () => ac.abort();
   }, [bodyUrls]);
 
+  // Prefetch captions / article text when polish is on and URLs are present.
+  useEffect(() => {
+    if (!autoInsight || bodyUrls.length === 0) {
+      setSourceStatus(null);
+      sourceBlockRef.current = "";
+      return;
+    }
+    const ac = new AbortController();
+    const key = bodyUrls.join("|");
+    setSourceStatus({ state: "loading", count: bodyUrls.length });
+    sourceBlockRef.current = "";
+    (async () => {
+      try {
+        const res = await fetch("/api/learned/source", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ urls: bodyUrls }),
+          signal: ac.signal,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (ac.signal.aborted) return;
+        const sources = Array.isArray(data?.sources) ? data.sources : [];
+        const usable = sources.filter((s) => String(s?.text || "").trim());
+        const block = formatSourcesForPrompt(usable);
+        sourceBlockRef.current = block;
+        if (!usable.length) {
+          setSourceStatus({ state: "empty", count: bodyUrls.length });
+          return;
+        }
+        const labels = [...new Set(usable.map((s) => sourceProviderLabel(s.provider)))];
+        setSourceStatus({ state: "ready", count: usable.length, labels, key });
+      } catch {
+        if (!ac.signal.aborted) {
+          setSourceStatus({ state: "error", count: bodyUrls.length });
+          sourceBlockRef.current = "";
+        }
+      }
+    })();
+    return () => ac.abort();
+  }, [autoInsight, bodyUrls]);
+
   const onPasteNotes = (e) => {
     const pasted = e.clipboardData?.getData("text") || "";
     const url = urlFromPaste(pasted);
@@ -404,7 +563,8 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
               (it) =>
                 it.title.toLowerCase().includes(q) ||
                 it.body.toLowerCase().includes(q) ||
-                (it.insight || "").toLowerCase().includes(q),
+                (it.insight || "").toLowerCase().includes(q) ||
+                (it.tags || []).some((t) => t.includes(q)),
             )
           : items,
       }))
@@ -495,13 +655,18 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
       id: createLearnedId(),
       title: title.trim() || "Untitled",
       body: body.trim(),
+      ...(tags.length ? { tags: [...tags] } : {}),
       createdAt: Date.now(),
     };
     try {
       let usedSources = false;
       if (autoInsight && (title.trim() || body.trim())) {
         try {
-          const enriched = await generateEnrichment(item.title, item.body);
+          const enriched = await generateEnrichment(
+            item.title,
+            item.body,
+            sourceBlockRef.current || null,
+          );
           item.title = enriched.title;
           item.insight = enriched.summary;
           usedSources = enriched.usedSources;
@@ -512,6 +677,7 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
       onAdd(date, item);
       setTitle("");
       setBody("");
+      setTags([]);
       setPreview(false);
       setExpandedId(item.id);
       if (item.insight) {
@@ -628,6 +794,26 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
         </label>
 
         <div className="learned-field">
+          <span className="learned-field-label">Stamp</span>
+          <div className="learned-tag-row" role="group" aria-label="Slip tags">
+            {LEARNED_TAG_OPTIONS.map((tag) => {
+              const on = tags.includes(tag);
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  className={classNames("learned-tag-chip", on && "is-on")}
+                  aria-pressed={on}
+                  onClick={() => toggleTag(tag)}
+                >
+                  {tag}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="learned-field">
           <span className="learned-field-label">02 · Notes</span>
           {preview ? (
             <div className="learned-preview">
@@ -697,6 +883,43 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
               })}
             </div>
           )}
+          {autoInsight && sourceStatus && (
+            <div
+              className={classNames(
+                "learned-source-chip",
+                `learned-source-chip-${sourceStatus.state}`,
+              )}
+              aria-live="polite"
+            >
+              {sourceStatus.state === "loading" && (
+                <>
+                  <Icon.Bolt size={11} />
+                  <span>Pulling source for summary…</span>
+                </>
+              )}
+              {sourceStatus.state === "ready" && (
+                <>
+                  <Icon.Check size={11} />
+                  <span>
+                    Using {(sourceStatus.labels || []).join(" · ") || "source"}
+                    {sourceStatus.count > 1 ? ` · ${sourceStatus.count} links` : ""}
+                  </span>
+                </>
+              )}
+              {sourceStatus.state === "empty" && (
+                <>
+                  <Icon.Search size={11} />
+                  <span>No captions/page text yet — summary will stay high-level</span>
+                </>
+              )}
+              {sourceStatus.state === "error" && (
+                <>
+                  <Icon.X size={11} />
+                  <span>Couldn&apos;t fetch source — summary will use your notes</span>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="learned-dispatch-foot">
@@ -723,21 +946,30 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
         </div>
       </section>
 
-      <div className="learned-toolbar">
-        <div className="learned-search-wrap">
-          <Icon.Search size={15} />
-          <input
-            className="search-input"
-            placeholder="Search the board…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search journal"
-          />
+      {!kitLens && (
+        <div className="learned-toolbar">
+          <div className="learned-search-wrap">
+            <Icon.Search size={15} />
+            <input
+              className="search-input"
+              placeholder="Search the board…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="Search journal"
+            />
+          </div>
+          <div className="learned-board-label" aria-hidden="true">
+            Evidence board
+          </div>
         </div>
-        <div className="learned-board-label" aria-hidden="true">
-          Evidence board
+      )}
+      {kitLens && (
+        <div className="learned-toolbar learned-toolbar-slim">
+          <div className="learned-board-label" aria-hidden="true">
+            Evidence board
+          </div>
         </div>
-      </div>
+      )}
 
       {totalCount > 0 && (
         <section className="learned-chrono" aria-label="Filter by date">
@@ -892,20 +1124,23 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
               ? "Widen the chrono window, clear filters, or try another search term."
               : "Log the first rabbit hole — a talk, a doc, a hallway tip — and it lands here as a slip."}
           </p>
-          {(query.trim() || chronoActive) && (
-            <div className="learned-empty-actions">
-              {chronoActive && (
-                <button type="button" className="learned-chrono-clear" onClick={jumpAll}>
-                  Clear date filter
-                </button>
-              )}
-              {query.trim() && (
-                <button type="button" className="learned-chrono-clear" onClick={() => setQuery("")}>
-                  Clear search
-                </button>
-              )}
-            </div>
-          )}
+          <div className="learned-empty-actions">
+            {chronoActive && (
+              <button type="button" className="learned-chrono-clear" onClick={jumpAll}>
+                Clear date filter
+              </button>
+            )}
+            {query.trim() && (
+              <button type="button" className="learned-chrono-clear" onClick={() => setQuery("")}>
+                Clear search
+              </button>
+            )}
+            {!query.trim() && !chronoActive && onOpenBookmarks && (
+              <button type="button" className="learned-chrono-clear" onClick={onOpenBookmarks}>
+                Or pin a bookmark
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -980,66 +1215,213 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
                           {!open && item.insight && (
                             <span className="sticky-insight-chip">summary</span>
                           )}
+                          {!open && (item.tags || [])[0] && (
+                            <span className="sticky-tag-chip">{item.tags[0]}</span>
+                          )}
                         </button>
 
                         {open && (
                           <div className="sticky-note-body">
-                            {urls.length > 0 && (
-                              <div className="learned-embed-stack">
-                                {urls.map((url) => (
-                                  <LearnedLinkEmbed key={url} url={url} />
-                                ))}
-                              </div>
-                            )}
-                            {noteText ? (
-                              <div className="sticky-notes-block">
-                                <MiniMarkdown text={noteText} />
-                              </div>
-                            ) : null}
-                            {item.insight ? (
-                              <div className="sticky-insight">
-                                <div className="learned-insight-label">Summary</div>
-                                {item.insight.split(/\n\s*\n/).map((para, pi) => (
-                                  <p key={pi} className="sticky-insight-text">
-                                    {para}
-                                  </p>
-                                ))}
+                            {editingId === item.id && editDraft ? (
+                              <div className="sticky-edit">
+                                <label className="sticky-edit-field">
+                                  <span>Title</span>
+                                  <input
+                                    value={editDraft.title}
+                                    onChange={(e) =>
+                                      setEditDraft((d) => ({ ...d, title: e.target.value }))
+                                    }
+                                    maxLength={120}
+                                  />
+                                </label>
+                                <label className="sticky-edit-field">
+                                  <span>Date</span>
+                                  <input
+                                    type="date"
+                                    value={editDraft.date}
+                                    onChange={(e) =>
+                                      setEditDraft((d) => ({ ...d, date: e.target.value }))
+                                    }
+                                  />
+                                </label>
+                                <label className="sticky-edit-field">
+                                  <span>Notes</span>
+                                  <textarea
+                                    value={editDraft.body}
+                                    onChange={(e) =>
+                                      setEditDraft((d) => ({ ...d, body: e.target.value }))
+                                    }
+                                    rows={5}
+                                  />
+                                </label>
+                                <div className="learned-tag-row">
+                                  {LEARNED_TAG_OPTIONS.map((tag) => {
+                                    const on = (editDraft.tags || []).includes(tag);
+                                    return (
+                                      <button
+                                        key={tag}
+                                        type="button"
+                                        className={classNames("learned-tag-chip", on && "is-on")}
+                                        aria-pressed={on}
+                                        onClick={() =>
+                                          setEditDraft((draft) => {
+                                            const cur = draft.tags || [];
+                                            return {
+                                              ...draft,
+                                              tags: on
+                                                ? cur.filter((t) => t !== tag)
+                                                : [...cur, tag],
+                                            };
+                                          })
+                                        }
+                                      >
+                                        {tag}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                <div className="sticky-actions">
+                                  <button
+                                    type="button"
+                                    className="sticky-action"
+                                    onClick={() => {
+                                      const next = {
+                                        ...item,
+                                        title: (editDraft.title || "").trim() || "Untitled",
+                                        body: editDraft.body || "",
+                                        tags: (editDraft.tags || []).length
+                                          ? editDraft.tags
+                                          : undefined,
+                                      };
+                                      onUpdate(d, next, editDraft.date);
+                                      setEditingId(null);
+                                      setEditDraft(null);
+                                      fireToast?.("Slip updated", "day");
+                                    }}
+                                  >
+                                    <Icon.Check size={11} /> Save
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="sticky-action sticky-action-mute"
+                                    onClick={() => {
+                                      setEditingId(null);
+                                      setEditDraft(null);
+                                    }}
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
                               </div>
                             ) : (
-                              !noteText && urls.length === 0 && (
-                                <p className="sticky-empty">No notes yet — add a summary to flesh this out.</p>
-                              )
+                              <>
+                                {(item.tags || []).length > 0 && (
+                                  <div className="sticky-tags">
+                                    {item.tags.map((t) => (
+                                      <span key={t} className="sticky-tag">
+                                        {t}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                                {urls.length > 0 && (
+                                  <div className="learned-embed-stack">
+                                    {urls.map((url) => (
+                                      <div key={url} className="learned-embed-wrap">
+                                        <LearnedLinkEmbed url={url} />
+                                        {onPinBookmark && (
+                                          <button
+                                            type="button"
+                                            className="learned-pin-bm"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              onPinBookmark(url, {
+                                                title: item.title,
+                                                note: snippet(noteText || item.insight || "", 160),
+                                              });
+                                            }}
+                                          >
+                                            <Icon.Link size={11} /> Pin to Bookmarks
+                                          </button>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {noteText ? (
+                                  <div className="sticky-notes-block">
+                                    <MiniMarkdown text={noteText} />
+                                  </div>
+                                ) : null}
+                                {item.insight ? (
+                                  <div className="sticky-insight">
+                                    <div className="learned-insight-label">Summary</div>
+                                    {item.insight.split(/\n\s*\n/).map((para, pi) => (
+                                      <p key={pi} className="sticky-insight-text">
+                                        {para}
+                                      </p>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  !noteText &&
+                                  urls.length === 0 && (
+                                    <p className="sticky-empty">
+                                      No notes yet — add a summary to flesh this out.
+                                    </p>
+                                  )
+                                )}
+                                <div className="sticky-actions">
+                                  <button
+                                    type="button"
+                                    className="sticky-action"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingId(item.id);
+                                      setEditDraft({
+                                        title: item.title,
+                                        body: item.body || "",
+                                        date: d,
+                                        tags: [...(item.tags || [])],
+                                      });
+                                    }}
+                                  >
+                                    <Icon.Note size={11} /> Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="sticky-action"
+                                    disabled={insightBusy === item.id}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      refreshInsight(d, item);
+                                    }}
+                                  >
+                                    <Icon.Bolt size={11} />
+                                    {insightBusy === item.id
+                                      ? "Writing…"
+                                      : item.insight
+                                        ? "Regenerate"
+                                        : "Summary"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="sticky-action sticky-action-mute"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onRemove(d, item.id);
+                                      if (expandedId === item.id) setExpandedId(null);
+                                      if (editingId === item.id) {
+                                        setEditingId(null);
+                                        setEditDraft(null);
+                                      }
+                                      fireToast?.("Removed", "xp");
+                                    }}
+                                  >
+                                    <Icon.X size={11} /> Remove
+                                  </button>
+                                </div>
+                              </>
                             )}
-                            <div className="sticky-actions">
-                              <button
-                                type="button"
-                                className="sticky-action"
-                                disabled={insightBusy === item.id}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  refreshInsight(d, item);
-                                }}
-                              >
-                                <Icon.Bolt size={11} />
-                                {insightBusy === item.id
-                                  ? "Writing…"
-                                  : item.insight
-                                    ? "Regenerate"
-                                    : "Summary"}
-                              </button>
-                              <button
-                                type="button"
-                                className="sticky-action sticky-action-mute"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onRemove(d, item.id);
-                                  if (expandedId === item.id) setExpandedId(null);
-                                  fireToast?.("Removed", "xp");
-                                }}
-                              >
-                                <Icon.X size={11} /> Remove
-                              </button>
-                            </div>
                           </div>
                         )}
                       </article>

@@ -36,6 +36,43 @@ export function countLearned(learned: LearnedMap | undefined | null): number {
   return Object.values(learned).reduce((n, items) => n + (items?.length || 0), 0);
 }
 
+/** Last-7-days rollup for Field Kit digest card. */
+export function buildKitWeekDigest(
+  learned: LearnedMap | undefined | null,
+  bookmarks: { createdAt?: number }[] | undefined | null,
+  now: number = Date.now(),
+) {
+  const since = now - 7 * 24 * 60 * 60 * 1000;
+  let slipCount = 0;
+  const tagHits: Record<string, number> = {};
+  const recentSlips: { date: string; title: string; id: string }[] = [];
+
+  for (const [date, items] of Object.entries(learned || {})) {
+    for (const it of items || []) {
+      if ((it.createdAt || 0) < since) continue;
+      slipCount += 1;
+      for (const t of it.tags || []) {
+        tagHits[t] = (tagHits[t] || 0) + 1;
+      }
+      recentSlips.push({ date, title: it.title, id: it.id });
+    }
+  }
+
+  recentSlips.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  const bookmarkCount = (bookmarks || []).filter((b) => (b.createdAt || 0) >= since).length;
+  const topTags = Object.entries(tagHits)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([tag, n]) => ({ tag, n }));
+
+  return {
+    slipCount,
+    bookmarkCount,
+    topTags,
+    recentSlips: recentSlips.slice(0, 3),
+  };
+}
+
 /** Newest date first; items within a day newest first. */
 export function sortedLearnedDays(
   learned: LearnedMap | undefined | null,
@@ -50,6 +87,24 @@ export function sortedLearnedDays(
     }));
 }
 
+export const LEARNED_TAG_OPTIONS = [
+  "talk",
+  "paper",
+  "tool",
+  "tip",
+  "course",
+  "other",
+] as const;
+
+export type LearnedTag = (typeof LEARNED_TAG_OPTIONS)[number];
+
+function sanitizeLearnedTags(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const allowed = new Set<string>(LEARNED_TAG_OPTIONS);
+  const out = [...new Set(raw.map((t) => String(t || "").trim().toLowerCase()).filter((t) => allowed.has(t)))];
+  return out.length ? out : undefined;
+}
+
 export function sanitizeLearned(raw: unknown): LearnedMap {
   const out: LearnedMap = {};
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
@@ -62,11 +117,13 @@ export function sanitizeLearned(raw: unknown): LearnedMap {
       const body = typeof e.body === "string" ? e.body : "";
       const title = typeof e.title === "string" ? e.title : "";
       if (!body.trim() && !title.trim()) continue;
+      const tags = sanitizeLearnedTags(e.tags);
       items.push({
         id: typeof e.id === "string" && e.id ? e.id : createLearnedId(),
         title: title.trim() || "Untitled",
         body,
         insight: typeof e.insight === "string" && e.insight.trim() ? e.insight : undefined,
+        ...(tags ? { tags } : {}),
         createdAt: typeof e.createdAt === "number" ? e.createdAt : Date.now(),
       });
     }

@@ -297,7 +297,7 @@ export function TopBar({
           {onOpenKit && (
             <nav className="topbar-cluster topbar-cluster-kit" aria-label="Field kit">
               <span className="topbar-cluster-tag" aria-hidden="true">Kit</span>
-              <Tip content="Off-plan field notes — independent of any campaign." stamp="LOG" tone="mint" side="bottom">
+              <Tip content="Off-plan notes — independent of any campaign." stamp="LOG" tone="mint" side="bottom">
                 <button
                   type="button"
                   className={classNames("topbar-item", kitTab === "learned" && "topbar-item-active")}
@@ -309,7 +309,7 @@ export function TopBar({
                   <span className="topbar-kit-count">{learnedCount}</span>
                 </button>
               </Tip>
-              <Tip content="Pinned refs — videos, articles, docs outside the plan." stamp="REF" tone="violet" side="bottom">
+              <Tip content="Pinned bookmarks — videos, articles, docs outside the plan." stamp="BM" tone="violet" side="bottom">
                 <button
                   type="button"
                   className={classNames(
@@ -320,7 +320,7 @@ export function TopBar({
                   onClick={() => onOpenKit("bookmarks")}
                 >
                   <Icon.Link size={13} />
-                  <span className="topbar-item-label">Refs</span>
+                  <span className="topbar-item-label">Bookmarks</span>
                   <span className="topbar-kit-count">{bookmarkCount}</span>
                 </button>
               </Tip>
@@ -348,8 +348,12 @@ export function TopBar({
           <div className="topbar-cluster topbar-cluster-status" aria-label="Progress">
             <SaveIndicator status={saveStatus} compact />
             {noteCount > 0 && (
-              <div className="topbar-item topbar-item-static topbar-day-notes" title={`${noteCount} days with notes`}>
+              <div
+                className="topbar-item topbar-item-static topbar-day-notes"
+                title={`${noteCount} campaign days with day notes (separate from Field Kit Notes)`}
+              >
                 <Icon.Note size={13} />
+                <span className="topbar-item-label topbar-day-notes-label">Day notes</span>
                 <span>{noteCount}</span>
               </div>
             )}
@@ -402,7 +406,7 @@ export function TopBar({
               <div id="topbar-ops-panel" className="topbar-ops-panel" role="menu">
                 <div className="topbar-ops-head">
                   <span className="topbar-ops-stamp">Ops manual</span>
-                  <span className="topbar-ops-head-meta">Station · kit · awards</span>
+                  <span className="topbar-ops-head-meta">Station · notes · bookmarks</span>
                 </div>
 
                 <div className="topbar-ops-section">
@@ -674,7 +678,7 @@ const LANDING_FEATURES = [
     tone: "ink",
     icon: Icon.Note,
     title: "Field kit · notes",
-    copy: "Off-plan field notes in the navbar Field Kit — slips, chrono filters, and grounded AI summaries.",
+    copy: "Off-plan notes in Field Kit — slips, chrono filters, and grounded AI summaries.",
   },
   {
     id: "clips",
@@ -1096,28 +1100,51 @@ function agoLabel(daysAgo) {
   return `${daysAgo} day${daysAgo === 1 ? "" : "s"} ago`;
 }
 
-export function OnThisDayCard({ memory, onDismiss }) {
+export function OnThisDayCard({ memory, onDismiss, onOpen }) {
   if (!memory) return null;
+  const canOpen = typeof onOpen === "function";
+  const open = () => onOpen?.(memory);
   return (
-    <div className="today-widget on-this-day-card">
+    <div className={classNames("today-widget on-this-day-card", canOpen && "on-this-day-card-openable")}>
       <div className="today-widget-icon" aria-hidden="true"><Icon.Calendar size={15} /></div>
-      <div className="today-widget-body">
-        <div className="today-widget-eyebrow">
-          <span className="today-widget-stamp">On this day</span>
-          <span>{agoLabel(memory.daysAgo)}</span>
+      {canOpen ? (
+        <button type="button" className="today-widget-body today-widget-body-btn" onClick={open}>
+          <div className="today-widget-eyebrow">
+            <span className="today-widget-stamp">On this day</span>
+            <span>{agoLabel(memory.daysAgo)}</span>
+          </div>
+          {memory.kind === "journal" ? (
+            <>
+              <div className="today-widget-title">{memory.title}</div>
+              {memory.snippet && <p className="today-widget-copy">{memory.snippet}</p>}
+              <span className="today-widget-cta">Open in Notes →</span>
+            </>
+          ) : (
+            <>
+              <div className="today-widget-title">{memory.dayLabel} · {memory.planName}</div>
+              <p className="today-widget-copy">{memory.topics.join(" · ")}</p>
+            </>
+          )}
+        </button>
+      ) : (
+        <div className="today-widget-body">
+          <div className="today-widget-eyebrow">
+            <span className="today-widget-stamp">On this day</span>
+            <span>{agoLabel(memory.daysAgo)}</span>
+          </div>
+          {memory.kind === "journal" ? (
+            <>
+              <div className="today-widget-title">{memory.title}</div>
+              {memory.snippet && <p className="today-widget-copy">{memory.snippet}</p>}
+            </>
+          ) : (
+            <>
+              <div className="today-widget-title">{memory.dayLabel} · {memory.planName}</div>
+              <p className="today-widget-copy">{memory.topics.join(" · ")}</p>
+            </>
+          )}
         </div>
-        {memory.kind === "journal" ? (
-          <>
-            <div className="today-widget-title">{memory.title}</div>
-            {memory.snippet && <p className="today-widget-copy">{memory.snippet}</p>}
-          </>
-        ) : (
-          <>
-            <div className="today-widget-title">{memory.dayLabel} · {memory.planName}</div>
-            <p className="today-widget-copy">{memory.topics.join(" · ")}</p>
-          </>
-        )}
-      </div>
+      )}
       <Tip content="Hide until tomorrow — another memory may surface next visit." stamp="DISMISS" tone="ink" side="left">
         <button type="button" className="today-widget-dismiss" onClick={onDismiss} aria-label="Dismiss">
           <Icon.X size={12} />
@@ -1391,6 +1418,8 @@ export function FieldKitChrome({
   hasCampaign,
   onBackToCampaign,
   accent,
+  lensQuery = "",
+  setLensQuery,
 }) {
   return (
     <section className="field-kit" style={{ "--accent": accent }} aria-label="Field kit">
@@ -1403,7 +1432,7 @@ export function FieldKitChrome({
             <span className="field-kit-title-accent"> inventory</span>
           </h2>
           <p className="field-kit-lead">
-            Notes and bookmarks live outside every campaign — rabbit holes, talks, and refs that
+            Notes and bookmarks live outside every campaign — rabbit holes, talks, and links that
             don&apos;t belong on a day card.
           </p>
         </div>
@@ -1414,7 +1443,7 @@ export function FieldKitChrome({
           </div>
           <div className="field-kit-meter-cell field-kit-meter-cell-accent">
             <span className="field-kit-meter-val">{String(bookmarkCount).padStart(2, "0")}</span>
-            <span className="field-kit-meter-label">Refs</span>
+            <span className="field-kit-meter-label">Bookmarks</span>
           </div>
         </div>
       </div>
@@ -1429,7 +1458,7 @@ export function FieldKitChrome({
             onClick={() => setTab("learned")}
           >
             <span className="field-kit-tab-stamp">LOG</span>
-            <span className="field-kit-tab-label">Field notes</span>
+            <span className="field-kit-tab-label">Notes</span>
             <span className="field-kit-tab-count">{learnedCount}</span>
           </button>
           <button
@@ -1439,11 +1468,34 @@ export function FieldKitChrome({
             className={classNames("field-kit-tab field-kit-tab-refs", tab === "bookmarks" && "is-on")}
             onClick={() => setTab("bookmarks")}
           >
-            <span className="field-kit-tab-stamp">REF</span>
+            <span className="field-kit-tab-stamp">BM</span>
             <span className="field-kit-tab-label">Bookmarks</span>
             <span className="field-kit-tab-count">{bookmarkCount}</span>
           </button>
         </div>
+        {typeof setLensQuery === "function" && (
+          <label className="field-kit-lens">
+            <span className="field-kit-lens-label">Lens</span>
+            <Icon.Search size={13} />
+            <input
+              className="field-kit-lens-input"
+              placeholder="Search notes & bookmarks…"
+              value={lensQuery}
+              onChange={(e) => setLensQuery(e.target.value)}
+              aria-label="Search Field Kit"
+            />
+            {String(lensQuery || "").trim() && (
+              <button
+                type="button"
+                className="field-kit-lens-clear"
+                onClick={() => setLensQuery("")}
+                aria-label="Clear kit search"
+              >
+                <Icon.X size={11} />
+              </button>
+            )}
+          </label>
+        )}
         {hasCampaign && (
           <button type="button" className="field-kit-back" onClick={onBackToCampaign}>
             <Icon.Chevron size={14} style={{ transform: "rotate(180deg)" }} />
@@ -1451,6 +1503,52 @@ export function FieldKitChrome({
           </button>
         )}
       </div>
+    </section>
+  );
+}
+
+export function KitWeekDigestCard({ digest, onOpenKit, onOpenSlip }) {
+  if (!digest) return null;
+  const { slipCount, bookmarkCount, topTags, recentSlips } = digest;
+  return (
+    <section className="kit-digest" aria-label="Field kit this week">
+      <div className="kit-digest-head">
+        <span className="kit-digest-stamp">7D kit</span>
+        <h3 className="kit-digest-title">Field kit this week</h3>
+        <button type="button" className="kit-digest-open" onClick={onOpenKit}>
+          Open kit
+        </button>
+      </div>
+      <div className="kit-digest-meters">
+        <div className="kit-digest-meter">
+          <span className="kit-digest-val">{slipCount}</span>
+          <span className="kit-digest-label">Notes</span>
+        </div>
+        <div className="kit-digest-meter">
+          <span className="kit-digest-val">{bookmarkCount}</span>
+          <span className="kit-digest-label">Pins</span>
+        </div>
+      </div>
+      {topTags?.length > 0 && (
+        <div className="kit-digest-tags">
+          {topTags.map(({ tag, n }) => (
+            <span key={tag} className="kit-digest-tag">
+              {tag} · {n}
+            </span>
+          ))}
+        </div>
+      )}
+      {recentSlips?.length > 0 && (
+        <ul className="kit-digest-list">
+          {recentSlips.map((s) => (
+            <li key={s.id}>
+              <button type="button" className="kit-digest-link" onClick={() => onOpenSlip?.(s.date)}>
+                {s.title}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
@@ -1658,6 +1756,7 @@ function DayDetailBody({
   getRelated,
   onJumpDay,
   onOpenTool,
+  onCaptureToKit,
   refs,
   setRef,
 }) {
@@ -1701,6 +1800,18 @@ function DayDetailBody({
             <Icon.Send size={12} /> Draft post
           </button>
         </Tip>
+        {onCaptureToKit && (
+          <Tip
+            content="Send this day's topics and notes into Field Kit as a draft slip — off-plan rabbit hole."
+            stamp="KIT"
+            tone="mint"
+            side="top"
+          >
+            <button type="button" className="tool-btn" onClick={() => onCaptureToKit(day)}>
+              <Icon.Link size={12} /> To Field Kit
+            </button>
+          </Tip>
+        )}
       </div>
       <ReferenceBlock
         data={refs[day.id]}
@@ -1712,7 +1823,7 @@ function DayDetailBody({
   );
 }
 
-export function ConsoleView({ campaign, days, progress, onToggle, expandedDay, setExpandedDay, topicsDoneCount, isDayComplete, jumpTarget, notes, setNote, getRelated, onJumpDay, onOpenTool, query, refs, setRef }) {
+export function ConsoleView({ campaign, days, progress, onToggle, expandedDay, setExpandedDay, topicsDoneCount, isDayComplete, jumpTarget, notes, setNote, getRelated, onJumpDay, onOpenTool, onCaptureToKit, query, refs, setRef }) {
   const listRef = useRef(null);
   const [layout, setLayoutState] = useState(readConsoleLayout);
 
@@ -1742,6 +1853,7 @@ export function ConsoleView({ campaign, days, progress, onToggle, expandedDay, s
     getRelated,
     onJumpDay,
     onOpenTool,
+    onCaptureToKit,
     query,
     refs,
     setRef,
@@ -1823,6 +1935,7 @@ function DayRow({
   getRelated,
   onJumpDay,
   onOpenTool,
+  onCaptureToKit,
   query,
   refs,
   setRef,
@@ -1893,6 +2006,7 @@ function DayRow({
             getRelated={getRelated}
             onJumpDay={onJumpDay}
             onOpenTool={onOpenTool}
+            onCaptureToKit={onCaptureToKit}
             refs={refs}
             setRef={setRef}
           />
@@ -1917,6 +2031,7 @@ function DayTile({
   getRelated,
   onJumpDay,
   onOpenTool,
+  onCaptureToKit,
   query,
   refs,
   setRef,
@@ -2012,6 +2127,7 @@ function DayTile({
             getRelated={getRelated}
             onJumpDay={onJumpDay}
             onOpenTool={onOpenTool}
+            onCaptureToKit={onCaptureToKit}
             refs={refs}
             setRef={setRef}
           />
@@ -2049,6 +2165,7 @@ function DayMission({
   getRelated,
   onJumpDay,
   onOpenTool,
+  onCaptureToKit,
   query,
   refs,
   setRef,
@@ -2134,6 +2251,7 @@ function DayMission({
               getRelated={getRelated}
               onJumpDay={onJumpDay}
               onOpenTool={onOpenTool}
+              onCaptureToKit={onCaptureToKit}
               refs={refs}
               setRef={setRef}
             />

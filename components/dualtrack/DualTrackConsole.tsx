@@ -50,7 +50,7 @@ import {
 import { hydrateCredentialsFromStorage } from "@/lib/providers/credentials";
 import { computeBadges } from "@/lib/achievements";
 import { findOnThisDayMemory } from "@/lib/onThisDay";
-import { countLearned, dateKey } from "@/lib/learned";
+import { buildKitWeekDigest, countLearned, dateKey } from "@/lib/learned";
 
 import {
   BackgroundFX,
@@ -72,10 +72,19 @@ import {
   HomeView,
   OnThisDayCard,
   FieldKitChrome,
+  KitWeekDigestCard,
 } from "@/features/ui/Views";
 import { LearnedView } from "@/features/learned/LearnedView";
 import { BookmarksView } from "@/features/bookmarks/BookmarksView";
-import { sanitizeBookmarks } from "@/lib/bookmarks";
+import {
+  applyPreviewToBookmark,
+  createBookmarkId,
+  defaultTitleForUrl,
+  detectBookmarkKind,
+  normalizeBookmarkUrl,
+  sanitizeBookmarks,
+  seedPreviewFromUrl,
+} from "@/lib/bookmarks";
 
 const GUEST_MODE_KEY = "dualtrack:guest";
 const PAGE_KEY = "dualtrack:page";
@@ -133,6 +142,18 @@ export default function DualTrackConsole() {
   const openKit = useCallback(
     (tab = "learned") => {
       setKitTab(tab === "bookmarks" ? "bookmarks" : "learned");
+      setPage("kit");
+    },
+    [setKitTab, setPage],
+  );
+  /** When set, LearnedView jumps Chrono to this YYYY-MM-DD (e.g. On This Day). */
+  const [kitFocusDate, setKitFocusDate] = useState(null);
+  const [kitQuery, setKitQuery] = useState("");
+  const [kitSeed, setKitSeed] = useState(null);
+  const openKitToDate = useCallback(
+    (dateStr) => {
+      setKitFocusDate(dateStr || null);
+      setKitTab("learned");
       setPage("kit");
     },
     [setKitTab, setPage],
@@ -407,13 +428,23 @@ export default function DualTrackConsole() {
     });
   }, []);
 
-  const updateLearned = useCallback((date, item) => {
+  const updateLearned = useCallback((fromDate, item, toDate) => {
+    const dest = toDate && /^\d{4}-\d{2}-\d{2}$/.test(toDate) ? toDate : fromDate;
     setLearned((prev) => {
-      const list = prev[date] || [];
-      return {
-        ...prev,
-        [date]: list.map((x) => (x.id === item.id ? item : x)),
-      };
+      if (dest === fromDate) {
+        const list = prev[fromDate] || [];
+        return {
+          ...prev,
+          [fromDate]: list.map((x) => (x.id === item.id ? item : x)),
+        };
+      }
+      const next = { ...prev };
+      const remaining = (prev[fromDate] || []).filter((x) => x.id !== item.id);
+      if (remaining.length) next[fromDate] = remaining;
+      else delete next[fromDate];
+      const destList = (prev[dest] || []).filter((x) => x.id !== item.id);
+      next[dest] = [item, ...destList];
+      return next;
     });
   }, []);
 
@@ -438,6 +469,77 @@ export default function DualTrackConsole() {
   const removeBookmark = useCallback((id) => {
     setBookmarks((prev) => (prev || []).filter((x) => x.id !== id));
   }, []);
+
+  const pinBookmarkFromUrl = useCallback(
+    async (url, meta = {}) => {
+      const normalized = normalizeBookmarkUrl(url);
+      if (!normalized) {
+        fireToast("Invalid URL", "xp");
+        return;
+      }
+      const existing = (bookmarks || []).find((b) => b.url === normalized);
+      if (existing) {
+        fireToast("Already in Bookmarks", "xp");
+        openKit("bookmarks");
+        return;
+      }
+      const kind = detectBookmarkKind(normalized);
+      const item = {
+        id: createBookmarkId(),
+        url: normalized,
+        kind,
+        title: meta.title || defaultTitleForUrl(normalized),
+        note: meta.note || undefined,
+        preview: seedPreviewFromUrl(normalized),
+        createdAt: Date.now(),
+      };
+      addBookmark(item);
+      fireToast("Pinned to Bookmarks", "day");
+      try {
+        const res = await fetch("/api/bookmarks/preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: normalized }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.preview) {
+          updateBookmark(
+            applyPreviewToBookmark(item, data.preview, { overwriteTitle: !meta.title }),
+          );
+        }
+      } catch {
+        /* keep seed */
+      }
+    },
+    [bookmarks, addBookmark, updateBookmark, fireToast, openKit],
+  );
+
+  const captureDayToKit = useCallback(
+    (day) => {
+      if (!day) return;
+      const dayNote = (notes[day.id] || "").trim();
+      const topicLine = (day.topics || []).slice(0, 4).join(" · ");
+      const body = [
+        dayNote || null,
+        topicLine ? `From Day ${day.day}: ${topicLine}` : `From Day ${day.day}`,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      const firstTopic = String(day.topics?.[0] || "").trim();
+      setKitSeed({
+        title: firstTopic
+          ? `Day ${day.day} · ${firstTopic.slice(0, 72)}`
+          : `Day ${day.day} rabbit hole`,
+        body,
+        date: dateKey(),
+        tags: ["tip"],
+      });
+      setKitTab("learned");
+      setPage("kit");
+      fireToast("Opened Field Kit · edit & pin", "day");
+    },
+    [notes, setKitTab, setPage, fireToast],
+  );
 
   const handleReset = useCallback(async () => {
     setProgress({});
@@ -817,6 +919,11 @@ export default function DualTrackConsole() {
     [srs],
   );
 
+  const kitWeekDigest = useMemo(
+    () => buildKitWeekDigest(learned, bookmarks),
+    [learned, bookmarks],
+  );
+
   if (saveStatus === "loading") {
     // Always the same shell during hydrate — `page` is restored from localStorage
     // after mount, so branching here would flash or rematch incorrectly.
@@ -962,6 +1069,8 @@ export default function DualTrackConsole() {
             hasCampaign={!!campaign}
             onBackToCampaign={() => setPage("dashboard")}
             accent={kitAccent}
+            lensQuery={kitQuery}
+            setLensQuery={setKitQuery}
           />
           {kitTab === "learned" ? (
             <LearnedView
@@ -971,6 +1080,14 @@ export default function DualTrackConsole() {
               onRemove={removeLearned}
               accent={kitAccent}
               fireToast={fireToast}
+              focusDate={kitFocusDate}
+              onFocusDateConsumed={() => setKitFocusDate(null)}
+              onOpenBookmarks={() => setKitTab("bookmarks")}
+              lensQuery={kitQuery}
+              onLensQueryChange={setKitQuery}
+              kitSeed={kitSeed}
+              onKitSeedConsumed={() => setKitSeed(null)}
+              onPinBookmark={pinBookmarkFromUrl}
             />
           ) : (
             <BookmarksView
@@ -980,6 +1097,9 @@ export default function DualTrackConsole() {
               onRemove={removeBookmark}
               accent={kitAccent}
               fireToast={fireToast}
+              onOpenNotes={() => setKitTab("learned")}
+              lensQuery={kitQuery}
+              onLensQueryChange={setKitQuery}
             />
           )}
           {modal && (
@@ -1051,11 +1171,30 @@ export default function DualTrackConsole() {
           onToggle={handleToggleTopic}
         />
 
-        {onThisDayMemory && !onThisDayDismissed && (
+        {(onThisDayMemory && !onThisDayDismissed) ||
+        kitWeekDigest.slipCount > 0 ||
+        kitWeekDigest.bookmarkCount > 0 ? (
           <div className="today-widgets-row">
-            <OnThisDayCard memory={onThisDayMemory} onDismiss={dismissOnThisDay} />
+            {onThisDayMemory && !onThisDayDismissed && (
+              <OnThisDayCard
+                memory={onThisDayMemory}
+                onDismiss={dismissOnThisDay}
+                onOpen={(memory) => {
+                  if (memory?.kind === "journal" && memory.date) {
+                    openKitToDate(memory.date);
+                  }
+                }}
+              />
+            )}
+            {(kitWeekDigest.slipCount > 0 || kitWeekDigest.bookmarkCount > 0) && (
+              <KitWeekDigestCard
+                digest={kitWeekDigest}
+                onOpenKit={() => openKit("learned")}
+                onOpenSlip={(date) => openKitToDate(date)}
+              />
+            )}
           </div>
-        )}
+        ) : null}
 
         <ViewTabs view={view} setView={setView} dueCount={reviewQueue.length} />
 
@@ -1138,6 +1277,7 @@ export default function DualTrackConsole() {
               setScope("all");
             }}
             onOpenTool={(kind, day) => setModal({ kind, day })}
+            onCaptureToKit={captureDayToKit}
             query={query}
           />
         )}

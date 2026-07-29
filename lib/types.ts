@@ -103,6 +103,8 @@ export type LearnedItem = {
   title: string;
   body: string;
   insight?: string;
+  /** Optional stamps: talk, paper, tool, tip, course, other */
+  tags?: string[];
   createdAt: number;
 };
 export type LearnedMap = Record<string, LearnedItem[]>;

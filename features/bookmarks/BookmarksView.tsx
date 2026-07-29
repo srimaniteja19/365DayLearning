@@ -85,12 +85,27 @@ function StickyThumb({ src }) {
   );
 }
 
-export function BookmarksView({ bookmarks, onAdd, onUpdate, onRemove, accent, fireToast }) {
+export function BookmarksView({
+  bookmarks,
+  onAdd,
+  onUpdate,
+  onRemove,
+  accent,
+  fireToast,
+  onOpenNotes,
+  lensQuery,
+  onLensQueryChange,
+}) {
   const [urlInput, setUrlInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
-  const [query, setQuery] = useState("");
+  const [localQuery, setLocalQuery] = useState("");
+  const query = typeof lensQuery === "string" ? lensQuery : localQuery;
+  const setQuery = typeof onLensQueryChange === "function" ? onLensQueryChange : setLocalQuery;
+  const kitLens = typeof onLensQueryChange === "function";
   const [enrichBusy, setEnrichBusy] = useState(null);
+  const [noteEditId, setNoteEditId] = useState(null);
+  const [noteDraft, setNoteDraft] = useState("");
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -206,7 +221,7 @@ export function BookmarksView({ bookmarks, onAdd, onUpdate, onRemove, accent, fi
           </button>
         </div>
 
-        {(bookmarks || []).length > 0 && (
+        {(bookmarks || []).length > 0 && !kitLens && (
           <label className="bm-search">
             <span className="bm-search-label">Find</span>
             <Icon.Search size={13} />
@@ -248,6 +263,11 @@ export function BookmarksView({ bookmarks, onAdd, onUpdate, onRemove, accent, fi
               : "Paste a link above — it’ll land on a sticky in its category."}
           </p>
           <span className="ops-empty-stamp">{query.trim() ? "SCAN" : "PIN"}</span>
+          {!query.trim() && onOpenNotes && (
+            <button type="button" className="bm-empty-cross" onClick={onOpenNotes}>
+              Or log a note
+            </button>
+          )}
         </div>
       )}
 
@@ -314,6 +334,49 @@ export function BookmarksView({ bookmarks, onAdd, onUpdate, onRemove, accent, fi
                           <StickyThumb src={image} />
                         </a>
                       )}
+
+                      {noteEditId === item.id ? (
+                        <div className="bm-note-edit">
+                          <textarea
+                            className="bm-note-input"
+                            value={noteDraft}
+                            onChange={(e) => setNoteDraft(e.target.value)}
+                            placeholder="Personal note — why this matters…"
+                            rows={3}
+                            maxLength={500}
+                          />
+                          <div className="bm-note-actions">
+                            <button
+                              type="button"
+                              className="bm-sticky-action"
+                              onClick={() => {
+                                const note = noteDraft.trim();
+                                onUpdate({
+                                  ...item,
+                                  note: note || undefined,
+                                });
+                                setNoteEditId(null);
+                                setNoteDraft("");
+                                fireToast?.(note ? "Note saved" : "Note cleared", "xp");
+                              }}
+                            >
+                              Save note
+                            </button>
+                            <button
+                              type="button"
+                              className="bm-sticky-action bm-sticky-action-mute"
+                              onClick={() => {
+                                setNoteEditId(null);
+                                setNoteDraft("");
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : item.note ? (
+                        <p className="bm-sticky-note">{item.note}</p>
+                      ) : null}
                     </div>
 
                     <div className="bm-sticky-actions">
@@ -325,6 +388,16 @@ export function BookmarksView({ bookmarks, onAdd, onUpdate, onRemove, accent, fi
                       >
                         Open
                       </a>
+                      <button
+                        type="button"
+                        className="bm-sticky-action"
+                        onClick={() => {
+                          setNoteEditId(item.id);
+                          setNoteDraft(item.note || "");
+                        }}
+                      >
+                        {item.note ? "Edit note" : "Add note"}
+                      </button>
                       <button
                         type="button"
                         className="bm-sticky-action"
