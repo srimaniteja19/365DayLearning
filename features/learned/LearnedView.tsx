@@ -25,6 +25,7 @@ import {
   vimeoEmbedUrl,
   youtubeEmbedUrl,
 } from "@/lib/bookmarks";
+import { formatSourcesForPrompt } from "@/lib/sourceContentShared";
 import { MiniMarkdown } from "@/features/ui/Views";
 
 const SLIP_TONES = ["lemon", "coral", "mint", "sky", "blush", "butter", "lilac", "seafoam"];
@@ -203,12 +204,38 @@ function LearnedLinkEmbed({ url, compact = false }) {
   );
 }
 
+async function fetchLinkedSources(body) {
+  const urls = extractUrlsFromText(body || "").slice(0, 3);
+  if (!urls.length) return "";
+  try {
+    const res = await fetch("/api/learned/source", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ urls }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !Array.isArray(data?.sources)) return "";
+    return formatSourcesForPrompt(data.sources);
+  } catch {
+    return "";
+  }
+}
+
 async function generateEnrichment(title, body) {
+  const sourceBlock = await fetchLinkedSources(body);
   const prompt = `You help clean up a learner's journal entry.
 
 Current title: ${title || "(untitled)"}
 Their notes (markdown):
 ${body || "(no notes — infer from the title alone)"}
+${
+  sourceBlock
+    ? `
+Source material extracted from linked URLs (primary evidence — captions / page text):
+${sourceBlock}
+`
+    : ""
+}
 
 Reply in EXACTLY this plain-text format, with no markdown fences, no extra labels, no commentary before or after:
 
@@ -219,12 +246,13 @@ SUMMARY:
 Rules:
 - title: fix grammar, capture what was learned, do not start with "Learned about" or "I learned", do not wrap it in quotes.
 - summary: explain what this is, why it matters, and one practical takeaway. Plain prose only — no headings, no bullet lists. You may use a blank line between paragraphs if it reads better as two short paragraphs.
-- Do not invent facts beyond what the title/notes imply. If notes are thin, stay high-level and practical.
+- When source material is present, ground the summary in it. Prefer concrete points from the transcript or article over guessing from the URL alone.
+- Do not invent facts beyond what the title, notes, and source material support. If notes/sources are thin, stay high-level and practical.
 - The summary MUST be complete — never stop mid-sentence.
 - Do not repeat the word TITLE or SUMMARY anywhere except as the two labels above.`;
 
   const raw = await callClaude(prompt, 1400);
-  return parseEnrichment(raw, title);
+  return { ...parseEnrichment(raw, title), usedSources: Boolean(sourceBlock) };
 }
 
 function parseEnrichment(raw, fallbackTitle) {
@@ -379,11 +407,13 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
       createdAt: Date.now(),
     };
     try {
+      let usedSources = false;
       if (autoInsight && (title.trim() || body.trim())) {
         try {
           const enriched = await generateEnrichment(item.title, item.body);
           item.title = enriched.title;
           item.insight = enriched.summary;
+          usedSources = enriched.usedSources;
         } catch (e) {
           fireToast?.(`Saved without summary — ${formatAiError(e)}`, "xp");
         }
@@ -393,7 +423,14 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
       setBody("");
       setPreview(false);
       setExpandedId(item.id);
-      fireToast?.(item.insight ? "Logged · title & summary ready" : "Logged what you learned", "day");
+      if (item.insight) {
+        fireToast?.(
+          usedSources ? "Logged · summary from source" : "Logged · title & summary ready",
+          "day",
+        );
+      } else {
+        fireToast?.("Logged what you learned", "day");
+      }
     } finally {
       setSaving(false);
     }
@@ -408,7 +445,10 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
         title: enriched.title,
         insight: enriched.summary,
       });
-      fireToast?.("Title & summary updated", "xp");
+      fireToast?.(
+        enriched.usedSources ? "Title & summary updated from source" : "Title & summary updated",
+        "xp",
+      );
     } catch (e) {
       fireToast?.(formatAiError(e), "xp");
     } finally {
@@ -430,7 +470,7 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
           </h2>
           <p className="learned-lead">
             Rabbit holes, talks, articles, hallway wisdom — pinned to the board outside the campaign.
-            Markdown welcome. Optional AI polish writes a cleaner title and a short summary.
+            Paste a link and optional AI polish pulls captions or page text for a grounded summary.
           </p>
         </div>
         <div className="learned-meter" aria-label="Journal totals">
@@ -575,7 +615,7 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
               checked={autoInsight}
               onChange={(e) => setAutoInsight(e.target.checked)}
             />
-            <span>Polish title + write summary on save</span>
+            <span>Polish title + grounded summary on save</span>
           </label>
           <div className="learned-composer-actions">
             {err && <span className="panel-error learned-inline-err" role="alert">{err}</span>}
