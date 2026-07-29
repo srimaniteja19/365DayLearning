@@ -5,7 +5,7 @@ import { SubscriptionError } from "@/lib/providers/errors";
  * (Recruit is level 1, Architect is the top rank) so pricing doubles as an
  * in-app callback rather than introducing a second, disconnected vocabulary.
  *
- * Paid tiers use Stripe Checkout + webhooks. Managed AI (server Anthropic
+ * Paid tiers use Stripe Checkout + webhooks. Managed AI (server OpenRouter
  * proxy) is available on Operator/Architect; Recruit stays OpenRouter BYOK.
  */
 export type SubscriptionTier = "free" | "operator" | "architect";
