@@ -958,9 +958,12 @@ export function OnThisDayCard({ memory, onDismiss }) {
   if (!memory) return null;
   return (
     <div className="today-widget on-this-day-card">
-      <div className="today-widget-icon"><Icon.Calendar size={15} /></div>
+      <div className="today-widget-icon" aria-hidden="true"><Icon.Calendar size={15} /></div>
       <div className="today-widget-body">
-        <div className="today-widget-eyebrow">ON THIS DAY · {agoLabel(memory.daysAgo)}</div>
+        <div className="today-widget-eyebrow">
+          <span className="today-widget-stamp">On this day</span>
+          <span>{agoLabel(memory.daysAgo)}</span>
+        </div>
         {memory.kind === "journal" ? (
           <>
             <div className="today-widget-title">{memory.title}</div>
@@ -3161,7 +3164,14 @@ export function DataPanel({
 export function ToastLayer({ toast }) {
   if (!toast) return null;
   return (
-    <div key={toast.id} className={classNames("toast", toast.kind === "day" && "toast-day")}>
+    <div
+      key={toast.id}
+      className={classNames(
+        "toast",
+        toast.kind === "day" && "toast-day",
+        toast.kind === "xp" && "toast-xp",
+      )}
+    >
       {toast.kind === "day" ? <Icon.Trophy size={14} /> : <Icon.Bolt size={14} />}
       <span>{toast.msg}</span>
     </div>
