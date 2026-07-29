@@ -306,6 +306,28 @@
   width: 100%;
   border: 2px solid var(--text);
 }
+.topbar-ops-scrim {
+  display: none;
+}
+.topbar-mobile-lv {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 2.5px solid var(--text);
+  background: #fff1a8;
+  color: #111;
+  box-shadow: 2px 2px 0 var(--text);
+}
+.topbar-mobile-lv .level-badge {
+  border-color: #111;
+  box-shadow: 1px 1px 0 #111;
+}
+.topbar-mobile-lv .xp-bar-mini {
+  border-color: #111;
+  background: color-mix(in srgb, #111 12%, transparent);
+}
 
 @media (max-width: 1100px) {
   .topbar-cluster-kit .topbar-item-label { display: none; }
@@ -7530,68 +7552,86 @@ select.settings-input { cursor: pointer; }
 @media (max-width: 860px) {
   .app-root { padding-bottom: max(48px, env(safe-area-inset-bottom)); }
 
-  /* Topbar: brand + kit | look(hidden) + XP + Ops menu */
+  /* Topbar mobile: Brand ····· LV · Ops — kit lives inside Ops */
   .topbar {
-    padding: 10px 14px;
+    padding: 10px 12px;
     padding-top: max(10px, env(safe-area-inset-top));
-    padding-left: max(14px, env(safe-area-inset-left));
-    padding-right: max(14px, env(safe-area-inset-right));
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
   }
   .topbar-row {
     display: flex;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: 10px;
+    min-height: 44px;
   }
   .topbar-left {
     flex: 1;
     min-width: 0;
-    gap: 8px;
+    gap: 0;
   }
   .topbar-right {
     display: flex;
     flex-direction: row;
     align-items: center;
+    justify-content: flex-end;
     gap: 8px;
     margin-left: 0;
     width: auto;
+    flex-shrink: 0;
   }
+  .topbar-cluster-kit,
+  .topbar-deck-btn,
   .topbar-cluster-look,
-  .topbar-day-notes,
-  .topbar-rank,
-  .topbar-xp,
-  .topbar-xp-total {
+  .topbar-cluster-status {
     display: none !important;
   }
-  .topbar-cluster-status {
-    min-height: 36px;
+  .brand-kicker { display: none; }
+  .brand-btn {
+    min-height: 44px;
+    padding: 8px 10px 8px 8px;
+    max-width: 100%;
   }
-  .topbar-cluster-status .save-chip { display: none; }
-  .topbar-progress {
-    padding: 0 10px;
-    gap: 6px;
+  .brand-text { font-size: 14px; }
+  .brand-stack { gap: 0; }
+  .topbar-mobile-lv {
+    display: inline-flex;
   }
-  .topbar-cluster-kit .topbar-item-label { display: none; }
-  .topbar-cluster-tag { display: none; }
-  .topbar-deck-btn span { display: none; }
-  .topbar-deck-btn { padding: 0 10px; }
   .topbar-ops-trigger {
-    min-height: 40px;
+    min-height: 44px;
     min-width: 44px;
-    padding: 0 12px;
+    padding: 0;
+    justify-content: center;
+    box-shadow: 2px 2px 0 var(--text);
+  }
+  .topbar-ops-trigger-label { display: none; }
+  .topbar-ops-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    border: none;
+    padding: 0;
+    margin: 0;
+    background: color-mix(in srgb, var(--text) 28%, transparent);
+    cursor: pointer;
   }
   .topbar-ops-panel {
     position: fixed;
-    top: max(64px, calc(env(safe-area-inset-top) + 56px));
-    left: 14px;
-    right: 14px;
+    top: max(66px, calc(env(safe-area-inset-top) + 58px));
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
     width: auto;
-    max-height: min(75dvh, 560px);
+    max-height: min(78dvh, 580px);
     z-index: 60;
+    box-shadow: 6px 6px 0 var(--text);
   }
   .topbar-ops-look-mobile { display: block; }
-  .topbar-ops-trigger-label { display: none; }
+  .topbar-ops-open {
+    z-index: 30;
+  }
 
   /* Dashboard chrome — tighter gutters */
   .switcher { padding: 12px 14px 8px; gap: 6px; }

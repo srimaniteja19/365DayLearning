@@ -368,7 +368,25 @@ export function TopBar({
             </div>
           </div>
 
+          <div
+            className="topbar-mobile-lv"
+            title={`${stats.rank} · Level ${stats.level} · ${stats.xp.toLocaleString()} XP`}
+          >
+            <span className="level-badge">LV {stats.level}</span>
+            <div className="xp-bar-mini" aria-hidden="true">
+              <div className="xp-bar-mini-fill" style={{ width: pct + "%" }} />
+            </div>
+          </div>
+
           <div className="topbar-ops" ref={opsRef}>
+            {opsOpen && (
+              <button
+                type="button"
+                className="topbar-ops-scrim"
+                aria-label="Close ops menu"
+                onClick={() => setOpsOpen(false)}
+              />
+            )}
             <button
               type="button"
               className={classNames("topbar-ops-trigger", opsOpen && "is-on")}
@@ -376,7 +394,7 @@ export function TopBar({
               aria-controls="topbar-ops-panel"
               onClick={() => setOpsOpen((v) => !v)}
             >
-              {opsOpen ? <Icon.X size={15} /> : <Icon.Menu size={15} />}
+              {opsOpen ? <Icon.X size={16} /> : <Icon.Menu size={16} />}
               <span className="topbar-ops-trigger-label">Ops</span>
             </button>
 
@@ -404,7 +422,7 @@ export function TopBar({
                         onClick={go(() => onOpenKit("learned"))}
                       >
                         <Icon.Note size={14} />
-                        <span>Field notes</span>
+                        <span>Notes</span>
                         <span className="topbar-ops-meta">{learnedCount}</span>
                       </button>
                       <button
