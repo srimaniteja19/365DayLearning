@@ -113,22 +113,21 @@ function ThemePicker({ themeKey, setThemeKey }) {
 
   return (
     <div className="theme-wrap" ref={wrapRef}>
-      <Tip content="Swap the Field Ops colorway — signal, folio, afterburn, and more." stamp="LOOK" tone="violet" side="bottom">
-        <button
-          className="stat-chip theme-btn"
-          onClick={() => setOpen((v) => !v)}
-          aria-haspopup="listbox"
-          aria-expanded={open}
-        >
-          <span className="theme-swatches">
-            {current.swatch.map((col, i) => (
-              <span key={i} className="theme-sw" style={{ background: col }} />
-            ))}
-          </span>
-          <span className="stat-chip-val">{current.name}</span>
-          <Icon.Chevron size={12} className={classNames("theme-chev", open && "theme-chev-open")} />
-        </button>
-      </Tip>
+      <button
+        className="stat-chip theme-btn"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="Swap Field Ops colorway"
+      >
+        <span className="theme-swatches">
+          {current.swatch.map((col, i) => (
+            <span key={i} className="theme-sw" style={{ background: col }} />
+          ))}
+        </span>
+        <span className="stat-chip-val">{current.name}</span>
+        <Icon.Chevron size={12} className={classNames("theme-chev", open && "theme-chev-open")} />
+      </button>
       {open && (
         <div className="theme-menu" role="listbox">
           {THEME_ORDER.map((k) => {
@@ -182,20 +181,19 @@ function FontPicker({ fontKey, setFontKey }) {
 
   return (
     <div className="theme-wrap font-wrap" ref={wrapRef}>
-      <Tip content="Pick a type pack — display, body, and mono move together." stamp="TYPE" tone="sky" side="bottom">
-        <button
-          className="stat-chip theme-btn font-btn"
-          onClick={() => setOpen((v) => !v)}
-          aria-haspopup="listbox"
-          aria-expanded={open}
-        >
-          <span className="font-sample" style={{ fontFamily: current.display }}>
-            {current.sample}
-          </span>
-          <span className="stat-chip-val">{current.name}</span>
-          <Icon.Chevron size={12} className={classNames("theme-chev", open && "theme-chev-open")} />
-        </button>
-      </Tip>
+      <button
+        className="stat-chip theme-btn font-btn"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="Pick a type pack"
+      >
+        <span className="font-sample" style={{ fontFamily: current.display }}>
+          {current.sample}
+        </span>
+        <span className="stat-chip-val">{current.name}</span>
+        <Icon.Chevron size={12} className={classNames("theme-chev", open && "theme-chev-open")} />
+      </button>
       {open && (
         <div className="theme-menu font-menu" role="listbox">
           {FONT_ORDER.map((k) => {
@@ -281,44 +279,33 @@ export function TopBar({
     <header className={classNames("topbar", menuOpen && "topbar-menu-open")}>
       <div className="topbar-row">
         <div className="topbar-left">
-          <Tip content="Back to the landing strip — pick a campaign or spin up a new one." stamp="HOME" tone="ink" side="bottom">
-            <button className="brand brand-btn" onClick={onGoHome} type="button">
-              <span className="brand-mark" aria-hidden="true" />
-              <span className="brand-stack">
-                <span className="brand-kicker">Field ops</span>
-                <span className="brand-text">REFRAIN<span className="brand-accent">LY</span></span>
-              </span>
-            </button>
-          </Tip>
+          <button className="brand brand-btn" onClick={onGoHome} type="button" aria-label="Back to landing">
+            <span className="brand-mark" aria-hidden="true" />
+            <span className="brand-stack">
+              <span className="brand-kicker">Field ops</span>
+              <span className="brand-text">REFRAIN<span className="brand-accent">LY</span></span>
+            </span>
+          </button>
         </div>
 
         <div className="topbar-mobile-tray" aria-hidden={false}>
           <SaveIndicator status={saveStatus} compact />
-          <Tip
-            content={`${stats.rank} · Level ${stats.level} · ${stats.xp.toLocaleString()} XP earned on this campaign.`}
-            stamp="RANK"
-            tone="lemon"
-            side="bottom"
-          >
-            <div className="topbar-mobile-level" tabIndex={0}>
-              <span className="level-badge">LV {stats.level}</span>
-              <div className="xp-bar-mini" aria-hidden="true">
-                <div className="xp-bar-mini-fill" style={{ width: pct + "%" }} />
-              </div>
+          <div className="topbar-mobile-level" title={`${stats.rank} · Level ${stats.level}`}>
+            <span className="level-badge">LV {stats.level}</span>
+            <div className="xp-bar-mini" aria-hidden="true">
+              <div className="xp-bar-mini-fill" style={{ width: pct + "%" }} />
             </div>
-          </Tip>
-          <Tip content={menuOpen ? "Close the ops drawer" : "Open New, AI, Plans, Data, and Account"} stamp="MENU" tone="ink" side="bottom">
-            <button
-              type="button"
-              className="topbar-menu-btn"
-              aria-expanded={menuOpen}
-              aria-controls="topbar-panel"
-              onClick={() => setMenuOpen((v) => !v)}
-            >
-              {menuOpen ? <Icon.X size={18} /> : <Icon.Menu size={18} />}
-              <span className="sr-only">{menuOpen ? "Close menu" : "Open menu"}</span>
-            </button>
-          </Tip>
+          </div>
+          <button
+            type="button"
+            className="topbar-menu-btn"
+            aria-expanded={menuOpen}
+            aria-controls="topbar-panel"
+            onClick={() => setMenuOpen((v) => !v)}
+          >
+            {menuOpen ? <Icon.X size={18} /> : <Icon.Menu size={18} />}
+            <span className="sr-only">{menuOpen ? "Close menu" : "Open menu"}</span>
+          </button>
         </div>
 
         <div
@@ -326,49 +313,32 @@ export function TopBar({
           className={classNames("topbar-right", menuOpen && "topbar-right-open")}
         >
           <nav className="topbar-cluster" aria-label="Workspace">
-            <Tip content="Generate a custom day-by-day roadmap with your domains and constraints." stamp="NEW" tone="mint" side="bottom">
-              <button className="topbar-item" type="button" onClick={runAndClose(onNewPlan)}>
-                <Icon.Target size={13} />
-                <span className="topbar-item-label">New</span>
-              </button>
-            </Tip>
+            <button className="topbar-item" type="button" onClick={runAndClose(onNewPlan)}>
+              <Icon.Target size={13} />
+              <span className="topbar-item-label">New</span>
+            </button>
             <Tip content="OpenRouter model + API key. Your key stays on this device." stamp="AI" tone="sky" side="bottom">
               <button className="topbar-item" type="button" onClick={runAndClose(onOpenSettings)}>
                 <Icon.Cloud size={13} />
                 <span className="topbar-item-label">AI</span>
               </button>
             </Tip>
-            <Tip content="Compare Recruit / Operator / Command tiers and usage headroom." stamp="PLANS" tone="violet" side="bottom">
-              <button className="topbar-item" type="button" onClick={runAndClose(onOpenPricing)}>
-                <Icon.Sparkle size={13} />
-                <span className="topbar-item-label">Plans</span>
-              </button>
-            </Tip>
-            <Tip content="Export a full backup, share one plan, or import a dualtrack file." stamp="DATA" tone="lemon" side="bottom">
-              <button className="topbar-item" type="button" onClick={runAndClose(onOpenData)}>
-                <Icon.Download size={13} />
-                <span className="topbar-item-label">Data</span>
-              </button>
-            </Tip>
-            <Tip
-              content={
-                accountLabel
-                  ? `Signed in as ${accountLabel}. Cloud sync keeps progress across devices.`
-                  : "Sign in to sync progress, or continue as a guest on this device."
-              }
-              stamp="ID"
-              tone="coral"
-              side="bottom"
+            <button className="topbar-item" type="button" onClick={runAndClose(onOpenPricing)}>
+              <Icon.Sparkle size={13} />
+              <span className="topbar-item-label">Plans</span>
+            </button>
+            <button className="topbar-item" type="button" onClick={runAndClose(onOpenData)}>
+              <Icon.Download size={13} />
+              <span className="topbar-item-label">Data</span>
+            </button>
+            <button
+              className={classNames("topbar-item", accountLabel && "topbar-item-active")}
+              type="button"
+              onClick={runAndClose(onOpenAccount)}
             >
-              <button
-                className={classNames("topbar-item", accountLabel && "topbar-item-active")}
-                type="button"
-                onClick={runAndClose(onOpenAccount)}
-              >
-                <Icon.User size={13} />
-                <span className="topbar-item-label">{accountLabel ? "Account" : "Sign in"}</span>
-              </button>
-            </Tip>
+              <Icon.User size={13} />
+              <span className="topbar-item-label">{accountLabel ? "Account" : "Sign in"}</span>
+            </button>
             <Tip content={`${badgeCount} of ${badgeTotal} Field Ops badges unlocked.`} stamp="MEDAL" tone="lemon" side="bottom">
               <button
                 className="topbar-item"
@@ -389,35 +359,24 @@ export function TopBar({
           <div className="topbar-cluster topbar-cluster-status" aria-label="Progress">
             <SaveIndicator status={saveStatus} compact />
             {noteCount > 0 && (
-              <Tip
-                content={`${noteCount} ${noteCount === 1 ? "day has" : "days have"} notes pinned in the field log.`}
-                stamp="NOTES"
-                tone="sky"
-                side="bottom"
-              >
-                <div className="topbar-item topbar-item-static" tabIndex={0}>
-                  <Icon.Note size={13} />
-                  <span>{noteCount}</span>
-                </div>
-              </Tip>
-            )}
-            <Tip
-              content={`${stats.rank} · Level ${stats.level} · ${stats.xp.toLocaleString()} total XP. Bar fills toward the next rank.`}
-              stamp="XP"
-              tone="lemon"
-              side="bottom"
-            >
-              <div className="topbar-item topbar-item-static topbar-progress" tabIndex={0}>
-                <Icon.Trophy size={13} />
-                <span className="topbar-rank">{stats.rank}</span>
-                <span className="level-badge">LV {stats.level}</span>
-                <div className="xp-bar-mini" aria-hidden="true">
-                  <div className="xp-bar-mini-fill" style={{ width: pct + "%" }} />
-                </div>
-                <span className="topbar-xp">{stats.into}/{stats.need}</span>
-                <span className="topbar-xp-total">{stats.xp.toLocaleString()} XP</span>
+              <div className="topbar-item topbar-item-static" title={`${noteCount} days with notes`}>
+                <Icon.Note size={13} />
+                <span>{noteCount}</span>
               </div>
-            </Tip>
+            )}
+            <div
+              className="topbar-item topbar-item-static topbar-progress"
+              title={`${stats.rank} · Level ${stats.level} · ${stats.xp.toLocaleString()} XP`}
+            >
+              <Icon.Trophy size={13} />
+              <span className="topbar-rank">{stats.rank}</span>
+              <span className="level-badge">LV {stats.level}</span>
+              <div className="xp-bar-mini" aria-hidden="true">
+                <div className="xp-bar-mini-fill" style={{ width: pct + "%" }} />
+              </div>
+              <span className="topbar-xp">{stats.into}/{stats.need}</span>
+              <span className="topbar-xp-total">{stats.xp.toLocaleString()} XP</span>
+            </div>
             {confirmReset ? (
               <div className="reset-confirm">
                 <span>Erase all?</span>
@@ -533,6 +492,17 @@ export function PlanSwitcher({
 }
 
 /* ============================== LANDING PAGE ============================== */
+const LANDING_FEATURES_PRIMARY = [
+  "roadmaps",
+  "multiplan",
+  "xp",
+  "streaks",
+  "srs",
+  "quiz",
+  "journal",
+  "sync",
+];
+
 const LANDING_FEATURES = [
   {
     id: "roadmaps",
@@ -661,6 +631,7 @@ export function HomeView({
   onOpenPricing,
 }) {
   const [started, setStarted] = useState(false);
+  const [showAllFeatures, setShowAllFeatures] = useState(false);
   const pickerRef = useRef(null);
 
   useEffect(() => {
@@ -671,6 +642,11 @@ export function HomeView({
 
   const handleGetStarted = () => onRequireAuth(() => setStarted(true));
   const handleBuildCustom = () => onRequireAuth(onOpenBuilder);
+
+  const visibleFeatures = showAllFeatures
+    ? LANDING_FEATURES
+    : LANDING_FEATURES.filter((f) => LANDING_FEATURES_PRIMARY.includes(f.id));
+  const hiddenCount = LANDING_FEATURES.length - LANDING_FEATURES_PRIMARY.length;
 
   return (
     <div className="landing">
@@ -775,7 +751,7 @@ export function HomeView({
           </p>
         </div>
         <div className="landing-features-grid">
-          {LANDING_FEATURES.map((f, i) => (
+          {visibleFeatures.map((f, i) => (
             <div
               key={f.id}
               className={classNames("landing-feature", `landing-feature-${f.tone}`)}
@@ -791,6 +767,24 @@ export function HomeView({
             </div>
           ))}
         </div>
+        {!showAllFeatures && hiddenCount > 0 && (
+          <button
+            type="button"
+            className="landing-features-more"
+            onClick={() => setShowAllFeatures(true)}
+          >
+            Field ops kit · +{hiddenCount} more
+          </button>
+        )}
+        {showAllFeatures && (
+          <button
+            type="button"
+            className="landing-features-more"
+            onClick={() => setShowAllFeatures(false)}
+          >
+            Show less
+          </button>
+        )}
       </section>
 
       {!started && !hasCampaign && (
@@ -1221,28 +1215,38 @@ function PricingPanel({ onClose, onOpenAccount }) {
 
 /* ============================== VIEW TABS ============================== */
 export function ViewTabs({ view, setView, dueCount }) {
-  const tabs = [
+  const primary = [
     { key: "console", label: "Console", icon: Icon.Terminal, stamp: "LIST", tone: "ink", tip: "Day-by-day mission list — check topics, jot notes, run tools." },
-    { key: "grid", label: "Grid", icon: Icon.Grid, stamp: "MAP", tone: "sky", tip: "Heatmap of every day. Spot gaps and jump straight to a cell." },
     { key: "review", label: "Review", icon: Icon.Rotate, badge: dueCount, stamp: "SRS", tone: "coral", tip: dueCount > 0 ? `${dueCount} topic${dueCount === 1 ? "" : "s"} due for spaced recall.` : "Spaced-repetition queue — nothing due right now." },
+    { key: "grid", label: "Grid", icon: Icon.Grid, stamp: "MAP", tone: "sky", tip: "Heatmap of every day. Spot gaps and jump straight to a cell." },
+  ];
+  const secondary = [
     { key: "weekly", label: "Weekly", icon: Icon.Calendar, stamp: "7D", tone: "lemon", tip: "Last seven days of clears, notes, and open questions." },
     { key: "learned", label: "Learned", icon: Icon.Note, stamp: "LOG", tone: "mint", tip: "Archive of what you actually absorbed — searchable field notes." },
     { key: "bookmarks", label: "Bookmarks", icon: Icon.Link, stamp: "REF", tone: "violet", tip: "Stash articles, docs, and videos beside the campaign." },
     { key: "log", label: "Analytics", icon: Icon.List, stamp: "STATS", tone: "ink", tip: "Completion, streaks, and domain coverage for this plan." },
   ];
+  const renderTab = (t, secondaryTone = false) => (
+    <Tip key={t.key} content={t.tip} stamp={t.stamp} tone={t.tone} side="bottom">
+      <button
+        className={classNames(
+          "view-tab",
+          view === t.key && "view-tab-active",
+          secondaryTone && "view-tab-secondary",
+        )}
+        onClick={() => setView(t.key)}
+      >
+        <t.icon size={13} /> {t.label}
+        {view === t.key && <span className="view-tab-stamp">{t.stamp}</span>}
+        {t.badge > 0 && <span className="tab-badge">{t.badge}</span>}
+      </button>
+    </Tip>
+  );
   return (
     <div className="view-tabs">
-      {tabs.map((t) => (
-        <Tip key={t.key} content={t.tip} stamp={t.stamp} tone={t.tone} side="bottom">
-          <button
-            className={classNames("view-tab", view === t.key && "view-tab-active")}
-            onClick={() => setView(t.key)}
-          >
-            <t.icon size={13} /> {t.label}
-            {t.badge > 0 && <span className="tab-badge">{t.badge}</span>}
-          </button>
-        </Tip>
-      ))}
+      {primary.map((t) => renderTab(t))}
+      <span className="view-tabs-divider" aria-hidden="true" />
+      {secondary.map((t) => renderTab(t, true))}
     </div>
   );
 }
@@ -1563,7 +1567,6 @@ export function ConsoleView({ campaign, days, progress, onToggle, expandedDay, s
                     <LayoutIcon size={13} />
                     {opt.label}
                   </span>
-                  <em>{opt.hint}</em>
                 </button>
               </Tip>
             );
@@ -2143,6 +2146,10 @@ export function ReviewView({ queue, srs, notes, scheduledCount, onGrade, onOpenD
         </div>
 
         <div className="review-card">
+          <div className="review-day-stamp" aria-hidden="true">
+            <span className="review-day-stamp-num">{String(day.day).padStart(2, "0")}</span>
+            <span className="review-day-stamp-label">Day</span>
+          </div>
           <div className="review-prompt">
             <span className="field-ops-kicker" aria-hidden="true">
               <span className="field-ops-kicker-mark" />
@@ -2291,6 +2298,10 @@ export function WeeklyView({ log, notes, progress, srs, campaigns, activeCampaig
 
   return (
     <div className="weekly-view">
+      <div className="log-ops-mast">
+        <span className="log-ops-title">Weekly</span>
+        <span className="log-ops-sub">Last 7 days · pulse · open questions</span>
+      </div>
       <div className="weekly-strip">
         <SummaryCard label="Topics This Week" value={weekEvents.length} sub="last 7 days" accent={campaign.accent} tone="mint" />
         <SummaryCard label="Active Day Streak" value={activeDayStreak} sub={activeDayStreak === 1 ? "day" : "days"} accent={campaign.accent} tone="sky" />

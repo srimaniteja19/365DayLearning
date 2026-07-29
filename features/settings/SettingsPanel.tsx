@@ -75,6 +75,10 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="settings-panel">
+      <div className="settings-ops-mast">
+        <span className="settings-ops-title">AI station</span>
+        <span className="settings-ops-sub">OpenRouter · BYOK</span>
+      </div>
       <p className="settings-lead">
         Refrainly uses <strong>OpenRouter</strong> only. Paste your OpenRouter key and pick a model —
         requests go from this browser to OpenRouter. Keys stay in memory unless you opt in to remember
@@ -254,6 +258,9 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
 
       {testResult && (
         <div className={classNames("settings-test", testResult.ok ? "settings-test-ok" : "settings-test-err")}>
+          <span className="settings-test-stamp" aria-hidden="true">
+            {testResult.ok ? "SYNC" : "FAIL"}
+          </span>
           {testResult.ok
             ? `Connected · ${testResult.model} · ${testResult.latencyMs}ms`
             : testResult.error || "Connection failed"}

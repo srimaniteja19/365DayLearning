@@ -103,15 +103,11 @@ export default function DualTrackConsole() {
   const [saveStatus, setSaveStatus] = useState("loading");
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmDeletePlanId, setConfirmDeletePlanId] = useState(null);
-  /** Top-level page (Home vs Dashboard) — remembered across reloads. */
-  const [page, setPageState] = useState(() => {
-    if (typeof window === "undefined") return "home";
-    try {
-      return window.localStorage.getItem(PAGE_KEY) || "home";
-    } catch {
-      return "home";
-    }
-  });
+  /**
+   * Top-level page (Home vs Dashboard). Always start as "home" so SSR and the
+   * first client paint match — localStorage is applied in an effect below.
+   */
+  const [page, setPageState] = useState("home");
   const setPage = useCallback((next) => {
     setPageState(next);
     if (typeof window === "undefined") return;
@@ -128,14 +124,8 @@ export default function DualTrackConsole() {
   const { data: session } = useSession();
   const cloudUserId = session?.user?.id || null;
   const cloudSyncedFor = useRef(null);
-  const [guestMode, setGuestMode] = useState(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return window.localStorage.getItem(GUEST_MODE_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
+  /** Guest preference — same SSR-safe pattern as `page`. */
+  const [guestMode, setGuestMode] = useState(false);
   const pendingAuthAction = useRef(null);
 
   /**
@@ -236,6 +226,21 @@ export default function DualTrackConsole() {
 
   useEffect(() => {
     hydrateCredentialsFromStorage();
+  }, []);
+
+  // Restore remembered page + guest mode after mount (avoids hydration mismatch).
+  useEffect(() => {
+    try {
+      const savedPage = window.localStorage.getItem(PAGE_KEY);
+      if (savedPage === "dashboard" || savedPage === "home") {
+        setPageState(savedPage);
+      }
+      if (window.localStorage.getItem(GUEST_MODE_KEY) === "1") {
+        setGuestMode(true);
+      }
+    } catch {
+      // best-effort only
+    }
   }, []);
 
   useEffect(() => {
@@ -781,10 +786,11 @@ export default function DualTrackConsole() {
   );
 
   if (saveStatus === "loading") {
-    const preferDashboard = page === "dashboard";
+    // Always the same shell during hydrate — `page` is restored from localStorage
+    // after mount, so branching here would flash or rematch incorrectly.
     return (
       <div className="app-root" style={rootStyle}>
-        <AppHydrateSkeleton page={preferDashboard ? "dashboard" : "home"} />
+        <AppHydrateSkeleton />
       </div>
     );
   }

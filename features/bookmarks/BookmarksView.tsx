@@ -162,12 +162,20 @@ export function BookmarksView({ bookmarks, onAdd, onUpdate, onRemove, accent, fi
   return (
     <div className="bm-view" style={{ "--accent": accent }}>
       <header className="bm-head">
-        <div>
-          <div className="bm-kicker">Pinned · by kind</div>
-          <h2 className="bm-title">Bookmarks</h2>
+        <div className="bm-head-copy">
+          <div className="bm-kicker">
+            <span className="bm-kicker-mark" aria-hidden="true" />
+            <span>Pinned · by kind</span>
+          </div>
+          <h2 className="bm-title">
+            Book<span className="bm-title-accent">marks</span>
+          </h2>
           <p className="bm-lead">Sticky slips grouped by type — YouTube embeds right on the card.</p>
         </div>
-        <span className="bm-count">{(bookmarks || []).length}</span>
+        <div className="bm-head-meta">
+          <span className="bm-live-stamp">Live</span>
+          <span className="bm-count">{(bookmarks || []).length}</span>
+        </div>
       </header>
 
       <div className="bm-toolbar">

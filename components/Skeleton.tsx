@@ -15,8 +15,7 @@ export function Bone({
 }
 
 /** Full-app shell while IndexedDB / snapshot hydrate. */
-export function AppHydrateSkeleton({ page }: { page: string }) {
-  const dashboard = page === "dashboard";
+export function AppHydrateSkeleton() {
   return (
     <div className="hydrate-shell" role="status" aria-live="polite" aria-busy="true">
       <span className="sr-only">Restoring your Field Ops progress…</span>
@@ -36,65 +35,39 @@ export function AppHydrateSkeleton({ page }: { page: string }) {
         </div>
       </header>
 
-      {dashboard ? (
-        <>
-          <div className="hydrate-switcher">
-            <Bone className="ops-bone-tab" />
-            <Bone className="ops-bone-tab" />
-            <Bone className="ops-bone-tab ops-bone-tab-new" />
-          </div>
-          <div className="hydrate-hero">
-            <div className="hydrate-hero-copy">
-              <Bone className="ops-bone-stamp" />
-              <Bone className="ops-bone-hero-title" />
+      <div className="hydrate-switcher">
+        <Bone className="ops-bone-tab" />
+        <Bone className="ops-bone-tab" />
+        <Bone className="ops-bone-tab ops-bone-tab-new" />
+      </div>
+      <div className="hydrate-hero">
+        <div className="hydrate-hero-copy">
+          <Bone className="ops-bone-stamp" />
+          <Bone className="ops-bone-hero-title" />
+          <Bone className="ops-bone-line" />
+          <Bone className="ops-bone-line ops-bone-short" />
+        </div>
+        <Bone className="ops-bone-pct" />
+      </div>
+      <div className="hydrate-tabs">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Bone key={i} className="ops-bone-view-tab" />
+        ))}
+      </div>
+      <div className="hydrate-days">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="hydrate-day-row">
+            <Bone className="ops-bone-day-num" />
+            <div className="hydrate-day-body">
               <Bone className="ops-bone-line" />
-              <Bone className="ops-bone-line ops-bone-short" />
-            </div>
-            <Bone className="ops-bone-pct" />
-          </div>
-          <div className="hydrate-tabs">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Bone key={i} className="ops-bone-view-tab" />
-            ))}
-          </div>
-          <div className="hydrate-days">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="hydrate-day-row">
-                <Bone className="ops-bone-day-num" />
-                <div className="hydrate-day-body">
-                  <Bone className="ops-bone-line" />
-                  <div className="hydrate-topic-pills">
-                    <Bone className="ops-bone-pill" />
-                    <Bone className="ops-bone-pill ops-bone-pill-short" />
-                  </div>
-                </div>
+              <div className="hydrate-topic-pills">
+                <Bone className="ops-bone-pill" />
+                <Bone className="ops-bone-pill ops-bone-pill-short" />
               </div>
-            ))}
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="hydrate-landing-hero">
-            <Bone className="ops-bone-stamp" />
-            <Bone className="ops-bone-landing-title" />
-            <Bone className="ops-bone-line ops-bone-mid" />
-            <div className="hydrate-cta-row">
-              <Bone className="ops-bone-btn" />
-              <Bone className="ops-bone-btn ops-bone-btn-ghost" />
             </div>
           </div>
-          <div className="hydrate-landing-cards">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="hydrate-card">
-                <Bone className="ops-bone-stamp" />
-                <Bone className="ops-bone-line" />
-                <Bone className="ops-bone-line ops-bone-short" />
-                <Bone className="ops-bone-btn" />
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+        ))}
+      </div>
 
       <div className="hydrate-status">
         <span className="hydrate-status-dot" />
