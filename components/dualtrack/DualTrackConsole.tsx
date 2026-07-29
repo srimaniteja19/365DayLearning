@@ -35,6 +35,7 @@ import {
 import { ThemeCtx } from "@/theme/ThemeContext";
 import { Icon } from "@/components/Icon";
 import { Tip } from "@/components/Tip";
+import { AppHydrateSkeleton } from "@/components/Skeleton";
 import { classNames } from "@/lib/classNames";
 import { XP_PER_TOPIC, XP_PER_DAY_BONUS, levelFromXp, rankForLevel } from "@/lib/xp";
 import { seedReview, nextReview, dueList } from "@/lib/srs";
@@ -780,9 +781,10 @@ export default function DualTrackConsole() {
   );
 
   if (saveStatus === "loading") {
+    const preferDashboard = page === "dashboard";
     return (
       <div className="app-root" style={rootStyle}>
-        <div className="panel-loading">Loading…</div>
+        <AppHydrateSkeleton page={preferDashboard ? "dashboard" : "home"} />
       </div>
     );
   }

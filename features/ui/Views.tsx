@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import DOMAIN_META from "@/data/domains.json";
 import { Icon } from "@/components/Icon";
 import { Tip } from "@/components/Tip";
+import { PricingUsageSkeleton } from "@/components/Skeleton";
 import { classNames } from "@/lib/classNames";
 import { ThemeCtx, useDomainColor } from "@/theme/ThemeContext";
 import { THEMES, THEME_ORDER, hexToRgba, resolveThemeKey } from "@/theme/themes";
@@ -1184,6 +1185,8 @@ function PricingPanel({ onClose, onOpenAccount }) {
           );
         })}
       </div>
+
+      {session?.user && loadingUsage && <PricingUsageSkeleton />}
 
       {session?.user && usage && !loadingUsage && (
         <div className="pricing-usage">

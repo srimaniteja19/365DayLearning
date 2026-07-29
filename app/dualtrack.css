@@ -6407,3 +6407,211 @@ select.settings-input { cursor: pointer; }
 
 .heatmap .ops-tip-anchor { display: block; }
 .heatmap .ops-tip-anchor > .heat-cell { width: 100%; height: 100%; }
+
+/* ---------- Field Ops loading skeletons ---------- */
+@keyframes ops-bone-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.ops-bone {
+  display: block;
+  border: 2px solid color-mix(in srgb, var(--text) 55%, transparent);
+  border-radius: 0;
+  background:
+    linear-gradient(
+      110deg,
+      color-mix(in srgb, var(--text) 6%, var(--bg-panel)) 0%,
+      color-mix(in srgb, var(--accent-main, var(--accent)) 14%, var(--bg-panel)) 45%,
+      color-mix(in srgb, var(--text) 6%, var(--bg-panel)) 90%
+    );
+  background-size: 220% 100%;
+  animation: ops-bone-shimmer 1.15s ease-in-out infinite;
+  box-shadow: 2px 2px 0 color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+.hydrate-shell {
+  position: relative;
+  z-index: 2;
+  min-height: 100dvh;
+  padding-bottom: 56px;
+}
+.hydrate-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 2.5px solid var(--text);
+  background: var(--bg-panel);
+}
+.hydrate-brand { display: flex; align-items: center; gap: 10px; }
+.hydrate-brand-stack { display: flex; flex-direction: column; gap: 6px; }
+.ops-bone-mark { width: 28px; height: 28px; }
+.ops-bone-kicker { width: 64px; height: 8px; }
+.ops-bone-title { width: 110px; height: 14px; }
+.hydrate-topbar-right { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.ops-bone-chip { width: 72px; height: 28px; }
+.ops-bone-wide { width: 120px; }
+
+.hydrate-switcher {
+  display: flex; gap: 8px; padding: 12px 20px;
+  border-bottom: 2px solid var(--text);
+  overflow: hidden;
+}
+.ops-bone-tab { width: 160px; height: 36px; flex-shrink: 0; }
+.ops-bone-tab-new { width: 72px; border-style: dashed; }
+
+.hydrate-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 16px 20px;
+  padding: 22px 22px 20px;
+  border: 2.5px solid var(--text);
+  background: var(--bg-panel);
+  box-shadow: 4px 4px 0 color-mix(in srgb, var(--text) 14%, transparent);
+}
+.hydrate-hero-copy { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ops-bone-stamp { width: 72px; height: 16px; }
+.ops-bone-hero-title { width: min(420px, 90%); height: 28px; }
+.ops-bone-line { width: 100%; height: 12px; }
+.ops-bone-short { width: 55%; }
+.ops-bone-mid { width: 72%; }
+.ops-bone-pct { width: 72px; height: 72px; flex-shrink: 0; }
+
+.hydrate-tabs {
+  display: flex; gap: 8px; padding: 0 20px 14px; overflow: hidden;
+}
+.ops-bone-view-tab { width: 88px; height: 32px; flex-shrink: 0; }
+
+.hydrate-days {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 0 20px 20px;
+}
+.hydrate-day-row {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 12px 14px;
+  border: 2px solid var(--text);
+  background: var(--bg-panel);
+  box-shadow: 2px 2px 0 color-mix(in srgb, var(--text) 10%, transparent);
+}
+.ops-bone-day-num { width: 36px; height: 36px; flex-shrink: 0; }
+.hydrate-day-body { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.hydrate-topic-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+.ops-bone-pill { width: 140px; height: 22px; }
+.ops-bone-pill-short { width: 96px; }
+
+.hydrate-landing-hero {
+  display: flex; flex-direction: column; gap: 12px;
+  max-width: 640px; margin: 48px auto 28px; padding: 0 20px;
+}
+.ops-bone-landing-title { width: min(480px, 100%); height: 42px; }
+.hydrate-cta-row { display: flex; gap: 10px; margin-top: 6px; }
+.ops-bone-btn { width: 140px; height: 40px; }
+.ops-bone-btn-ghost { width: 120px; opacity: 0.75; }
+.ops-bone-btn-block { width: 100%; height: 44px; margin-top: 8px; }
+
+.hydrate-landing-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 20px 40px;
+}
+.hydrate-card {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 18px;
+  border: 2.5px solid var(--text);
+  background: var(--bg-panel);
+  box-shadow: 3px 3px 0 color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+.hydrate-status {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 2px solid var(--text);
+  background: var(--bg-panel);
+  box-shadow: 3px 3px 0 var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+  z-index: 30;
+}
+.hydrate-status-dot {
+  width: 8px; height: 8px;
+  background: var(--accent-main, var(--accent));
+  border: 1.5px solid var(--text);
+  animation: ops-bone-pulse 1s ease-in-out infinite;
+}
+@keyframes ops-bone-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.pricing-usage-skeleton .ops-bone {
+  border-color: color-mix(in srgb, #fff 45%, transparent);
+  background:
+    linear-gradient(
+      110deg,
+      color-mix(in srgb, #fff 10%, transparent) 0%,
+      color-mix(in srgb, #fff 22%, transparent) 45%,
+      color-mix(in srgb, #fff 10%, transparent) 90%
+    );
+  background-size: 220% 100%;
+  box-shadow: none;
+  animation: ops-bone-shimmer 1.15s ease-in-out infinite;
+}
+.ops-bone-usage-label { width: 120px; height: 10px; }
+.ops-bone-usage-val { width: 40px; height: 10px; }
+.pricing-usage-track-skel { position: relative; height: 6px; padding: 0; overflow: hidden; }
+.ops-bone-usage-fill { width: 42%; height: 100%; border: none; box-shadow: none; }
+
+.account-skel { gap: 12px; }
+.account-signed-skel {
+  background: color-mix(in srgb, var(--account-blue, #2E9BE6) 85%, #12283A);
+}
+.account-signed-skel .ops-bone {
+  border-color: color-mix(in srgb, #fff 55%, transparent);
+  background:
+    linear-gradient(
+      110deg,
+      color-mix(in srgb, #fff 12%, transparent) 0%,
+      color-mix(in srgb, #fff 28%, transparent) 45%,
+      color-mix(in srgb, #fff 12%, transparent) 90%
+    );
+  background-size: 220% 100%;
+  box-shadow: none;
+  animation: ops-bone-shimmer 1.15s ease-in-out infinite;
+}
+.ops-bone-avatar {
+  width: 36px; height: 36px; margin: 10px 0 0 10px;
+  transform: rotate(45deg);
+}
+.ops-bone-sync { width: 100%; height: 40px; margin-top: 4px; }
+
+@media (max-width: 720px) {
+  .hydrate-topbar-right { display: none; }
+  .hydrate-hero { flex-direction: column; }
+  .ops-bone-pct { align-self: flex-start; }
+  .ops-bone-tab { width: 120px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ops-bone,
+  .pricing-usage-skeleton .ops-bone,
+  .account-signed-skel .ops-bone,
+  .hydrate-status-dot {
+    animation: none;
+  }
+}

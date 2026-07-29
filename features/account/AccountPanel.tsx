@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { Icon } from "@/components/Icon";
+import { AccountSessionSkeleton } from "@/components/Skeleton";
 import { classNames } from "@/lib/classNames";
 import { formatAgo, getLastSyncedAt } from "@/lib/cloudSync";
 
@@ -45,11 +46,7 @@ export function AccountPanel({
   const lastSyncedLabel = useLastSyncedLabel(!!session?.user);
 
   if (status === "loading") {
-    return (
-      <div className="account-panel">
-        <p className="account-lead">Checking your session…</p>
-      </div>
-    );
+    return <AccountSessionSkeleton />;
   }
 
   if (session?.user) {
