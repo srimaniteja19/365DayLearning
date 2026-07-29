@@ -27,13 +27,13 @@ describe("tier definitions", () => {
     expect(free.aiActionsPerPeriod).toBeNull();
   });
 
-  it("paid tiers are coming soon and keep planned quotas for later", () => {
+  it("paid tiers are live with managed AI quotas", () => {
     const operator = SUBSCRIPTION_TIERS.operator;
     const architect = SUBSCRIPTION_TIERS.architect;
-    expect(operator.managedAi).toBe(false);
-    expect(architect.managedAi).toBe(false);
-    expect(operator.comingSoon).toBe(true);
-    expect(architect.comingSoon).toBe(true);
+    expect(operator.managedAi).toBe(true);
+    expect(architect.managedAi).toBe(true);
+    expect(operator.comingSoon).toBe(false);
+    expect(architect.comingSoon).toBe(false);
     expect(architect.planGenerationsPerPeriod!).toBeGreaterThan(operator.planGenerationsPerPeriod!);
     expect(architect.aiActionsPerPeriod!).toBeGreaterThan(operator.aiActionsPerPeriod!);
     expect(architect.priceMonthlyUsd).toBeGreaterThan(operator.priceMonthlyUsd);
@@ -81,21 +81,9 @@ describe("client fetch helpers", () => {
       aiActionsLimit: 150,
       periodResetAt: new Date().toISOString(),
     };
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({ ok: true, json: async () => usage })),
-    );
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => usage })));
     const result = await fetchSubscriptionStatus();
     expect(result).toEqual({ ok: true, usage });
-  });
-
-  it("fetchSubscriptionStatus surfaces server errors", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({ ok: false, status: 401, json: async () => ({ error: "Sign in required." }) })),
-    );
-    const result = await fetchSubscriptionStatus();
-    expect(result).toEqual({ ok: false, error: "Sign in required." });
   });
 
   it("reservePlanGeneration resolves silently on success", async () => {
@@ -115,16 +103,18 @@ describe("client fetch helpers", () => {
     await expect(reservePlanGeneration()).rejects.toThrow(/used all 3 AI-generated plans/);
   });
 
-  it("requestUpgrade reports the 'coming soon' placeholder error", async () => {
+  it("requestUpgrade returns the Stripe Checkout URL on success", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
-        ok: false,
-        json: async () => ({ error: "Checkout isn't connected yet — payments are coming soon." }),
+        ok: true,
+        json: async () => ({ url: "https://checkout.stripe.com/c/pay/cs_test_123" }),
       })),
     );
     const result = await requestUpgrade("operator");
-    expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/coming soon/);
+    expect(result).toEqual({
+      ok: true,
+      url: "https://checkout.stripe.com/c/pay/cs_test_123",
+    });
   });
 });

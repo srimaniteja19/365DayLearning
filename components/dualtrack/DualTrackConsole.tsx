@@ -46,6 +46,10 @@ import {
   SCHEMA_VERSION,
 } from "@/lib/types";
 import { hydrateCredentialsFromStorage } from "@/lib/providers/credentials";
+import {
+  fetchSubscriptionStatus,
+  setCachedSubscriptionTier,
+} from "@/lib/subscriptions";
 import { computeBadges } from "@/lib/achievements";
 import { findOnThisDayMemory } from "@/lib/onThisDay";
 import { buildKitWeekDigest, countLearned, dateKey } from "@/lib/learned";
@@ -131,6 +135,21 @@ export default function DualTrackConsole() {
   const { data: session, status: sessionStatus } = useSession();
   const cloudUserId = session?.user?.id || null;
   const pendingAuthAction = useRef(null);
+
+  useEffect(() => {
+    if (!cloudUserId) {
+      setCachedSubscriptionTier(null);
+      return;
+    }
+    let cancelled = false;
+    fetchSubscriptionStatus().then((res) => {
+      if (cancelled || !res.ok) return;
+      setCachedSubscriptionTier(res.usage.tier);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [cloudUserId]);
 
   /** Gate plan/kit/dashboard actions behind sign-in. */
   const requireAuth = useCallback(

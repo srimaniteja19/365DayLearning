@@ -44,18 +44,19 @@ be configured for the app to be usable beyond the landing page.
 
 ## Subscriptions
 
-Three tiers, named after ranks from the XP ladder (`lib/xp.ts`) and defined in `lib/subscriptions.ts`:
+Three tiers, named after ranks from the XP ladder (`lib/xp.ts`) and defined in `lib/subscriptions.ts`. Checkout uses **Stripe Billing** (Checkout Sessions + Customer Portal + webhooks).
 
 | Tier | Price | Status | AI |
 |------|-------|--------|----|
 | **Recruit** (free) | $0 | **Live** | Bring your own OpenRouter key — unlimited plans + AI tools on your credits |
-| **Operator** | $7/mo | Coming soon | Planned: managed AI with 3 plan generations + 150 AI actions / month |
-| **Architect** | $12/mo | Coming soon | Planned: managed AI with 5 plan generations + 400 AI actions / month |
+| **Operator** | $7/mo | **Live** | Managed AI: 3 plan generations + 150 AI actions / month |
+| **Architect** | $12/mo | **Live** | Managed AI: 5 plan generations + 400 AI actions / month |
 
-- **Today everyone uses Recruit behavior:** OpenRouter BYOK in Settings. Plan generation, quiz, notes, LinkedIn drafts, and journal insights all hit your key — no server quota.
-- Paid tiers keep the planned quotas in code (`planGenerationsPerPeriod` / `aiActionsPerPeriod`) but `managedAi` is off, so those limits are not enforced until managed AI + checkout ship.
-- Quota plumbing still lives in `lib/db/subscriptionQuota.ts` and `/api/claude` for when managed AI returns.
-- **Checkout isn't wired up yet.** Upgrade buttons show “Coming soon.” `POST /api/subscription/upgrade` remains a 501 placeholder for a future payment processor.
+- **Recruit** stays OpenRouter BYOK in Settings (no card).
+- **Operator / Architect** unlock managed AI via `/api/ai` (server OpenRouter key) when you have no BYOK key. Quotas live in `lib/db/subscriptionQuota.ts`. BYOK still works on paid tiers and bypasses managed quotas. Set `OPENROUTER_API_KEY` on the server.
+- Checkout: `POST /api/subscription/upgrade` → Stripe Checkout (`mode: subscription`). Webhooks at `/api/webhooks/stripe` sync tier/status. Customer Portal: `POST /api/subscription/portal` (invoices, payment method, cancel).
+- Env: `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_PRICE_OPERATOR`, `STRIPE_PRICE_ARCHITECT`, `STRIPE_WEBHOOK_SECRET` (see `.env.example`).
+- Local webhooks: `stripe listen --forward-to localhost:3000/api/webhooks/stripe` and paste the signing secret into `.env.local`.
 - View plans from **Plans** in the top bar or landing nav, or **View plans & usage** in the account panel.
 
 ## Scripts
@@ -80,7 +81,7 @@ npm run db:studio    # browse the database with Drizzle Studio
 - **Other things I learned** — calendar journal with markdown notes, rich links, and AI insights
 - **Bookmarks** — save articles, YouTube/Vimeo, docs, and repos with compact link previews when available
 - **Accounts + cloud sync** (Neon Postgres + Auth.js) — required to use the app; syncs across devices
-- **Subscriptions** — Recruit (free OpenRouter BYOK) is live; Operator/Architect managed AI is planned (checkout not connected)
+- **Subscriptions** — Recruit (free OpenRouter BYOK); Operator/Architect via Stripe Checkout + managed AI quotas
 - Themes (10) via CSS custom properties for the **dashboard** — Signal, Folio, Afterburn, Chlorophyll, Oxide, Ion, Cinnabar, Halide, Voltaic, Marina. The **homepage** always uses a fixed **Briefing** skin (steel paper + electric blue + flare coral), independent of account theme.
 - Export: notes markdown, full backup, **plan-only share**
 - Import: plan share adds a plan; full backup asks **merge** or **replace**

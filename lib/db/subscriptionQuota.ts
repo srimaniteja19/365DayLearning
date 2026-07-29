@@ -72,7 +72,7 @@ async function reserve(userId: string, kind: "plan" | "action"): Promise<Reserve
       reason: "tier",
       status: 402,
       message:
-        "Managed AI isn't available yet. Add your OpenRouter key in Settings — Recruit is unlimited on your own credits.",
+        "Managed AI requires Operator or Architect. Add your OpenRouter key in Settings, or upgrade.",
     };
   }
 
@@ -132,7 +132,7 @@ export async function requireManagedAiTier(userId: string): Promise<ReserveResul
       reason: "tier",
       status: 402,
       message:
-        "Managed AI isn't available yet. Add your OpenRouter key in Settings — Recruit is unlimited on your own credits.",
+        "Managed AI requires Operator or Architect. Add your OpenRouter key in Settings, or upgrade.",
     };
   }
   return { ok: true };

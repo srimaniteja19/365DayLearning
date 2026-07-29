@@ -400,14 +400,13 @@ export function HomeView({
             </ul>
           </div>
           <div className="landing-ai-card">
-            <h3 className="landing-ai-card-title">Managed AI · planned</h3>
+            <h3 className="landing-ai-card-title">Managed AI · live</h3>
             <p className="landing-ai-card-copy">
-              Operator and Architect will add managed AI (no key required) with monthly quotas once
-              checkout ships. Paid tiers keep bring-your-own-key too — managed AI is an option, not
-              a replacement.
+              Operator and Architect include managed AI (no key required) with monthly quotas.
+              Paid tiers keep bring-your-own-key too — managed AI is an option, not a replacement.
             </p>
             <button type="button" className="landing-surface-cta landing-ai-link" onClick={() => scrollToId("pricing")}>
-              See planned tiers
+              See plans
             </button>
           </div>
         </div>
@@ -421,7 +420,7 @@ export function HomeView({
       >
         <span className="landing-stamp">Pricing</span>
         <h2 id="landing-pricing-title" className="landing-section-title">
-          Start free with an account. Paid tiers when checkout lands.
+          Start free with an account. Upgrade anytime with Stripe.
         </h2>
         <p className="landing-section-lead">
           Tier names match XP ranks (Recruit / Operator / Architect). Annual is the default view —
@@ -504,18 +503,18 @@ export function HomeView({
                   ) : id === "operator" ? (
                     <>
                       <li>Everything in Recruit</li>
-                      <li>Planned: managed AI — 3 plan gens + 150 actions / month</li>
-                      <li>Planned: no key required for those quotas</li>
+                      <li>Managed AI — 3 plan gens + 150 actions / month</li>
+                      <li>No key required for those quotas</li>
                       <li>Bring-your-own-key remains available</li>
-                      <li>Checkout not connected yet</li>
+                      <li>Stripe checkout · invoices · billing portal</li>
                     </>
                   ) : (
                     <>
-                      <li>Everything planned for Operator</li>
-                      <li>Planned: managed AI — 5 plan gens + 400 actions / month</li>
-                      <li>Planned: highest managed allowance</li>
+                      <li>Everything in Operator</li>
+                      <li>Managed AI — 5 plan gens + 400 actions / month</li>
+                      <li>Highest managed allowance</li>
                       <li>Bring-your-own-key remains available</li>
-                      <li>Checkout not connected yet</li>
+                      <li>Stripe checkout · invoices · billing portal</li>
                     </>
                   )}
                 </ul>
@@ -527,10 +526,9 @@ export function HomeView({
                   <button
                     type="button"
                     className="landing-surface-cta landing-price-cta"
-                    disabled
-                    title="Checkout isn't live yet"
+                    onClick={onOpenPricing}
                   >
-                    Coming soon
+                    {billing === "annual" ? "See monthly checkout" : `Get ${tier.rankLabel}`}
                   </button>
                 )}
                 {isFree && (
@@ -545,8 +543,7 @@ export function HomeView({
           <button type="button" className="landing-text-btn" onClick={onOpenPricing}>
             Open Plans
           </button>
-          . Annual figures are planned display pricing (10× monthly) — not purchasable until checkout
-          ships.
+          . Checkout is monthly for now — annual figures are illustrative (10× monthly).
         </p>
       </section>
 

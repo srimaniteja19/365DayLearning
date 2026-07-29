@@ -12,7 +12,7 @@ const MAX_SNAPSHOT_CHARS = 5_000_000;
 /**
  * Session cookies ride along on cross-site requests, so state-changing
  * requests need an explicit same-origin check to prevent CSRF (mirrors the
- * pattern used in app/api/claude and app/api/auth/signup).
+ * pattern used in app/api/ai and app/api/auth/signup).
  */
 function isSameOrigin(req: NextRequest): boolean {
   const origin = req.headers.get("origin");

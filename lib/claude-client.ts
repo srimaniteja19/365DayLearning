@@ -4,6 +4,7 @@ import type { ChatRequest, StructuredSchema } from "@/lib/providers/types";
 import {
   AuthError,
   ProviderError,
+  SubscriptionError,
   formatAiError,
 } from "@/lib/providers/errors";
 import {
@@ -14,35 +15,77 @@ import {
   setSessionPreferredModel,
   shouldSkipRemainingFreeModels,
 } from "@/lib/providers/openrouter";
+import { getCachedSubscriptionTier, tierDef } from "@/lib/subscriptions";
 import type { ZodType } from "zod";
 
 export type ChatKind = "plan" | "action";
 
 /**
- * True when the next `chat()` call would use server-managed AI.
- * Refrainly is OpenRouter-only BYOK — managed Anthropic proxy is disabled.
+ * True when the next `chat()` call would use server-managed AI
+ * (paid tier, no OpenRouter key in Settings). BYOK always wins when present.
  */
 export function willUseManagedAi(): boolean {
-  return false;
+  const creds = getCredentials();
+  if (creds.apiKey?.trim()) return false;
+  return tierDef(getCachedSubscriptionTier()).managedAi;
 }
 
 export {
   clearSessionPreferredModel,
 } from "@/lib/providers/openrouter";
 
+async function chatManaged(
+  req: Omit<ChatRequest, "prompt"> & { prompt: string; kind?: ChatKind },
+): Promise<string> {
+  const res = await fetch("/api/ai", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    signal: req.signal,
+    body: JSON.stringify({
+      prompt: req.prompt,
+      system: req.system,
+      maxTokens: req.maxTokens,
+      temperature: req.temperature,
+      kind: req.kind || "action",
+      structured: req.structured || undefined,
+    }),
+  });
+  const data = (await res.json().catch(() => null)) as {
+    text?: string;
+    error?: string;
+  } | null;
+  if (!res.ok) {
+    const message = data?.error || `Managed AI request failed (${res.status}).`;
+    if (res.status === 401 || res.status === 402 || res.status === 429) {
+      throw new SubscriptionError(message, res.status);
+    }
+    throw new ProviderError(message, "http");
+  }
+  if (!data?.text?.trim()) {
+    throw new ProviderError("Empty response from managed AI.", "http");
+  }
+  return data.text;
+}
+
 /**
- * Chat through OpenRouter using the key from Settings.
- * If the selected model is free (or fails), tries other free models, then
- * cheap paid models. Account-wide free daily caps skip remaining free models.
+ * Chat through OpenRouter — BYOK key from Settings, or the server-managed
+ * OpenRouter proxy (`/api/ai`) for Operator/Architect when no key is set.
+ * BYOK failover: free models → cheap paid models when the primary fails.
  */
 export async function chat(
   req: Omit<ChatRequest, "prompt"> & { prompt: string; kind?: ChatKind },
 ): Promise<string> {
+  if (willUseManagedAi()) {
+    return chatManaged(req);
+  }
+
   const creds = getCredentials();
   const provider = getProvider("openrouter");
 
   if (!creds.apiKey?.trim()) {
-    throw new AuthError("Add your OpenRouter API key in Settings.");
+    throw new AuthError(
+      "Add your OpenRouter API key in Settings, or upgrade to Operator/Architect for managed AI.",
+    );
   }
 
   const primary = creds.model || provider.models[0];

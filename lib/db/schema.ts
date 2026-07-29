@@ -18,6 +18,8 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   subscriptionTier: text("subscription_tier").notNull().default("free"),
   subscriptionStatus: text("subscription_status").notNull().default("active"),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
   planGenerationsUsed: integer("plan_generations_used").notNull().default(0),
   aiActionsUsed: integer("ai_actions_used").notNull().default(0),
   usagePeriodStart: timestamp("usage_period_start", { withTimezone: true }).notNull().defaultNow(),

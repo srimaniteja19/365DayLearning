@@ -21,6 +21,7 @@ import {
   SUBSCRIPTION_TIERS,
   TIER_ORDER,
   fetchSubscriptionStatus,
+  openBillingPortal,
   requestUpgrade,
 } from "@/lib/subscriptions";
 import { parseJsonText } from "@/lib/stripFences";
@@ -898,15 +899,29 @@ function PricingPanel({ onClose, onOpenAccount }) {
     setNotice(null);
     const result = await requestUpgrade(tierId);
     setPendingTier(null);
-    setNotice(result.error || "Upgraded!");
+    if (result.ok && result.url) {
+      window.location.href = result.url;
+      return;
+    }
+    setNotice(result.error || "Could not start checkout.");
+  };
+
+  const handlePortal = async () => {
+    setNotice(null);
+    const result = await openBillingPortal();
+    if (result.ok && result.url) {
+      window.location.href = result.url;
+      return;
+    }
+    setNotice(result.error || "Could not open billing portal.");
   };
 
   return (
     <div className="pricing-panel">
       <div className="pricing-intro">
         <p className="pricing-intro-lead">
-          AI runs on your OpenRouter key today — unlimited on Recruit. Operator and Architect
-          will add managed AI with monthly quotas once checkout ships.
+          Recruit is free with your OpenRouter key. Operator and Architect unlock managed AI
+          with monthly quotas — checkout via Stripe, invoices included.
         </p>
       </div>
 
@@ -999,6 +1014,11 @@ function PricingPanel({ onClose, onOpenAccount }) {
             <div className="pricing-usage-reset">
               Recruit · unlimited on your OpenRouter key
             </div>
+          )}
+          {usage.tier !== "free" && (
+            <button type="button" className="pricing-card-btn" onClick={handlePortal}>
+              Manage billing &amp; invoices
+            </button>
           )}
         </div>
       )}
