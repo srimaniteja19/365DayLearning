@@ -201,7 +201,7 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
   };
 
   return (
-    <div className="learned-view" style={{ "--accent": accent }}>
+    <div className="learned-view ops-view-enter" style={{ "--accent": accent }}>
       <header className="learned-mast">
         <div className="learned-mast-copy">
           <div className="learned-kicker">

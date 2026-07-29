@@ -722,19 +722,19 @@ export function HomeView({
 
       {hasCampaign && summary && (
         <section className="landing-stats" aria-label="Your progress">
-          <div className="landing-stat">
+          <div className="landing-stat" style={{ "--i": 0 }}>
             <span className="landing-stat-val">{summary.streak}</span>
             <span className="landing-stat-label">day streak</span>
           </div>
-          <div className="landing-stat">
+          <div className="landing-stat" style={{ "--i": 1 }}>
             <span className="landing-stat-val">{summary.xp.toLocaleString()}</span>
             <span className="landing-stat-label">XP</span>
           </div>
-          <div className="landing-stat">
+          <div className="landing-stat" style={{ "--i": 2 }}>
             <span className="landing-stat-val">LV {summary.level}</span>
             <span className="landing-stat-label">{summary.rank}</span>
           </div>
-          <div className="landing-stat">
+          <div className="landing-stat" style={{ "--i": 3 }}>
             <span className="landing-stat-val">
               {summary.daysComplete}/{summary.totalDays}
             </span>
@@ -1577,6 +1577,7 @@ export function ConsoleView({ campaign, days, progress, onToggle, expandedDay, s
       <div
         className={classNames(
           "console-view",
+          "ops-view-enter",
           layout === "list" && "console-list",
           layout === "bento" && "console-bento",
           layout === "timeline" && "console-timeline",
@@ -1999,13 +2000,36 @@ function DomainTag({ domain }) {
   );
 }
 
+function OpsEmpty({
+  title,
+  copy,
+  stamp,
+  inline = false,
+  className,
+}: {
+  title: string;
+  copy: string;
+  stamp?: string;
+  inline?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={classNames("ops-empty", inline && "ops-empty-inline", className)}>
+      <span className="ops-empty-mark" aria-hidden="true" />
+      <div className="ops-empty-title">{title}</div>
+      <p className="ops-empty-copy">{copy}</p>
+      {stamp ? <span className="ops-empty-stamp">{stamp}</span> : null}
+    </div>
+  );
+}
+
 function EmptyState() {
   return (
-    <div className="empty-state">
-      <Icon.Search size={28} />
-      <div className="empty-state-title">No matching transmissions</div>
-      <div className="empty-state-sub">Try a different search term or clear the domain filter.</div>
-    </div>
+    <OpsEmpty
+      stamp="SCAN"
+      title="No matching transmissions"
+      copy="Try a different search term or clear the domain filter."
+    />
   );
 }
 
@@ -2014,7 +2038,7 @@ export function GridView({ campaign, days, progress, isDayComplete, topicsDoneCo
   const completeCount = days.filter((d) => isDayComplete(d)).length;
   const notedCount = days.filter((d) => notes[d.id]).length;
   return (
-    <div className="grid-view">
+    <div className="grid-view ops-view-enter">
       <section className="grid-ops" style={{ "--accent": campaign.accent }} aria-label="Day completion grid">
         <div className="grid-ops-mast">
           <div className="grid-ops-mast-text">
@@ -2035,52 +2059,62 @@ export function GridView({ campaign, days, progress, isDayComplete, topicsDoneCo
             </span>
           </div>
         </div>
-        <div className="heatmap">
-          {days.map((day) => {
-            const done = topicsDoneCount(day);
-            const complete = isDayComplete(day);
-            const level = done === 0 ? 0 : done === day.topics.length ? 2 : 1;
-            return (
-              <Tip
-                key={day.id}
-                content={
-                  <>
-                    <strong>Day {day.day}</strong> · {done}/{day.topics.length} topics
-                    {complete ? " · cleared" : ""}
-                    {notes[day.id] ? " · has notes" : ""}
-                    <br />
-                    {day.topics.join(" · ")}
-                  </>
-                }
-                stamp={complete ? "DONE" : done ? "WIP" : "DAY"}
-                tone={complete ? "mint" : done ? "lemon" : "ink"}
-                side="top"
-                maxWidth={280}
-                delay={180}
-              >
-                <button
-                  type="button"
-                  className={classNames("heat-cell", `heat-level-${level}`)}
-                  onClick={() => onOpenDay(day)}
-                >
-                  <span className="heat-cell-num">{day.day}</span>
-                  {complete && <span className="heat-cell-check"><Icon.Check size={9} /></span>}
-                  {notes[day.id] && <span className="heat-cell-note" />}
-                </button>
-              </Tip>
-            );
-          })}
-        </div>
-        <div className="heat-legend">
-          <span className="heat-legend-label">Less</span>
-          <span className="heat-cell heat-level-0 heat-legend-swatch" />
-          <span className="heat-cell heat-level-1 heat-legend-swatch" />
-          <span className="heat-cell heat-level-2 heat-legend-swatch" />
-          <span className="heat-legend-label">More</span>
-          <span className="heat-legend-key">
-            <span className="heat-cell-note heat-legend-note" /> notes
-          </span>
-        </div>
+        {days.length === 0 ? (
+          <OpsEmpty
+            stamp="MAP"
+            title="No days in range"
+            copy="Widen the time slice or clear filters to populate the grid."
+          />
+        ) : (
+          <>
+            <div className="heatmap">
+              {days.map((day) => {
+                const done = topicsDoneCount(day);
+                const complete = isDayComplete(day);
+                const level = done === 0 ? 0 : done === day.topics.length ? 2 : 1;
+                return (
+                  <Tip
+                    key={day.id}
+                    content={
+                      <>
+                        <strong>Day {day.day}</strong> · {done}/{day.topics.length} topics
+                        {complete ? " · cleared" : ""}
+                        {notes[day.id] ? " · has notes" : ""}
+                        <br />
+                        {day.topics.join(" · ")}
+                      </>
+                    }
+                    stamp={complete ? "DONE" : done ? "WIP" : "DAY"}
+                    tone={complete ? "mint" : done ? "lemon" : "ink"}
+                    side="top"
+                    maxWidth={280}
+                    delay={180}
+                  >
+                    <button
+                      type="button"
+                      className={classNames("heat-cell", `heat-level-${level}`)}
+                      onClick={() => onOpenDay(day)}
+                    >
+                      <span className="heat-cell-num">{day.day}</span>
+                      {complete && <span className="heat-cell-check"><Icon.Check size={9} /></span>}
+                      {notes[day.id] && <span className="heat-cell-note" />}
+                    </button>
+                  </Tip>
+                );
+              })}
+            </div>
+            <div className="heat-legend">
+              <span className="heat-legend-label">Less</span>
+              <span className="heat-cell heat-level-0 heat-legend-swatch" />
+              <span className="heat-cell heat-level-1 heat-legend-swatch" />
+              <span className="heat-cell heat-level-2 heat-legend-swatch" />
+              <span className="heat-legend-label">More</span>
+              <span className="heat-legend-key">
+                <span className="heat-cell-note heat-legend-note" /> notes
+              </span>
+            </div>
+          </>
+        )}
       </section>
     </div>
   );
@@ -2099,7 +2133,7 @@ export function ReviewView({ queue, srs, notes, scheduledCount, onGrade, onOpenD
       .sort((a, b) => a[1].due - b[1].due)[0];
     const graduated = Object.values(srs).filter((e) => e && e.graduated).length;
     return (
-      <div className="review-view">
+      <div className="review-view ops-view-enter">
         <div className="review-ops">
           <div className="review-ops-mast">
             <span className="review-ops-title">Review queue</span>
@@ -2133,7 +2167,7 @@ export function ReviewView({ queue, srs, notes, scheduledCount, onGrade, onOpenD
   };
 
   return (
-    <div className="review-view">
+    <div className="review-view ops-view-enter">
       <div className="review-ops">
         <div className="review-ops-mast">
           <div className="review-ops-mast-text">
@@ -2297,7 +2331,7 @@ export function WeeklyView({ log, notes, progress, srs, campaigns, activeCampaig
   const maxCount = Math.max(1, ...byDay.map((b) => b.count));
 
   return (
-    <div className="weekly-view">
+    <div className="weekly-view ops-view-enter">
       <div className="log-ops-mast">
         <span className="log-ops-title">Weekly</span>
         <span className="log-ops-sub">Last 7 days · pulse · open questions</span>
@@ -2343,7 +2377,14 @@ export function WeeklyView({ log, notes, progress, srs, campaigns, activeCampaig
             <div className="log-panel-title">Domains touched</div>
           </div>
           <div className="log-panel-body">
-            {domainTally.length === 0 && <div className="weekly-empty">Nothing completed in the last 7 days.</div>}
+            {domainTally.length === 0 && (
+              <OpsEmpty
+                inline
+                stamp="IDLE"
+                title="No sectors yet"
+                copy="Nothing completed in the last 7 days."
+              />
+            )}
             {domainTally.map(([dom, count]) => {
               const meta = DOMAIN_META[dom] || DOMAIN_META["systems-eng"];
               const color = domainColors[dom] || domainColors["systems-eng"];
@@ -2375,7 +2416,12 @@ export function WeeklyView({ log, notes, progress, srs, campaigns, activeCampaig
           </div>
           <div className="log-panel-body">
             {openQuestions.length === 0 && (
-              <div className="weekly-empty">Nothing flagged. Lines with a question mark or TODO show up here.</div>
+              <OpsEmpty
+                inline
+                stamp="CLEAR"
+                title="No open flags"
+                copy="Lines with a question mark or TODO in your notes show up here."
+              />
             )}
             {openQuestions.map((q, i) => (
               <button key={i} className="question-row" onClick={() => dayById[q.id] && onOpenDay(dayById[q.id])}>
@@ -2395,7 +2441,14 @@ export function WeeklyView({ log, notes, progress, srs, campaigns, activeCampaig
             <div className="log-panel-title">Next up in {campaign.name}</div>
           </div>
           <div className="log-panel-body">
-            {upcoming.length === 0 && <div className="weekly-empty">Campaign complete.</div>}
+            {upcoming.length === 0 && (
+              <OpsEmpty
+                inline
+                stamp="DONE"
+                title="Campaign complete"
+                copy="Every day in this plan is cleared. Start a new mission when you're ready."
+              />
+            )}
             {upcoming.map((d) => (
               <button key={d.id} className="question-row" onClick={() => onOpenDay(d)}>
                 <span className="question-day">Day {d.day}</span>
@@ -2452,7 +2505,7 @@ export function LogView({ campaign, stats, progress, notes }) {
         : "Period velocity";
 
   return (
-    <div className="log-view" style={{ "--accent": campaign.accent }}>
+    <div className="log-view ops-view-enter" style={{ "--accent": campaign.accent }}>
       <div className="log-ops-mast">
         <span className="log-ops-title">Analytics</span>
         <span className="log-ops-sub">Domain coverage · velocity · campaign readout</span>
@@ -2473,6 +2526,14 @@ export function LogView({ campaign, stats, progress, notes }) {
             <div className="log-panel-title">Domain coverage</div>
           </div>
           <div className="log-panel-body">
+            {domainRows.length === 0 && (
+              <OpsEmpty
+                inline
+                stamp="VOID"
+                title="No domain data"
+                copy="Complete topics to build coverage bars for each sector."
+              />
+            )}
             {domainRows.map(([dom, t]) => {
               const meta = DOMAIN_META[dom] || DOMAIN_META["systems-eng"];
               const color = domainColors[dom] || domainColors["systems-eng"];
@@ -2501,7 +2562,12 @@ export function LogView({ campaign, stats, progress, notes }) {
           </div>
           <div className="log-panel-body">
             {buckets.length === 0 && (
-              <div className="weekly-empty">No period buckets on this plan.</div>
+              <OpsEmpty
+                inline
+                stamp="TEMPO"
+                title="No period buckets"
+                copy="This plan has no month or week scopes to chart velocity against."
+              />
             )}
             {buckets.map((b) => (
               <div key={b.label} className="log-bar-row">

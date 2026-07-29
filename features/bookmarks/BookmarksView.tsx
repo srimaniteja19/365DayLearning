@@ -160,7 +160,7 @@ export function BookmarksView({ bookmarks, onAdd, onUpdate, onRemove, accent, fi
   };
 
   return (
-    <div className="bm-view" style={{ "--accent": accent }}>
+    <div className="bm-view ops-view-enter" style={{ "--accent": accent }}>
       <header className="bm-head">
         <div className="bm-head-copy">
           <div className="bm-kicker">
@@ -237,10 +237,17 @@ export function BookmarksView({ bookmarks, onAdd, onUpdate, onRemove, accent, fi
       )}
 
       {groups.length === 0 && (
-        <div className="bm-empty">
-          {query.trim()
-            ? "No bookmarks match that search."
-            : "Paste a link above — it’ll land on a sticky in its category."}
+        <div className="ops-empty bm-empty">
+          <span className="ops-empty-mark" aria-hidden="true" />
+          <div className="ops-empty-title">
+            {query.trim() ? "No matches" : "Board is clear"}
+          </div>
+          <p className="ops-empty-copy">
+            {query.trim()
+              ? "No bookmarks match that search. Try another term or clear Find."
+              : "Paste a link above — it’ll land on a sticky in its category."}
+          </p>
+          <span className="ops-empty-stamp">{query.trim() ? "SCAN" : "PIN"}</span>
         </div>
       )}
 

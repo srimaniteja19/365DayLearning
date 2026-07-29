@@ -99,10 +99,21 @@ export const metadata: Metadata = {
     "365 day challenge",
     "roadmap",
   ],
+  appleWebApp: {
+    capable: true,
+    title: "Refrainly",
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0C1116",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#EEF2F6" },
+    { media: "(prefers-color-scheme: dark)", color: "#0C1116" },
+  ],
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
