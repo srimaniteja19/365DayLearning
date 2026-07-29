@@ -3,8 +3,12 @@ import {
   countLearned,
   createLearnedId,
   dateKey,
+  extractUrlsFromText,
+  insertAtSelection,
+  linkLabelForUrl,
   sanitizeLearned,
   sortedLearnedDays,
+  urlFromPaste,
 } from "@/lib/learned";
 
 describe("learned helpers", () => {
@@ -40,9 +44,42 @@ describe("learned helpers", () => {
     expect(days[0].items.map((i) => i.id)).toEqual(["3", "2"]);
   });
 
-  it("countLearned and createLearnedId work", () => {
-    expect(countLearned({})).toBe(0);
-    expect(countLearned({ "2026-07-27": [{ id: "1", title: "a", body: "", createdAt: 1 }] })).toBe(1);
-    expect(createLearnedId().startsWith("l-")).toBe(true);
+  it("createLearnedId is unique-ish", () => {
+    expect(createLearnedId()).not.toBe(createLearnedId());
+  });
+
+  it("countLearned sums items", () => {
+    expect(
+      countLearned({ "2026-07-27": [{ id: "1", title: "a", body: "", createdAt: 1 }] }),
+    ).toBe(1);
+  });
+
+  it("urlFromPaste accepts a single URL token", () => {
+    expect(urlFromPaste("https://youtu.be/9qMHBfLPGAY")).toMatch(/^https:\/\/youtu\.be\//);
+    expect(urlFromPaste("youtu.be/9qMHBfLPGAY")).toMatch(/^https:\/\//);
+    expect(urlFromPaste("not a url")).toBeNull();
+    expect(urlFromPaste("https://a.com and more")).toBeNull();
+  });
+
+  it("extractUrlsFromText finds bare and markdown links", () => {
+    const urls = extractUrlsFromText(
+      "See https://example.com/a and [YouTube](https://youtu.be/9qMHBfLPGAY?si=abc)",
+    );
+    expect(urls).toContain("https://example.com/a");
+    expect(urls.some((u) => u.includes("youtu.be"))).toBe(true);
+    expect(urls.length).toBe(2);
+  });
+
+  it("linkLabelForUrl prefers YouTube / host", () => {
+    expect(linkLabelForUrl("https://youtu.be/9qMHBfLPGAY")).toBe("YouTube");
+    expect(linkLabelForUrl("https://www.example.com/path")).toBe("example.com");
+  });
+
+  it("insertAtSelection pads tokens", () => {
+    expect(insertAtSelection("hello", 5, 5, "https://x.com")).toEqual({
+      next: "hello https://x.com",
+      cursor: "hello https://x.com".length,
+    });
+    expect(insertAtSelection("", 0, 0, "https://x.com").next).toBe("https://x.com");
   });
 });

@@ -9,9 +9,17 @@ import { formatAiError } from "@/lib/providers/errors";
 import {
   createLearnedId,
   dateKey,
+  extractUrlsFromText,
   formatLearnedDate,
+  insertAtSelection,
+  linkLabelForUrl,
   sortedLearnedDays,
+  urlFromPaste,
 } from "@/lib/learned";
+import {
+  hostnameOf,
+  seedPreviewFromUrl,
+} from "@/lib/bookmarks";
 import { MiniMarkdown } from "@/features/ui/Views";
 
 const SLIP_TONES = ["lemon", "coral", "mint", "sky", "blush", "butter", "lilac", "seafoam"];
@@ -114,14 +122,73 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
   const [query, setQuery] = useState("");
   const [expandedId, setExpandedId] = useState(null);
   const [insightBusy, setInsightBusy] = useState(null);
+  const [linkPreviews, setLinkPreviews] = useState({});
   const taRef = useRef(null);
+
+  const bodyUrls = useMemo(() => extractUrlsFromText(body), [body]);
 
   useEffect(() => {
     const el = taRef.current;
     if (!el || preview) return;
     el.style.height = "auto";
-    el.style.height = Math.max(120, el.scrollHeight) + "px";
+    el.style.height = Math.max(88, Math.min(220, el.scrollHeight)) + "px";
   }, [body, preview]);
+
+  // Seed + enrich link previews for URLs in notes.
+  useEffect(() => {
+    if (bodyUrls.length === 0) {
+      setLinkPreviews({});
+      return;
+    }
+    setLinkPreviews((prev) => {
+      const next = {};
+      bodyUrls.forEach((url) => {
+        next[url] = prev[url] || seedPreviewFromUrl(url);
+      });
+      return next;
+    });
+
+    const ac = new AbortController();
+    (async () => {
+      for (const url of bodyUrls) {
+        if (ac.signal.aborted) return;
+        try {
+          const res = await fetch("/api/bookmarks/preview", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url }),
+            signal: ac.signal,
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data?.preview) continue;
+          setLinkPreviews((prev) => ({
+            ...prev,
+            [url]: { ...(prev[url] || seedPreviewFromUrl(url)), ...data.preview },
+          }));
+        } catch {
+          /* keep seed */
+        }
+      }
+    })();
+    return () => ac.abort();
+  }, [bodyUrls]);
+
+  const onPasteNotes = (e) => {
+    const pasted = e.clipboardData?.getData("text") || "";
+    const url = urlFromPaste(pasted);
+    if (!url) return;
+    e.preventDefault();
+    const ta = taRef.current;
+    const start = ta?.selectionStart ?? body.length;
+    const end = ta?.selectionEnd ?? body.length;
+    const { next, cursor } = insertAtSelection(body, start, end, url);
+    setBody(next);
+    requestAnimationFrame(() => {
+      if (!taRef.current) return;
+      taRef.current.focus();
+      taRef.current.setSelectionRange(cursor, cursor);
+    });
+  };
 
   const days = useMemo(() => {
     const all = sortedLearnedDays(learned);
@@ -292,9 +359,63 @@ export function LearnedView({ learned, onAdd, onUpdate, onRemove, accent, fireTo
               className="note-input learned-body-input"
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              placeholder={"Markdown welcome…\n\n- Key idea\n- Link: https://…\n- Or [named link](https://…)"}
+              onPaste={onPasteNotes}
+              placeholder={"Paste a link or jot a note…\n\n- Key idea\n- https://… becomes a clickable link"}
               spellCheck="true"
             />
+          )}
+          {bodyUrls.length > 0 && (
+            <div className="learned-link-rack" aria-label="Detected links">
+              {bodyUrls.map((url) => {
+                const previewData = linkPreviews[url] || seedPreviewFromUrl(url);
+                const label =
+                  previewData.title ||
+                  previewData.siteName ||
+                  linkLabelForUrl(url);
+                const host = previewData.siteName || hostnameOf(url);
+                const yt = previewData.embedProvider === "youtube" && previewData.embedId;
+                return (
+                  <a
+                    key={url}
+                    className="learned-link-chip"
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {previewData.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        className="learned-link-thumb"
+                        src={previewData.image}
+                        alt=""
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : previewData.favicon ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        className="learned-link-favicon"
+                        src={previewData.favicon}
+                        alt=""
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <span className="learned-link-mark" aria-hidden="true" />
+                    )}
+                    <span className="learned-link-copy">
+                      <span className="learned-link-title">{label}</span>
+                      <span className="learned-link-host">{host}</span>
+                    </span>
+                    {yt ? (
+                      <span className="learned-link-stamp">YT</span>
+                    ) : (
+                      <span className="learned-link-stamp">OPEN</span>
+                    )}
+                  </a>
+                );
+              })}
+            </div>
           )}
         </div>
 

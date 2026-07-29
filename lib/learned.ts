@@ -1,4 +1,11 @@
 import type { LearnedItem, LearnedMap } from "@/lib/types";
+import {
+  defaultTitleForUrl,
+  extractVimeoId,
+  extractYoutubeId,
+  hostnameOf,
+  normalizeBookmarkUrl,
+} from "@/lib/bookmarks";
 
 /** Local calendar date as `YYYY-MM-DD`. */
 export function dateKey(d: Date = new Date()): string {
@@ -66,4 +73,67 @@ export function sanitizeLearned(raw: unknown): LearnedMap {
     if (items.length) out[key] = items;
   }
   return out;
+}
+
+const BARE_URL_RE = /https?:\/\/[^\s<>'"\]]+/gi;
+const MD_LINK_RE = /\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/gi;
+
+/** Friendly label for a URL (YouTube, host, etc.). */
+export function linkLabelForUrl(url: string): string {
+  if (extractYoutubeId(url)) return "YouTube";
+  if (extractVimeoId(url)) return "Vimeo";
+  return hostnameOf(url) || defaultTitleForUrl(url) || "Link";
+}
+
+/**
+ * If clipboard text is a single URL (with optional scheme), return the
+ * normalized absolute URL. Otherwise null — leave paste alone.
+ */
+export function urlFromPaste(raw: string): string | null {
+  const trimmed = String(raw || "").trim();
+  if (!trimmed || /\s/.test(trimmed)) return null;
+  return normalizeBookmarkUrl(trimmed);
+}
+
+/** Unique http(s) URLs from notes — bare URLs and markdown links. */
+export function extractUrlsFromText(text: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const add = (raw: string) => {
+    const cleaned = String(raw || "").replace(/[.,;:!?)]+$/g, "");
+    const n = normalizeBookmarkUrl(cleaned);
+    if (!n || seen.has(n)) return;
+    seen.add(n);
+    out.push(n);
+  };
+
+  MD_LINK_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = MD_LINK_RE.exec(text)) !== null) add(m[2]);
+
+  BARE_URL_RE.lastIndex = 0;
+  while ((m = BARE_URL_RE.exec(text)) !== null) add(m[0]);
+
+  return out;
+}
+
+/**
+ * Insert `insert` at [start, end) in `value`, padding with spaces when needed
+ * so the URL stays a discrete token.
+ */
+export function insertAtSelection(
+  value: string,
+  start: number,
+  end: number,
+  insert: string,
+): { next: string; cursor: number } {
+  const before = value.slice(0, Math.max(0, start));
+  const after = value.slice(Math.max(end, start));
+  const padBefore = before && !/\s$/.test(before) ? " " : "";
+  const padAfter = after && !/^\s/.test(after) ? " " : "";
+  const chunk = `${padBefore}${insert}${padAfter}`;
+  return {
+    next: before + chunk + after,
+    cursor: before.length + chunk.length,
+  };
 }
