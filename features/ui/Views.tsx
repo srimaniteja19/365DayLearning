@@ -7,11 +7,12 @@ import DOMAIN_META from "@/data/domains.json";
 import { Icon } from "@/components/Icon";
 import { classNames } from "@/lib/classNames";
 import { ThemeCtx, useDomainColor } from "@/theme/ThemeContext";
-import { THEMES, THEME_ORDER, hexToRgba } from "@/theme/themes";
+import { THEMES, THEME_ORDER, hexToRgba, resolveThemeKey } from "@/theme/themes";
 import {
   DEFAULT_FONT_KEY,
   FONT_ORDER,
   FONT_PACKS,
+  resolveFontKey,
 } from "@/theme/fonts";
 import { callClaude } from "@/lib/claude-client";
 import {
@@ -89,7 +90,8 @@ export function SaveIndicator({ status, compact = false }) {
 export function ThemePicker({ themeKey, setThemeKey }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
-  const current = THEMES[themeKey];
+  const resolved = resolveThemeKey(themeKey);
+  const current = THEMES[resolved];
 
   useEffect(() => {
     if (!open) return;
@@ -126,7 +128,7 @@ export function ThemePicker({ themeKey, setThemeKey }) {
         <div className="theme-menu" role="listbox">
           {THEME_ORDER.map((k) => {
             const t = THEMES[k];
-            const isOn = k === themeKey;
+            const isOn = k === resolved;
             return (
               <button
                 key={k}
@@ -154,7 +156,8 @@ export function ThemePicker({ themeKey, setThemeKey }) {
 export function FontPicker({ fontKey, setFontKey }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
-  const current = FONT_PACKS[fontKey] || FONT_PACKS[DEFAULT_FONT_KEY];
+  const resolved = resolveFontKey(fontKey);
+  const current = FONT_PACKS[resolved];
 
   useEffect(() => {
     if (!open) return;
@@ -191,7 +194,7 @@ export function FontPicker({ fontKey, setFontKey }) {
         <div className="theme-menu font-menu" role="listbox">
           {FONT_ORDER.map((k) => {
             const pack = FONT_PACKS[k];
-            const isOn = k === fontKey;
+            const isOn = k === resolved;
             return (
               <button
                 key={k}
@@ -547,7 +550,7 @@ const LANDING_FEATURES = [
     tone: "ink",
     icon: Icon.Note,
     title: "Other things I learned",
-    copy: "A sticky-note journal for tangents — markdown, rich links, and AI-written summaries.",
+    copy: "Field notes for tangents — an evidence board of slips, markdown, and AI summaries.",
   },
   {
     id: "onthisday",
@@ -568,7 +571,7 @@ const LANDING_FEATURES = [
     tone: "pink",
     icon: Icon.Grid,
     title: "Themes & type voices",
-    copy: "Eight visual themes and uncommon font voices — including Bloom, Ledger, and Matte Black.",
+    copy: "Ten visual themes and ten type voices — Space Grotesk, Literata, JetBrains Mono, Archivo, and more.",
   },
   {
     id: "sync",
@@ -804,44 +807,79 @@ export function HomeView({
 export function CampaignHero({ campaign, stats }) {
   const activeDay = stats.activeDay;
   return (
-    <div className="hero" style={{ "--accent": campaign.accent, "--glow": campaign.glow }}>
-      <div className="hero-left">
-        <div className="hero-eyebrow">ACTIVE CAMPAIGN</div>
-        <h1 className="hero-title">{campaign.name}</h1>
-        <p className="hero-sub">{campaign.subtitle}</p>
-        <div className="hero-ring-row">
-          <ProgressRing pct={stats.pct} accent={campaign.accent} />
-          <div className="hero-metrics">
-            <Metric label="Days Complete" value={`${stats.daysComplete} / ${stats.totalDays}`} />
-            <Metric label="Topics Mastered" value={`${stats.doneTopics} / ${stats.totalTopics}`} />
-            <Metric label="Current Streak" value={`${stats.streak} ${stats.streak === 1 ? "day" : "days"}`} icon={stats.streak > 0 ? <Icon.Flame size={14} /> : null} />
+    <header className="hero" style={{ "--accent": campaign.accent, "--glow": campaign.glow }}>
+      <div className="hero-mast">
+        <div className="hero-kicker">
+          <span className="hero-kicker-mark" aria-hidden="true" />
+          <span>Field log · active campaign</span>
+        </div>
+        <div className="hero-mast-row">
+          <div className="hero-identity">
+            <h1 className="hero-title">{campaign.name}</h1>
+            <p className="hero-sub">{campaign.subtitle}</p>
           </div>
+          <div className="hero-pct-block" aria-label={`${stats.pct} percent complete`}>
+            <span className="hero-pct-num">{stats.pct}</span>
+            <span className="hero-pct-unit">%</span>
+          </div>
+        </div>
+        <BulletTrack pct={stats.pct} />
+        <div className="hero-statstrip" role="list">
+          <Metric label="Days" value={`${stats.daysComplete}/${stats.totalDays}`} />
+          <Metric label="Topics" value={`${stats.doneTopics}/${stats.totalTopics}`} />
+          <Metric
+            label="Streak"
+            value={`${stats.streak}d`}
+            icon={stats.streak > 0 ? <Icon.Flame size={13} /> : null}
+          />
         </div>
       </div>
       {activeDay && (
-        <div className="hero-right">
+        <aside className="hero-dispatch">
+          <div className="hero-dispatch-frame" aria-hidden="true" />
           <div className="next-mission-label">
-            <Icon.Target size={13} /> NEXT MISSION
+            <Icon.Target size={13} />
+            <span>Next dispatch</span>
+            <span className="next-mission-day">Day {String(activeDay.day).padStart(3, "0")}</span>
           </div>
-          <div className="next-mission-card">
-            <div className="next-mission-day">DAY {activeDay.day}</div>
-            <ul className="next-mission-topics">
-              {activeDay.topics.map((t, i) => (
-                <li key={i}>{t}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
+          <ol className="next-mission-topics">
+            {activeDay.topics.map((t, i) => (
+              <li key={i}>
+                <span className="next-mission-idx">{i + 1}</span>
+                <span>{t}</span>
+              </li>
+            ))}
+          </ol>
+        </aside>
       )}
-    </div>
+    </header>
   );
 }
 
 export function Metric({ label, value, icon }) {
   return (
-    <div className="metric">
-      <div className="metric-value">{icon}{value}</div>
+    <div className="metric" role="listitem">
       <div className="metric-label">{label}</div>
+      <div className="metric-value">{icon}{value}</div>
+    </div>
+  );
+}
+
+/** Segmented progress — readable without color alone (waffle / bullet chart). */
+export function BulletTrack({ pct, segments = 20 }) {
+  const filled = Math.round((Math.min(100, Math.max(0, pct)) / 100) * segments);
+  return (
+    <div
+      className="bullet-track"
+      role="img"
+      aria-label={`${pct}% complete`}
+    >
+      {Array.from({ length: segments }, (_, i) => (
+        <span
+          key={i}
+          className={classNames("bullet-seg", i < filled && "bullet-seg-on")}
+        />
+      ))}
     </div>
   );
 }
@@ -856,9 +894,9 @@ export function ProgressRing({ pct, accent }) {
         <circle cx="52" cy="52" r={r} fill="none" stroke="var(--track)" strokeWidth="7" />
         <circle
           cx="52" cy="52" r={r} fill="none" stroke={accent} strokeWidth="7"
-          strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
+          strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="square"
           transform="rotate(-90 52 52)"
-          style={{ transition: "stroke-dashoffset 0.6s cubic-bezier(.4,0,.2,1)" }}
+          style={{ transition: "stroke-dashoffset 0.35s ease-out" }}
         />
       </svg>
       <div className="progress-ring-label">{pct}%</div>
@@ -1242,9 +1280,9 @@ export function DomainLegend({ tally, active, setActive, accent }) {
 /* ============================== CONSOLE VIEW ============================== */
 const CONSOLE_LAYOUT_KEY = "dualtrack:console-layout";
 const CONSOLE_LAYOUTS = [
-  { key: "list", label: "List", hint: "Classic day rows", Icon: Icon.List },
-  { key: "bento", label: "Bento", hint: "Soft tile grid", Icon: Icon.LayoutDashboard },
-  { key: "timeline", label: "Mission", hint: "Vertical timeline spine", Icon: Icon.Path },
+  { key: "list", label: "List", hint: "Dense day rows", Icon: Icon.List },
+  { key: "bento", label: "Index", hint: "Asymmetric day cards", Icon: Icon.LayoutDashboard },
+  { key: "timeline", label: "Spine", hint: "Alternating mission spine", Icon: Icon.Path },
 ];
 
 function readConsoleLayout() {
@@ -1468,7 +1506,7 @@ function DayRow({
           {notes[day.id] && (
             <span className="note-flag" title="This day has notes"><Icon.Note size={12} /></span>
           )}
-          {isCurrent && !complete && <span className="current-pill">Today</span>}
+          {isCurrent && !complete && <span className="current-pill">Now</span>}
           <span className="day-row-frac">{done}/{day.topics.length}</span>
           <Icon.Chevron size={14} className={classNames("chev", isExpanded && "chev-open")} />
         </span>
@@ -1539,7 +1577,7 @@ function DayTile({
         "--tile-b": colorB,
       }}
     >
-      <div className="day-tile-glow" aria-hidden="true" />
+      <div className="day-tile-rule" aria-hidden="true" />
 
       <button
         type="button"
@@ -1549,14 +1587,14 @@ function DayTile({
       >
         <div className="day-tile-top">
           <span className={classNames("day-tile-num", complete && "day-tile-num-done", isCurrent && !complete && "day-tile-num-current")}>
-            {isCurrent && !complete && <span className="day-tile-live" aria-hidden="true" />}
             {complete ? (
-              <Icon.Check size={14} />
+              <Icon.Check size={13} />
             ) : (
               <span className="day-num-text">{String(day.day).padStart(3, "0")}</span>
             )}
           </span>
           <div className="day-tile-meta">
+            {isCurrent && !complete && <span className="current-pill">Now</span>}
             {noteMatch && (
               <span className="note-match" title="Matched inside your notes">
                 note
@@ -1567,7 +1605,6 @@ function DayTile({
                 <Icon.Note size={12} />
               </span>
             )}
-            {isCurrent && !complete && <span className="current-pill">Today</span>}
             <span className="day-tile-frac">
               {done}/{day.topics.length}
             </span>
@@ -1590,7 +1627,7 @@ function DayTile({
           {extraCount > 0 && <li className="day-tile-more">+{extraCount} more</li>}
         </ul>
 
-        <div className="day-tile-progress" aria-hidden="true">
+        <div className="day-tile-progress" aria-hidden="true" title={`${pct}%`}>
           <div className="day-tile-progress-fill" style={{ width: `${pct}%` }} />
         </div>
       </button>
@@ -1677,11 +1714,11 @@ function DayMission({
           <div className="mission-card-top">
             <span className="mission-card-label">Day {String(day.day).padStart(3, "0")}</span>
             <div className="mission-card-meta">
+              {isCurrent && !complete && <span className="current-pill">Now</span>}
               {noteMatch && <span className="note-match">note</span>}
               {notes[day.id] && (
                 <span className="note-flag" title="This day has notes"><Icon.Note size={12} /></span>
               )}
-              {isCurrent && !complete && <span className="current-pill">Today</span>}
               <span className="mission-card-frac">{done}/{day.topics.length}</span>
             </div>
           </div>

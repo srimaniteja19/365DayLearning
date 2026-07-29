@@ -31,7 +31,7 @@ describe("schema migration guard", () => {
       needsSchemaMigration({
         schemaVersion: SCHEMA_VERSION,
         activePlanId: BUILTIN_365_ID,
-        themeKey: "terminal",
+        themeKey: "ion",
         hiddenPlanIds: [],
       }),
     ).toBe(false);
@@ -69,7 +69,7 @@ describe("loadAppSnapshot migration runs once", () => {
     expect(first!.userdata.progress["builtin-365:12"]).toEqual({ 0: true });
     expect(first!.userdata.notes["builtin-45:3"]).toBe("note");
     expect(first!.userdata.progress["365-12"]).toBeUndefined();
-    expect(first!.meta.themeKey).toBe("ledger");
+    expect(first!.meta.themeKey).toBe("folio");
 
     // Mutate stored userdata to a new key that must not be rewritten on second load
     const storedUser = JSON.parse((await mem.get(KEYS.userdata))!);

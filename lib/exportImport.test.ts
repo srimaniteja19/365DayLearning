@@ -56,7 +56,7 @@ function slice(partial: Partial<AppDataSlice> = {}): AppDataSlice {
     srs: {},
     log: [{ d: "plan-a:1", i: 0, at: 1 }],
     learned: {},
-    themeKey: "bloom",
+    themeKey: "signal",
     activePlanId: "plan-a",
     ...partial,
   };
@@ -85,7 +85,7 @@ describe("exportPlan / exportAll", () => {
         log: [],
         learned: {},
       },
-      themeKey: "bloom",
+      themeKey: "signal",
       activePlanId: "plan-a",
     });
     const js = serializeExport(payload);
@@ -137,7 +137,7 @@ describe("detectImport + apply", () => {
       srs: {},
       log: [],
       plans: { custom: samplePlan("custom") },
-      themeKey: "matte",
+      themeKey: "matte" as never,
       activePlanId: "custom",
     };
     const next = applyFullImport(slice(), backup, "replace");
@@ -145,7 +145,7 @@ describe("detectImport + apply", () => {
     expect(next.notes).toEqual({});
     expect(next.plans.custom).toBeTruthy();
     expect(next.plans["builtin-365"]).toBeTruthy();
-    expect(next.themeKey).toBe("matte");
+    expect(next.themeKey).toBe("afterburn");
     expect(next.activePlanId).toBe("custom");
   });
 

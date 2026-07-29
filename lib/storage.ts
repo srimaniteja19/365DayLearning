@@ -8,10 +8,9 @@ import {
   type MetaState,
   type PersistedState,
   type PlansState,
-  type ThemeKey,
   type UserDataState,
 } from "@/lib/types";
-import { THEMES } from "@/theme/themes";
+import { resolveThemeKey } from "@/theme/themes";
 
 export const KEYS = {
   legacy: "dualtrack:state:v1",
@@ -29,7 +28,7 @@ function defaultMeta(overrides?: Partial<MetaState>): MetaState {
   return {
     schemaVersion: SCHEMA_VERSION,
     activePlanId: BUILTIN_365_ID,
-    themeKey: "bloom",
+    themeKey: "signal",
     hiddenPlanIds: [],
     ...overrides,
   };
@@ -101,6 +100,7 @@ export async function loadAppSnapshot(): Promise<AppSnapshot | null> {
   const needsIdMigration = needsSchemaMigration(metaRaw);
 
   const meta = defaultMeta(metaRaw || undefined);
+  meta.themeKey = resolveThemeKey(meta.themeKey);
   let plans = mergeBuiltinPlans(plansRaw);
   let userdata = userRaw ? { ...emptyUserData(), ...userRaw } : emptyUserData();
 
@@ -115,8 +115,8 @@ export async function loadAppSnapshot(): Promise<AppSnapshot | null> {
       log: [...migrated.log, ...userdata.log],
       learned: { ...migrated.learned, ...userdata.learned },
     };
-    if (legacy.themeKey && THEMES[legacy.themeKey as ThemeKey]) {
-      meta.themeKey = legacy.themeKey as ThemeKey;
+    if (legacy.themeKey) {
+      meta.themeKey = resolveThemeKey(legacy.themeKey);
     }
   } else if (needsIdMigration) {
     userdata = migrateUserData(userdata);

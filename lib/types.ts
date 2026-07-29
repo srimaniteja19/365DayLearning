@@ -63,26 +63,28 @@ export type DayEntry = PlanDay;
 export type DomainId = Domain;
 
 export type ThemeKey =
-  | "bloom"
-  | "ledger"
-  | "terminal"
-  | "pebble"
-  | "graphite"
-  | "parchment"
-  | "blueprint"
-  | "matte";
+  | "signal"
+  | "folio"
+  | "afterburn"
+  | "chlorophyll"
+  | "oxide"
+  | "ion"
+  | "cinnabar"
+  | "halide"
+  | "voltaic"
+  | "marina";
 
 export type FontKey =
-  | "syne"
-  | "fraunces"
-  | "bricolage"
-  | "instrument"
-  | "recursive"
-  | "fragment"
-  | "young"
-  | "besley"
-  | "oxanium"
-  | "bodoni";
+  | "space"
+  | "literata"
+  | "jetbrains"
+  | "archivo"
+  | "newsreader"
+  | "spacemono"
+  | "sora"
+  | "kalnia"
+  | "host"
+  | "redmono";
 
 export type ProgressMap = Record<string, Record<number, boolean>>;
 export type NotesMap = Record<string, string>;

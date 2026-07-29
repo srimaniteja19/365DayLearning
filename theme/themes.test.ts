@@ -1,10 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { THEMES, THEME_ORDER, themeVars } from "@/theme/themes";
+import {
+  THEMES,
+  THEME_ORDER,
+  themeVars,
+  resolveThemeKey,
+  DEFAULT_THEME_KEY,
+} from "@/theme/themes";
 import {
   DEFAULT_FONT_KEY,
   FONT_ORDER,
   FONT_PACKS,
   fontVars,
+  resolveFontKey,
 } from "@/theme/fonts";
 import type { ThemeKey } from "@/lib/types";
 
@@ -21,8 +28,8 @@ const REQUIRED_THEME_VARS = [
 ] as const;
 
 describe("theme tokens", () => {
-  it("ships all eight themes in THEME_ORDER", () => {
-    expect(THEME_ORDER).toHaveLength(8);
+  it("ships ten themes in THEME_ORDER", () => {
+    expect(THEME_ORDER).toHaveLength(10);
     for (const key of THEME_ORDER) {
       expect(THEMES[key]).toBeTruthy();
     }
@@ -37,8 +44,16 @@ describe("theme tokens", () => {
     }
   });
 
-  it("Ledger is light with effects off", () => {
-    const t = THEMES.ledger;
+  it("maps retired theme keys to the new set", () => {
+    expect(resolveThemeKey("bloom")).toBe("signal");
+    expect(resolveThemeKey("ledger")).toBe("folio");
+    expect(resolveThemeKey("matte")).toBe("afterburn");
+    expect(resolveThemeKey("unknown")).toBe(DEFAULT_THEME_KEY);
+    expect(resolveThemeKey("ion")).toBe("ion");
+  });
+
+  it("Folio is light with effects off", () => {
+    const t = THEMES.folio;
     expect(t.mode).toBe("light");
     expect(t.effects).toBe(false);
     const vars = themeVars(t) as Record<string, string>;
@@ -47,8 +62,8 @@ describe("theme tokens", () => {
     expect(vars["--accent"]).toBe(t.accents.main);
   });
 
-  it("Matte is dark muted with a single soft accent and no effects", () => {
-    const t = THEMES.matte;
+  it("Oxide is dark muted with effects off", () => {
+    const t = THEMES.oxide;
     expect(t.mode).toBe("dark");
     expect(t.palette).toBe("muted");
     expect(t.effects).toBe(false);
@@ -76,6 +91,14 @@ describe("font packs", () => {
       expect(vars["--display"]).toBe(pack.family);
       expect(vars["--mono"]).toBe(pack.family);
     }
+  });
+
+  it("maps retired font keys to the new set", () => {
+    expect(resolveFontKey("bricolage")).toBe("host");
+    expect(resolveFontKey("syne")).toBe("space");
+    expect(resolveFontKey("fragment")).toBe("jetbrains");
+    expect(resolveFontKey("unknown")).toBe(DEFAULT_FONT_KEY);
+    expect(resolveFontKey("sora")).toBe("sora");
   });
 
   it("avoids Inter / Roboto / system-ui stacks", () => {

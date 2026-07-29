@@ -23,97 +23,120 @@ function voice(cssVar: string, generic: string): Pick<FontPack, "family" | "sans
   return { family, sans: family, display: family, mono: family };
 }
 
+/** Default type voice — geometric ops sans. */
+export const DEFAULT_FONT_KEY: FontKey = "space";
+
 /**
- * Ten uncommon Google Font voices.
+ * Ten distinctive Google Font voices for the field-manual UI.
  * Avoids Inter, Roboto, Arial, system-ui, Open Sans, Montserrat, Poppins, etc.
  */
 export const FONT_PACKS: Record<FontKey, FontPack> = {
-  syne: {
-    key: "syne",
-    name: "Syne",
-    hint: "Angular geometric display",
-    sample: "Ag",
-    ...voice("var(--font-syne)", "sans-serif"),
+  space: {
+    key: "space",
+    name: "Space Grotesk",
+    hint: "Geometric ops sans",
+    sample: "Sg",
+    ...voice("var(--font-space)", "sans-serif"),
   },
-  fraunces: {
-    key: "fraunces",
-    name: "Fraunces",
-    hint: "Soft optical serif",
-    sample: "Qq",
-    ...voice("var(--font-fraunces)", "Georgia, serif"),
+  literata: {
+    key: "literata",
+    name: "Literata",
+    hint: "Literary book serif",
+    sample: "Ll",
+    ...voice("var(--font-literata)", "Georgia, serif"),
   },
-  bricolage: {
-    key: "bricolage",
-    name: "Bricolage",
-    hint: "Wonky workhorse grotesque",
-    sample: "Rr",
-    ...voice("var(--font-bricolage)", "sans-serif"),
-  },
-  instrument: {
-    key: "instrument",
-    name: "Instrument",
-    hint: "Sharp editorial serif",
-    sample: "Nn",
-    ...voice("var(--font-instrument)", "Georgia, serif"),
-  },
-  recursive: {
-    key: "recursive",
-    name: "Recursive",
-    hint: "Casual mono-sans hybrid",
-    sample: "Bb",
-    ...voice("var(--font-recursive)", "sans-serif"),
-  },
-  fragment: {
-    key: "fragment",
-    name: "Fragment",
-    hint: "Rare crisp monospace",
+  jetbrains: {
+    key: "jetbrains",
+    name: "JetBrains Mono",
+    hint: "Full console monospace",
     sample: "01",
-    ...voice("var(--font-fragment)", "ui-monospace, monospace"),
+    ...voice("var(--font-jetbrains)", "ui-monospace, monospace"),
   },
-  young: {
-    key: "young",
-    name: "Young Serif",
-    hint: "Friendly bookish serif",
-    sample: "Yy",
-    ...voice("var(--font-young)", "Georgia, serif"),
+  archivo: {
+    key: "archivo",
+    name: "Archivo",
+    hint: "Condensed industrial sans",
+    sample: "Aa",
+    ...voice("var(--font-archivo)", "sans-serif"),
   },
-  besley: {
-    key: "besley",
-    name: "Besley",
-    hint: "Quirky slab serif",
-    sample: "Kk",
-    ...voice("var(--font-besley)", "Georgia, serif"),
+  newsreader: {
+    key: "newsreader",
+    name: "Newsreader",
+    hint: "Press editorial serif",
+    sample: "Nn",
+    ...voice("var(--font-newsreader)", "Georgia, serif"),
   },
-  oxanium: {
-    key: "oxanium",
-    name: "Oxanium",
-    hint: "Soft sci-fi sans",
+  spacemono: {
+    key: "spacemono",
+    name: "Space Mono",
+    hint: "Brutalist raw mono",
     sample: "Xx",
-    ...voice("var(--font-oxanium)", "sans-serif"),
+    ...voice("var(--font-spacemono)", "ui-monospace, monospace"),
   },
-  bodoni: {
-    key: "bodoni",
-    name: "Bodoni Moda",
-    hint: "High-contrast fashion serif",
-    sample: "Dd",
-    ...voice("var(--font-bodoni)", "Georgia, serif"),
+  sora: {
+    key: "sora",
+    name: "Sora",
+    hint: "Soft rounded geometric",
+    sample: "So",
+    ...voice("var(--font-sora)", "sans-serif"),
+  },
+  kalnia: {
+    key: "kalnia",
+    name: "Kalnia",
+    hint: "Quirky display serif",
+    sample: "Kk",
+    ...voice("var(--font-kalnia)", "Georgia, serif"),
+  },
+  host: {
+    key: "host",
+    name: "Host Grotesk",
+    hint: "Contemporary workhorse",
+    sample: "Hh",
+    ...voice("var(--font-host)", "sans-serif"),
+  },
+  redmono: {
+    key: "redmono",
+    name: "Red Hat Mono",
+    hint: "Friendly technical mono",
+    sample: "Rh",
+    ...voice("var(--font-redmono)", "ui-monospace, monospace"),
   },
 };
 
 export const FONT_ORDER: FontKey[] = [
-  "syne",
-  "fraunces",
-  "bricolage",
-  "instrument",
-  "recursive",
-  "fragment",
-  "young",
-  "besley",
-  "oxanium",
-  "bodoni",
+  "space",
+  "literata",
+  "jetbrains",
+  "archivo",
+  "newsreader",
+  "spacemono",
+  "sora",
+  "kalnia",
+  "host",
+  "redmono",
 ];
 
-export const DEFAULT_FONT_KEY: FontKey = "bricolage";
+/** Map retired font keys → current ones so saved snapshots keep working. */
+const LEGACY_FONT_MAP: Record<string, FontKey> = {
+  syne: "space",
+  fraunces: "literata",
+  bricolage: "host",
+  instrument: "newsreader",
+  recursive: "sora",
+  fragment: "jetbrains",
+  young: "literata",
+  besley: "kalnia",
+  oxanium: "archivo",
+  bodoni: "kalnia",
+};
+
+export function resolveFontKey(raw: unknown): FontKey {
+  if (typeof raw === "string") {
+    if (raw in FONT_PACKS) return raw as FontKey;
+    if (raw in LEGACY_FONT_MAP) return LEGACY_FONT_MAP[raw];
+  }
+  return DEFAULT_FONT_KEY;
+}
 
 export function fontVars(pack: FontPack): CSSProperties {
   return {

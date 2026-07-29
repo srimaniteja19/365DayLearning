@@ -15,6 +15,7 @@ import { createPlanId } from "@/lib/planGeneration";
 import { migrateUserData } from "@/lib/migration";
 import { sanitizeLearned } from "@/lib/learned";
 import { seedBuiltinPlans } from "@/data/builtinPlans";
+import { resolveThemeKey } from "@/theme/themes";
 import {
   assertNoCredentialsInExport,
   getCredentials,
@@ -280,7 +281,7 @@ export function detectImport(raw: unknown): DetectedImport {
       srs: userdata.srs,
       log: userdata.log,
       learned: userdata.learned,
-      themeKey: data.themeKey as ThemeKey | undefined,
+      themeKey: data.themeKey != null ? resolveThemeKey(data.themeKey) : undefined,
       plans,
       activePlanId:
         typeof data.activePlanId === "string" ? data.activePlanId : undefined,
@@ -344,7 +345,7 @@ export function applyFullImport(
       srs: backup.srs || {},
       log: Array.isArray(backup.log) ? backup.log : [],
       learned: backup.learned || {},
-      themeKey: backup.themeKey || current.themeKey,
+      themeKey: resolveThemeKey(backup.themeKey || current.themeKey),
       activePlanId,
     };
   }
@@ -359,7 +360,7 @@ export function applyFullImport(
     srs: mergeRecords(current.srs, backup.srs || {}),
     log: [...current.log, ...(Array.isArray(backup.log) ? backup.log : [])],
     learned: mergeLearned(current.learned || {}, backup.learned || {}),
-    themeKey: backup.themeKey || current.themeKey,
+    themeKey: resolveThemeKey(backup.themeKey || current.themeKey),
     activePlanId:
       backup.activePlanId && plans[backup.activePlanId]
         ? backup.activePlanId

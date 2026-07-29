@@ -1,87 +1,87 @@
 import type { Metadata, Viewport } from "next";
 import {
-  Syne,
-  Fraunces,
-  Bricolage_Grotesque,
-  Instrument_Serif,
-  Recursive,
-  Fragment_Mono,
-  Young_Serif,
-  Besley,
-  Oxanium,
-  Bodoni_Moda,
+  Space_Grotesk,
+  Literata,
+  JetBrains_Mono,
+  Archivo,
+  Newsreader,
+  Space_Mono,
+  Sora,
+  Kalnia,
+  Host_Grotesk,
+  Red_Hat_Mono,
 } from "next/font/google";
 import "./globals.css";
 import "./dualtrack.css";
 import { Providers } from "./providers";
 
-const syne = Syne({
+const space = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-space",
+  display: "swap",
+});
+
+const literata = Literata({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-literata",
+  display: "swap",
+});
+
+const jetbrains = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-jetbrains",
+  display: "swap",
+});
+
+const archivo = Archivo({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-syne",
+  variable: "--font-archivo",
   display: "swap",
 });
 
-const fraunces = Fraunces({
+const newsreader = Newsreader({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
-  variable: "--font-fraunces",
+  variable: "--font-newsreader",
   display: "swap",
 });
 
-const bricolage = Bricolage_Grotesque({
+const spacemono = Space_Mono({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-spacemono",
+  display: "swap",
+});
+
+const sora = Sora({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-sora",
+  display: "swap",
+});
+
+const kalnia = Kalnia({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-kalnia",
+  display: "swap",
+});
+
+const host = Host_Grotesk({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-bricolage",
+  variable: "--font-host",
   display: "swap",
 });
 
-const instrument = Instrument_Serif({
-  subsets: ["latin"],
-  weight: "400",
-  variable: "--font-instrument",
-  display: "swap",
-});
-
-const recursive = Recursive({
+const redmono = Red_Hat_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
-  variable: "--font-recursive",
-  display: "swap",
-});
-
-const fragment = Fragment_Mono({
-  subsets: ["latin"],
-  weight: "400",
-  variable: "--font-fragment",
-  display: "swap",
-});
-
-const young = Young_Serif({
-  subsets: ["latin"],
-  weight: "400",
-  variable: "--font-young",
-  display: "swap",
-});
-
-const besley = Besley({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-besley",
-  display: "swap",
-});
-
-const oxanium = Oxanium({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-oxanium",
-  display: "swap",
-});
-
-const bodoni = Bodoni_Moda({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-bodoni",
+  variable: "--font-redmono",
   display: "swap",
 });
 
@@ -109,16 +109,16 @@ export const viewport: Viewport = {
 };
 
 const fontVars = [
-  syne.variable,
-  fraunces.variable,
-  bricolage.variable,
-  instrument.variable,
-  recursive.variable,
-  fragment.variable,
-  young.variable,
-  besley.variable,
-  oxanium.variable,
-  bodoni.variable,
+  space.variable,
+  literata.variable,
+  jetbrains.variable,
+  archivo.variable,
+  newsreader.variable,
+  spacemono.variable,
+  sora.variable,
+  kalnia.variable,
+  host.variable,
+  redmono.variable,
 ].join(" ");
 
 export default function RootLayout({

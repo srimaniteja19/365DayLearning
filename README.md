@@ -80,7 +80,7 @@ npm run db:studio    # browse the database with Drizzle Studio
 - **Other things I learned** — calendar journal with markdown notes, rich links, and AI insights
 - Optional **accounts + cloud sync** (Neon Postgres + Auth.js) — sign in to sync across devices
 - **Subscriptions** — Recruit (free OpenRouter BYOK) is live; Operator/Architect managed AI is planned (checkout not connected)
-- Themes (8) via CSS custom properties — including Ledger (light) and Matte Black
+- Themes (10) via CSS custom properties — Signal, Folio, Afterburn, Chlorophyll, Oxide, Ion, Cinnabar, Halide, Voltaic, Marina
 - Export: notes markdown, full backup, **plan-only share**
 - Import: plan share adds a plan; full backup asks **merge** or **replace**
 
@@ -107,5 +107,5 @@ Storage keys keep the legacy `dualtrack:` prefix so existing local data still lo
 - Fresh browser/storage: app opens to the "Start your first campaign" example picker, not a plan
 - Generate a 30-day plan with OpenRouter
 - Cancel generation midway, then resume
-- Switch all eight themes on builder + progress screens (esp. Ledger & Matte)
+- Switch all ten themes on builder + progress screens (esp. Afterburn & Voltaic)
 - Reload: plans, progress, and theme survive; API key is gone unless “remember” was ticked

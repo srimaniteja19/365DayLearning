@@ -11,7 +11,7 @@ const wrap: React.CSSProperties = {
   gap: 12,
   padding: 24,
   textAlign: "center",
-  fontFamily: "var(--font-syne, system-ui), sans-serif",
+  fontFamily: "var(--font-space, system-ui), sans-serif",
 };
 
 const btn: React.CSSProperties = {

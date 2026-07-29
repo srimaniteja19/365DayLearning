@@ -25,11 +25,12 @@ import {
   createBuiltin365,
   createBuiltin45,
 } from "@/data/builtinPlans";
-import { DOMAIN_PALETTES, THEMES, hexToRgba, themeVars } from "@/theme/themes";
+import { DOMAIN_PALETTES, THEMES, resolveThemeKey, DEFAULT_THEME_KEY, hexToRgba, themeVars } from "@/theme/themes";
 import {
   DEFAULT_FONT_KEY,
   FONT_PACKS,
   fontVars,
+  resolveFontKey,
 } from "@/theme/fonts";
 import { ThemeCtx } from "@/theme/ThemeContext";
 import { Icon } from "@/components/Icon";
@@ -92,7 +93,7 @@ export default function DualTrackConsole() {
   const [srs, setSrs] = useState({});
   const [log, setLog] = useState([]);
   const [modal, setModal] = useState(null);
-  const [themeKey, setThemeKey] = useState("bloom");
+  const [themeKey, setThemeKey] = useState(DEFAULT_THEME_KEY);
   const [fontKey, setFontKey] = useState(DEFAULT_FONT_KEY);
   const [saveStatus, setSaveStatus] = useState("loading");
   const [confirmReset, setConfirmReset] = useState(false);
@@ -172,8 +173,8 @@ export default function DualTrackConsole() {
     resolvePendingAuthAction();
   }, [resolvePendingAuthAction]);
 
-  const theme = THEMES[themeKey] || THEMES.bloom;
-  const fontPack = FONT_PACKS[fontKey] || FONT_PACKS[DEFAULT_FONT_KEY];
+  const theme = THEMES[resolveThemeKey(themeKey)] || THEMES[DEFAULT_THEME_KEY];
+  const fontPack = FONT_PACKS[resolveFontKey(fontKey)] || FONT_PACKS[DEFAULT_FONT_KEY];
   const domainColors = DOMAIN_PALETTES[theme.palette];
   const rootStyle = { ...themeVars(theme), ...fontVars(fontPack) };
 
@@ -255,11 +256,11 @@ export default function DualTrackConsole() {
         setSrs(snap.userdata.srs);
         setLog(snap.userdata.log);
         setLearned(snap.userdata.learned || {});
-        if (snap.meta.themeKey && THEMES[snap.meta.themeKey]) {
-          setThemeKey(snap.meta.themeKey);
+        if (snap.meta.themeKey) {
+          setThemeKey(resolveThemeKey(snap.meta.themeKey));
         }
-        if (snap.meta.fontKey && FONT_PACKS[snap.meta.fontKey]) {
-          setFontKey(snap.meta.fontKey);
+        if (snap.meta.fontKey) {
+          setFontKey(resolveFontKey(snap.meta.fontKey));
         }
       }
       didLoad.current = true;
@@ -291,8 +292,8 @@ export default function DualTrackConsole() {
         setSrs(snap.userdata.srs || {});
         setLog(snap.userdata.log || []);
         setLearned(snap.userdata.learned || {});
-        if (snap.meta.themeKey && THEMES[snap.meta.themeKey]) setThemeKey(snap.meta.themeKey);
-        if (snap.meta.fontKey && FONT_PACKS[snap.meta.fontKey]) setFontKey(snap.meta.fontKey);
+        if (snap.meta.themeKey) setThemeKey(resolveThemeKey(snap.meta.themeKey));
+        if (snap.meta.fontKey) setFontKey(resolveFontKey(snap.meta.fontKey));
         if (storageOk.current) await saveAppSnapshot(snap);
         fireToast("Synced from your account");
       } else {
@@ -678,7 +679,7 @@ export default function DualTrackConsole() {
       setSrs(s.srs);
       setLog(s.log);
       setLearned(s.learned || {});
-      if (s.themeKey && THEMES[s.themeKey]) setThemeKey(s.themeKey);
+      if (s.themeKey) setThemeKey(resolveThemeKey(s.themeKey));
       if (s.activePlanId) setActivePlanId(s.activePlanId);
       return;
     }
@@ -781,9 +782,9 @@ export default function DualTrackConsole() {
           totalDays: globalStats.totalDaysAll,
         }
       : null;
-    // Landing always uses Bloom so the marketing page reads as one bright
+    // Landing always uses Signal so the marketing page reads as one bright
     // composition — dashboard keeps the user's chosen theme separately.
-    const homeTheme = THEMES.bloom;
+    const homeTheme = THEMES[DEFAULT_THEME_KEY];
     const homeStyle = { ...themeVars(homeTheme), ...fontVars(fontPack) };
     return (
       <div
