@@ -2016,15 +2016,23 @@ export function ReviewView({ queue, srs, notes, scheduledCount, onGrade, onOpenD
     const graduated = Object.values(srs).filter((e) => e && e.graduated).length;
     return (
       <div className="review-view">
-        <div className="review-empty">
-          <Icon.Check size={26} />
-          <div className="review-empty-title">Nothing due right now</div>
-          <div className="review-empty-sub">
-            {scheduledCount > 0
-              ? `${scheduledCount} ${scheduledCount === 1 ? "day is" : "days are"} scheduled. Next one ${upcoming ? relativeDue(upcoming[1].due, Date.now()) : "soon"}.`
-              : "Complete a day in the console and it enters the review queue after 7 days."}
+        <div className="review-ops">
+          <div className="review-ops-mast">
+            <span className="review-ops-title">Review queue</span>
+            <span className="review-ops-sub">Spaced recall · nothing due</span>
           </div>
-          {graduated > 0 && <div className="review-empty-sub">{graduated} fully retained.</div>}
+          <div className="review-empty">
+            <span className="review-empty-icon" aria-hidden="true"><Icon.Check size={22} /></span>
+            <div className="review-empty-title">Nothing due right now</div>
+            <div className="review-empty-sub">
+              {scheduledCount > 0
+                ? `${scheduledCount} ${scheduledCount === 1 ? "day is" : "days are"} scheduled. Next one ${upcoming ? relativeDue(upcoming[1].due, Date.now()) : "soon"}.`
+                : "Complete a day in the console and it enters the review queue after 7 days."}
+            </div>
+            {graduated > 0 && (
+              <div className="review-empty-stamp">{graduated} fully retained</div>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -2042,52 +2050,73 @@ export function ReviewView({ queue, srs, notes, scheduledCount, onGrade, onOpenD
 
   return (
     <div className="review-view">
-      <div className="review-head">
-        <span className="review-count">{queue.length} due</span>
-        <span className="review-meta">
-          Day {day.day} · reviewed {entry.reps} {entry.reps === 1 ? "time" : "times"} · interval {SRS_INTERVALS[entry.idx]}d
-        </span>
-      </div>
-
-      <div className="review-card">
-        <div className="review-prompt">Can you still explain these without looking?</div>
-        <ul className="review-topics">
-          {day.topics.map((t, i) => <li key={i}>{t}</li>)}
-        </ul>
-
-        {!revealed ? (
-          <button className="reveal-btn" onClick={() => setRevealed(true)}>
-            {note ? "Show my notes" : "I have thought it through"}
-          </button>
-        ) : (
-          <div className="review-note">
-            {note
-              ? <pre className="review-note-text">{note}</pre>
-              : <div className="review-note-empty">No notes saved for this day. Open it to add some.</div>}
-            <button className="review-open-link" onClick={() => onOpenDay(day)}>Open Day {day.day} →</button>
+      <div className="review-ops">
+        <div className="review-ops-mast">
+          <div className="review-ops-mast-text">
+            <span className="review-ops-title">Review queue</span>
+            <span className="review-ops-sub">
+              Day {day.day} · reviewed {entry.reps} {entry.reps === 1 ? "time" : "times"} · interval {SRS_INTERVALS[entry.idx]}d
+            </span>
           </div>
+          <span className="review-count">{queue.length} due</span>
+        </div>
+
+        <div className="review-card">
+          <div className="review-prompt">
+            <span className="field-ops-kicker" aria-hidden="true">
+              <span className="field-ops-kicker-mark" />
+              <span>Prompt</span>
+            </span>
+            <span>Can you still explain these without looking?</span>
+          </div>
+          <ul className="review-topics">
+            {day.topics.map((t, i) => (
+              <li key={i}>
+                <span className="review-topic-idx">{i + 1}</span>
+                <span>{t}</span>
+              </li>
+            ))}
+          </ul>
+
+          {!revealed ? (
+            <button type="button" className="reveal-btn" onClick={() => setRevealed(true)}>
+              {note ? "Show my notes" : "I have thought it through"}
+            </button>
+          ) : (
+            <div className="review-note">
+              {note
+                ? <pre className="review-note-text">{note}</pre>
+                : <div className="review-note-empty">No notes saved for this day. Open it to add some.</div>}
+              <button type="button" className="review-open-link" onClick={() => onOpenDay(day)}>
+                Open Day {day.day} →
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="grade-row">
+          <button type="button" className="grade-btn grade-forgot" onClick={() => grade("forgot")}>
+            <span className="grade-label">Forgot</span>
+            <span className="grade-sub">back in 3d</span>
+          </button>
+          <button type="button" className="grade-btn grade-shaky" onClick={() => grade("shaky")}>
+            <span className="grade-label">Shaky</span>
+            <span className="grade-sub">repeat {SRS_INTERVALS[entry.idx]}d</span>
+          </button>
+          <button type="button" className="grade-btn grade-solid" onClick={() => grade("solid")}>
+            <span className="grade-label">Solid</span>
+            <span className="grade-sub">
+              {entry.idx + 1 >= SRS_INTERVALS.length ? "retained" : `next ${SRS_INTERVALS[entry.idx + 1]}d`}
+            </span>
+          </button>
+        </div>
+
+        {queue.length > 1 && (
+          <button type="button" className="skip-btn" onClick={() => setCursor((c) => (c + 1) % queue.length)}>
+            Skip for now
+          </button>
         )}
       </div>
-
-      <div className="grade-row">
-        <button className="grade-btn grade-forgot" onClick={() => grade("forgot")}>
-          Forgot <span className="grade-sub">back in 3d</span>
-        </button>
-        <button className="grade-btn grade-shaky" onClick={() => grade("shaky")}>
-          Shaky <span className="grade-sub">repeat {SRS_INTERVALS[entry.idx]}d</span>
-        </button>
-        <button className="grade-btn grade-solid" onClick={() => grade("solid")}>
-          Solid <span className="grade-sub">
-            {entry.idx + 1 >= SRS_INTERVALS.length ? "retained" : `next ${SRS_INTERVALS[entry.idx + 1]}d`}
-          </span>
-        </button>
-      </div>
-
-      {queue.length > 1 && (
-        <button className="skip-btn" onClick={() => setCursor((c) => (c + 1) % queue.length)}>
-          Skip for now
-        </button>
-      )}
     </div>
   );
 }
