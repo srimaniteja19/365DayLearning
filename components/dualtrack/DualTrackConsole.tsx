@@ -910,7 +910,12 @@ export default function DualTrackConsole() {
           onDeletePlan={handleDeletePlan}
           onNewPlan={() => setModal({ kind: "builder" })}
         />
-        <CampaignHero campaign={campaign} stats={stats} />
+        <CampaignHero
+          campaign={campaign}
+          stats={stats}
+          progress={progress}
+          onToggle={handleToggleTopic}
+        />
 
         {onThisDayMemory && !onThisDayDismissed && (
           <div className="today-widgets-row">
@@ -921,36 +926,49 @@ export default function DualTrackConsole() {
         <ViewTabs view={view} setView={setView} dueCount={reviewQueue.length} />
 
         {(view === "console" || view === "grid") && (
-          <PeriodNav
-            scopes={scopesForPlan(campaign)}
-            scope={scope}
-            setScope={setScope}
-            periods={periods}
-            periodIdx={periodIdx}
-            setPeriodIdx={setPeriodIdx}
-            accent={campaign.accent}
-            activeDayNum={activeDayNum}
-          />
-        )}
-
-        {(view === "console" || view === "grid") && (
-          <div className="controls-row">
-            <div className="search-wrap">
-              <Icon.Search size={15} />
-              <input
-                className="search-input"
-                placeholder={`Search ${campaign.totalDays} days of topics…`}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
+          <section className="field-ops" aria-label="Field ops filters">
+            <div className="field-ops-mast">
+              <span className="field-ops-title">Field ops</span>
+              <span className="field-ops-sub">Slice time · scan topics · filter sectors</span>
+            </div>
+            <PeriodNav
+              scopes={scopesForPlan(campaign)}
+              scope={scope}
+              setScope={setScope}
+              periods={periods}
+              periodIdx={periodIdx}
+              setPeriodIdx={setPeriodIdx}
+              accent={campaign.accent}
+              activeDayNum={activeDayNum}
+            />
+            <div className="controls-row">
+              <label className="ops-search">
+                <span className="ops-search-label">Find</span>
+                <Icon.Search size={14} />
+                <input
+                  className="ops-search-input"
+                  placeholder={`Search ${campaign.totalDays} days of topics…`}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+                {query.trim() && (
+                  <button
+                    type="button"
+                    className="ops-search-clear"
+                    aria-label="Clear search"
+                    onClick={() => setQuery("")}
+                  >
+                    <Icon.X size={14} />
+                  </button>
+                )}
+              </label>
+              <DomainLegend
+                tally={stats.domainTally}
+                active={domainFilter}
+                setActive={setDomainFilter}
               />
             </div>
-            <DomainLegend
-              tally={stats.domainTally}
-              active={domainFilter}
-              setActive={setDomainFilter}
-              accent={campaign.accent}
-            />
-          </div>
+          </section>
         )}
 
         {view === "console" && (

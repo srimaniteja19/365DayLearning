@@ -811,8 +811,12 @@ export function HomeView({
   );
 }
 
-export function CampaignHero({ campaign, stats }) {
+export function CampaignHero({ campaign, stats, progress, onToggle }) {
   const activeDay = stats.activeDay;
+  const dayProgress = activeDay && progress ? progress[activeDay.id] : null;
+  const doneCount = activeDay
+    ? activeDay.topics.filter((_, i) => dayProgress && dayProgress[i]).length
+    : 0;
   return (
     <header className="hero" style={{ "--accent": campaign.accent, "--glow": campaign.glow }}>
       <div className="hero-mast">
@@ -850,13 +854,28 @@ export function CampaignHero({ campaign, stats }) {
             <span className="next-mission-day">Day {String(activeDay.day).padStart(3, "0")}</span>
           </div>
           <ol className="next-mission-topics">
-            {activeDay.topics.map((t, i) => (
-              <li key={i}>
-                <span className="next-mission-idx">{i + 1}</span>
-                <span>{t}</span>
-              </li>
-            ))}
+            {activeDay.topics.map((t, i) => {
+              const isDone = !!(dayProgress && dayProgress[i]);
+              return (
+                <li key={i}>
+                  <label className={classNames("topic-line next-mission-topic", isDone && "topic-line-done")}>
+                    <input
+                      type="checkbox"
+                      checked={isDone}
+                      onChange={() => onToggle?.(activeDay, i, campaign)}
+                    />
+                    <span className="topic-checkbox">
+                      {isDone && <Icon.Check size={11} />}
+                    </span>
+                    <span className="topic-text">{t}</span>
+                  </label>
+                </li>
+              );
+            })}
           </ol>
+          <div className="next-mission-foot" aria-live="polite">
+            <span>{doneCount}/{activeDay.topics.length} marked</span>
+          </div>
         </aside>
       )}
     </header>
@@ -1191,6 +1210,7 @@ export function ViewTabs({ view, setView, dueCount }) {
 /* ============================== PERIOD NAV ============================== */
 export function PeriodNav({ scopes, scope, setScope, periods, periodIdx, setPeriodIdx, accent, activeDayNum }) {
   const stripRef = useRef(null);
+  const activePeriod = periods ? periods[Math.min(periodIdx, periods.length - 1)] : null;
 
   useEffect(() => {
     if (!stripRef.current) return;
@@ -1201,10 +1221,15 @@ export function PeriodNav({ scopes, scope, setScope, periods, periodIdx, setPeri
   return (
     <div className="period-nav" style={{ "--accent": accent }}>
       <div className="scope-row">
+        <div className="field-ops-kicker" aria-hidden="true">
+          <span className="field-ops-kicker-mark" />
+          <span>Time slice</span>
+        </div>
         <div className="scope-btns" role="group" aria-label="Time range">
           {scopes.map((sc) => (
             <button
               key={sc.key}
+              type="button"
               className={classNames("scope-btn", scope === sc.key && "scope-btn-active")}
               onClick={() => setScope(sc.key)}
             >
@@ -1212,11 +1237,14 @@ export function PeriodNav({ scopes, scope, setScope, periods, periodIdx, setPeri
             </button>
           ))}
         </div>
-        {periods && (
-          <div className="period-summary">
-            {periods[Math.min(periodIdx, periods.length - 1)].done}/{periods[Math.min(periodIdx, periods.length - 1)].total} topics
-            <span className="period-summary-sep">·</span>
-            {periods[Math.min(periodIdx, periods.length - 1)].pct}%
+        {activePeriod && (
+          <div className="period-summary" aria-live="polite">
+            <span className="period-summary-stamp">{activePeriod.label}</span>
+            <span className="period-summary-stat">
+              {activePeriod.done}/{activePeriod.total}
+            </span>
+            <span className="period-summary-sep">topics</span>
+            <span className="period-summary-pct">{activePeriod.pct}%</span>
           </div>
         )}
       </div>
@@ -1230,20 +1258,27 @@ export function PeriodNav({ scopes, scope, setScope, periods, periodIdx, setPeri
             return (
               <button
                 key={p.label + p.start}
+                type="button"
                 data-period-active={isActive ? "true" : "false"}
-                className={classNames("period-chip", isActive && "period-chip-active", complete && "period-chip-complete")}
+                className={classNames(
+                  "period-chip",
+                  isActive && "period-chip-active",
+                  complete && "period-chip-complete",
+                  holdsCurrent && "period-chip-here",
+                )}
                 onClick={() => setPeriodIdx(i)}
               >
                 <div className="period-chip-top">
                   <span className="period-chip-label">{p.label}</span>
-                  {holdsCurrent && <span className="period-here" title="Your current day is here" />}
+                  {holdsCurrent && <span className="period-here">YOU</span>}
+                  {complete && !holdsCurrent && <span className="period-done-mark">✓</span>}
                 </div>
                 <div className="period-chip-sub">{p.sub}</div>
-                <div className="period-chip-track">
+                <div className="period-chip-track" aria-hidden="true">
                   <div className="period-chip-fill" style={{ width: p.pct + "%" }} />
                 </div>
                 <div className="period-chip-meta">
-                  <span>{p.start}-{p.end}</span>
+                  <span>D{p.start}–{p.end}</span>
                   <span>{p.pct}%</span>
                 </div>
               </button>
@@ -1256,31 +1291,57 @@ export function PeriodNav({ scopes, scope, setScope, periods, periodIdx, setPeri
 }
 
 /* ============================== DOMAIN LEGEND ============================== */
-export function DomainLegend({ tally, active, setActive, accent }) {
+export function DomainLegend({ tally, active, setActive }) {
   const { domainColors } = useContext(ThemeCtx);
   const domains = Object.keys(DOMAIN_META).filter((k) => tally[k]);
+  const activeMeta = active && DOMAIN_META[active] ? DOMAIN_META[active] : null;
   return (
-    <div className="domain-legend">
-      {domains.map((k) => {
-        const meta = DOMAIN_META[k];
-        const color = domainColors[k];
-        const t = tally[k];
-        const pct = t ? Math.round((t.done / t.total) * 100) : 0;
-        const isActive = active === k;
-        return (
+    <div className="domain-legend" role="group" aria-label="Filter by domain">
+      <div className="domain-legend-head">
+        <span className="field-ops-kicker" aria-hidden="true">
+          <span className="field-ops-kicker-mark" />
+          <span>Sectors</span>
+        </span>
+        {activeMeta && (
           <button
-            key={k}
-            className={classNames("domain-chip", isActive && "domain-chip-active")}
-            style={{ "--dot": color, borderColor: isActive ? color : undefined }}
-            onClick={() => setActive(isActive ? null : k)}
-            title={`${t.done}/${t.total} complete`}
+            type="button"
+            className="domain-legend-clear"
+            onClick={() => setActive(null)}
           >
-            <span className="domain-chip-dot" />
-            {meta.label}
-            <span className="domain-chip-pct">{pct}%</span>
+            Clear · {activeMeta.label}
           </button>
-        );
-      })}
+        )}
+      </div>
+      <div className="domain-legend-grid">
+        {domains.map((k) => {
+          const meta = DOMAIN_META[k];
+          const color = domainColors[k];
+          const t = tally[k];
+          const pct = t ? Math.round((t.done / t.total) * 100) : 0;
+          const isActive = active === k;
+          return (
+            <button
+              key={k}
+              type="button"
+              className={classNames("domain-meter", isActive && "domain-meter-active")}
+              style={{ "--dot": color }}
+              onClick={() => setActive(isActive ? null : k)}
+              title={`${meta.label}: ${t.done}/${t.total} complete`}
+              aria-pressed={isActive}
+            >
+              <span className="domain-meter-top">
+                <span className="domain-meter-dot" />
+                <span className="domain-meter-pct">{pct}%</span>
+              </span>
+              <span className="domain-meter-track" aria-hidden="true">
+                <span className="domain-meter-fill" style={{ width: `${pct}%` }} />
+              </span>
+              <span className="domain-meter-label">{meta.label}</span>
+              <span className="domain-meter-count">{t.done}/{t.total}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1400,24 +1461,33 @@ export function ConsoleView({ campaign, days, progress, onToggle, expandedDay, s
   return (
     <div className="console-shell">
       <div className="console-layout-bar" role="tablist" aria-label="Console layout">
-        {CONSOLE_LAYOUTS.map((opt) => {
-          const LayoutIcon = opt.Icon;
-          const active = layout === opt.key;
-          return (
-            <button
-              key={opt.key}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              title={opt.hint}
-              className={classNames("console-layout-btn", active && "console-layout-btn-active")}
-              onClick={() => setLayout(opt.key)}
-            >
-              <LayoutIcon size={13} />
-              <span>{opt.label}</span>
-            </button>
-          );
-        })}
+        <span className="field-ops-kicker console-layout-kicker" aria-hidden="true">
+          <span className="field-ops-kicker-mark" />
+          <span>View</span>
+        </span>
+        <div className="console-layout-btns">
+          {CONSOLE_LAYOUTS.map((opt) => {
+            const LayoutIcon = opt.Icon;
+            const active = layout === opt.key;
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                title={opt.hint}
+                className={classNames("console-layout-btn", `console-layout-btn-${opt.key}`, active && "console-layout-btn-active")}
+                onClick={() => setLayout(opt.key)}
+              >
+                <span>
+                  <LayoutIcon size={13} />
+                  {opt.label}
+                </span>
+                <em>{opt.hint}</em>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div
@@ -1472,12 +1542,14 @@ function DayRow({
     query &&
     query.trim() &&
     (notes[day.id] || "").toLowerCase().includes(query.trim().toLowerCase());
+  const rowTone = stickerTone(day.domains?.[0] || "systems-eng", day.day);
 
   return (
     <div
       data-day-id={day.id}
       className={classNames(
         "day-row",
+        `day-row-tone-${rowTone}`,
         complete && "day-row-complete",
         isExpanded && "day-row-expanded",
         isCurrent && !complete && "day-row-current",
@@ -1490,7 +1562,7 @@ function DayRow({
         onClick={onToggleExpand}
         aria-expanded={isExpanded}
       >
-        <span className="day-num">
+        <span className={classNames("day-num", complete && "day-num-done")}>
           {complete ? <Icon.Check size={13} /> : <span className="day-num-text">{String(day.day).padStart(3, "0")}</span>}
         </span>
         <span className="day-row-topics-preview">
@@ -1501,9 +1573,10 @@ function DayRow({
                 "topic-chip-mini",
                 progress[day.id] && progress[day.id][i] && "topic-chip-mini-done",
               )}
+              title={t}
             >
-              <DomainDot domain={day.domains[i]} />
-              {t}
+              {progress[day.id] && progress[day.id][i] && <Icon.Check size={11} />}
+              <span className="topic-chip-mini-label">{t}</span>
             </span>
           ))}
         </span>
