@@ -23,6 +23,7 @@ describe("provider HTTP error mapping", () => {
   });
 
   it("maps OpenRouter free-models-per-day into actionable copy", () => {
+    const resetUnix = Math.floor(Date.now() / 1000) + 3600;
     const body = JSON.stringify({
       error: {
         message:
@@ -32,7 +33,7 @@ describe("provider HTTP error mapping", () => {
           headers: {
             "X-RateLimit-Limit": "50",
             "X-RateLimit-Remaining": "0",
-            "X-RateLimit-Reset": "1785283200",
+            "X-RateLimit-Reset": String(resetUnix),
           },
         },
       },

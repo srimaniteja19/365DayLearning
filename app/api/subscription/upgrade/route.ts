@@ -20,8 +20,8 @@ function isSameOrigin(req: NextRequest): boolean {
  * configured, so this intentionally always returns 501. It exists now so
  * the client contract (POST { tier }) is stable, and so wiring up real
  * checkout later is a matter of replacing the body of this handler with a
- * Checkout Session redirect/client secret, then flipping the tier via
- * `setSubscriptionTier` from a webhook once payment succeeds — not a
+ * Checkout Session redirect/client secret, then updating the user's
+ * subscriptionTier from a payment webhook once payment succeeds — not a
  * client-facing API change.
  */
 export async function POST(req: NextRequest) {

@@ -59,8 +59,6 @@ export type Plan = {
 
 /** @deprecated Use PlanDay — kept for gradual migration of UI props. */
 export type DayEntry = PlanDay;
-/** @deprecated Prefer Domain */
-export type DomainId = Domain;
 
 export type ThemeKey =
   | "signal"
@@ -179,28 +177,6 @@ export type PersistedState = {
   activePlanId?: string;
   plans?: PlansState;
 };
-
-export type BackupFile = {
-  app: "dualtrack";
-  version: 2 | 3;
-  exportedAt: number;
-  progress: ProgressMap;
-  notes: NotesMap;
-  refs: RefsMap;
-  srs: SrsMap;
-  log: LogEntry[];
-  learned?: LearnedMap;
-  bookmarks?: BookmarksList;
-  themeKey: ThemeKey;
-  plans?: PlansState;
-  activePlanId?: string;
-  schemaVersion?: number;
-};
-
-export type ViewKey = "console" | "grid" | "review" | "weekly" | "log" | "learned" | "bookmarks";
-export type ScopeKey = "all" | "quarter" | "month" | "week";
-export type ModalState = { kind: string; day?: PlanDay } | null;
-export type SaveStatus = "loading" | "idle" | "saving" | "saved" | "error" | "off";
 
 /** Current multi-plan schema. */
 export const SCHEMA_VERSION = 3;

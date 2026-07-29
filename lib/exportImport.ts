@@ -23,10 +23,7 @@ import {
   getCredentials,
   stripCredentialsFromObject,
 } from "@/lib/providers/credentials";
-
-export const SCHEMA_VERSION = 3;
-
-export type ExportKind = "dualtrack-plan" | "dualtrack-full";
+import { SCHEMA_VERSION } from "@/lib/types";
 
 export type PlanShareFile = {
   app: "dualtrack";

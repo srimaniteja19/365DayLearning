@@ -4,7 +4,7 @@ export interface StorageAdapter {
   remove(key: string): Promise<void>;
 }
 
-export class LocalStorageAdapter implements StorageAdapter {
+class LocalStorageAdapter implements StorageAdapter {
   async get(key: string): Promise<string | null> {
     try {
       return window.localStorage.getItem(key);
@@ -22,7 +22,7 @@ export class LocalStorageAdapter implements StorageAdapter {
   }
 }
 
-export class IndexedDBAdapter implements StorageAdapter {
+class IndexedDBAdapter implements StorageAdapter {
   private ready: Promise<typeof import("idb-keyval")>;
 
   constructor() {
@@ -74,11 +74,6 @@ export async function getStorageAdapter(): Promise<StorageAdapter | null> {
       return null;
     }
   }
-}
-
-/** Test helper — reset cached adapter. */
-export function resetStorageAdapterCache(): void {
-  cached = null;
 }
 
 /** Test helper — inject adapter (pass `undefined` to restore normal resolution). */

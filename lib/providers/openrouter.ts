@@ -4,9 +4,6 @@ import { openAiCompatibleChat } from "@/lib/providers/openaiCompat";
 /** Cost band used for Settings grouping (cheapest → costliest). */
 export type CostBand = "free" | "budget" | "mid" | "frontier";
 
-/** @deprecated Prefer CostBand — kept for older category names in UI/tests. */
-export type ModelCategory = CostBand | "usage" | "google";
-
 export type CuratedModelMeta = {
   id: string;
   costBand: CostBand;
@@ -69,60 +66,14 @@ export const OPENROUTER_TOP_FREE: readonly string[] = OPENROUTER_CURATED_MODELS
   .filter((m) => m.costBand === "free")
   .map((m) => m.id);
 
-/** Popular paid models (budget + a few mid) — used by older call sites. */
-export const OPENROUTER_TOP_USAGE: readonly string[] = [
-  "xiaomi/mimo-v2.5",
-  "deepseek/deepseek-v4-flash",
-  "tencent/hy3",
-  "deepseek/deepseek-v4-pro",
-  "nvidia/nemotron-3-ultra-550b-a55b",
-  "z-ai/glm-5.2",
-  "minimax/minimax-m3",
-  "stepfun/step-3.7-flash",
-  "moonshotai/kimi-k3",
-];
-
-export const OPENROUTER_FRONTIER: readonly string[] = [
-  "anthropic/claude-opus-4.8",
-  "openai/gpt-5.6-sol",
-  "moonshotai/kimi-k3",
-  "x-ai/grok-4.5",
-];
-
-export const OPENROUTER_GOOGLE: readonly string[] = [
-  "google/gemini-3.6-flash",
-  "google/gemini-3.5-flash",
-  "google/gemini-3.5-flash-lite",
-  "google/gemini-3.1-pro-preview",
-];
-
-export const OPENROUTER_CATEGORY_LABELS: Record<CostBand, string> = {
+const OPENROUTER_CATEGORY_LABELS: Record<CostBand, string> = {
   free: "Free",
   budget: "Budget",
   mid: "Mid-tier",
   frontier: "Frontier",
 };
 
-export const OPENROUTER_VENDOR_LABELS: Record<string, string> = {
-  anthropic: "Anthropic",
-  openai: "OpenAI",
-  google: "Google",
-  "x-ai": "xAI",
-  deepseek: "DeepSeek",
-  xiaomi: "Xiaomi",
-  tencent: "Tencent",
-  nvidia: "NVIDIA",
-  "z-ai": "Z.ai",
-  minimax: "MiniMax",
-  stepfun: "StepFun",
-  moonshotai: "Moonshot",
-  inclusionai: "InclusionAI",
-  poolside: "Poolside",
-  cohere: "Cohere",
-  openrouter: "OpenRouter",
-};
-
-export const OPENROUTER_SUGGESTED_MODELS = OPENROUTER_CURATED_MODELS.map((m) => m.id);
+const OPENROUTER_SUGGESTED_MODELS = OPENROUTER_CURATED_MODELS.map((m) => m.id);
 
 /** Sensible default: fast, cheap, widely used for agentic work. */
 export const OPENROUTER_DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
@@ -148,10 +99,6 @@ export type OpenRouterModelInfo = {
 export function vendorFromModelId(id: string): string {
   const slash = id.indexOf("/");
   return slash > 0 ? id.slice(0, slash) : "other";
-}
-
-export function vendorLabel(vendor: string): string {
-  return OPENROUTER_VENDOR_LABELS[vendor] || vendor;
 }
 
 export function shortModelName(id: string): string {
@@ -314,36 +261,6 @@ export function groupModelsByCategory(
       };
     })
     .filter((g) => g.models.length > 0);
-}
-
-/** @deprecated Prefer groupModelsByCategory — kept for older imports/tests. */
-export type ModelVendorGroup = {
-  vendor: string;
-  label: string;
-  models: OpenRouterModelInfo[];
-};
-
-export function groupModelsByVendor(models: OpenRouterModelInfo[]): ModelVendorGroup[] {
-  const preferred = Object.keys(OPENROUTER_VENDOR_LABELS);
-  const map = new Map<string, OpenRouterModelInfo[]>();
-  for (const m of models) {
-    const list = map.get(m.vendor) || [];
-    list.push(m);
-    map.set(m.vendor, list);
-  }
-  const vendors = Array.from(map.keys()).sort((a, b) => {
-    const ai = preferred.indexOf(a);
-    const bi = preferred.indexOf(b);
-    if (ai >= 0 && bi >= 0) return ai - bi;
-    if (ai >= 0) return -1;
-    if (bi >= 0) return 1;
-    return a.localeCompare(b);
-  });
-  return vendors.map((vendor) => ({
-    vendor,
-    label: vendorLabel(vendor),
-    models: (map.get(vendor) || []).slice().sort((a, b) => a.id.localeCompare(b.id)),
-  }));
 }
 
 function curatedAsInfo(meta: CuratedModelMeta): OpenRouterModelInfo {

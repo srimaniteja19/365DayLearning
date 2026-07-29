@@ -51,7 +51,7 @@ function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: n
   };
 }
 
-export function rotateHue(hex: string, degrees: number): string {
+function rotateHue(hex: string, degrees: number): string {
   const { r, g, b } = hexToRgb(hex);
   const { h, s, l } = rgbToHsl(r, g, b);
   const rgb = hslToRgb(h + degrees, s, l);

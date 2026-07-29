@@ -5,7 +5,6 @@ import {
   isPeriodExpired,
   periodResetsAt,
   tierDef,
-  type SubscriptionTier,
   type SubscriptionUsage,
 } from "@/lib/subscriptions";
 
@@ -31,7 +30,7 @@ async function loadUsageRow(userId: string): Promise<UsageRow | null> {
   return row || null;
 }
 
-export function toSubscriptionUsage(row: UsageRow): SubscriptionUsage {
+function toSubscriptionUsage(row: UsageRow): SubscriptionUsage {
   const tier = tierDef(row.subscriptionTier);
   const expired = isPeriodExpired(row.usagePeriodStart);
   // Quotas only apply when managed AI is live for the tier.
@@ -137,12 +136,4 @@ export async function requireManagedAiTier(userId: string): Promise<ReserveResul
     };
   }
   return { ok: true };
-}
-
-export async function setSubscriptionTier(userId: string, tier: SubscriptionTier): Promise<void> {
-  const db = getDb();
-  await db
-    .update(users)
-    .set({ subscriptionTier: tier, planGenerationsUsed: 0, aiActionsUsed: 0, usagePeriodStart: new Date() })
-    .where(eq(users.id, userId));
 }

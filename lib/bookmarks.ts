@@ -112,23 +112,6 @@ export function detectBookmarkKind(url: string): BookmarkKind {
   return "link";
 }
 
-export function kindLabel(kind: BookmarkKind): string {
-  switch (kind) {
-    case "youtube":
-      return "YouTube";
-    case "vimeo":
-      return "Vimeo";
-    case "article":
-      return "Article";
-    case "repo":
-      return "Repo";
-    case "doc":
-      return "Doc";
-    default:
-      return "Link";
-  }
-}
-
 /** Instant client-side preview seed before the network enrich finishes. */
 export function seedPreviewFromUrl(url: string): BookmarkPreview {
   const yt = extractYoutubeId(url);
@@ -182,23 +165,6 @@ export function youtubeEmbedUrl(id: string): string {
 
 export function vimeoEmbedUrl(id: string): string {
   return `https://player.vimeo.com/video/${encodeURIComponent(id)}`;
-}
-
-export function countBookmarksByKind(list: BookmarksList | undefined | null): Record<BookmarkKind | "all", number> {
-  const out: Record<BookmarkKind | "all", number> = {
-    all: 0,
-    youtube: 0,
-    vimeo: 0,
-    article: 0,
-    repo: 0,
-    doc: 0,
-    link: 0,
-  };
-  for (const item of list || []) {
-    out.all += 1;
-    out[item.kind] = (out[item.kind] || 0) + 1;
-  }
-  return out;
 }
 
 export function sanitizeBookmarks(raw: unknown): BookmarksList {

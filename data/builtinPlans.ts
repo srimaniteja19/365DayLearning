@@ -6,8 +6,6 @@ import {
 import DAYS_365_RAW from "@/data/days-365.json";
 import DAYS_45_RAW from "@/data/days-45.json";
 
-export type PeriodDef = PlanPeriod;
-
 function remapDays(raw: Array<{ day: number; id: string; topics: string[]; domains: string[] }>, planId: string): PlanDay[] {
   return raw.map((d) => ({
     day: d.day,
@@ -39,7 +37,7 @@ export const MONTHS_365: PlanPeriod[] = [
   { label: "Dec", sub: "Capstone", start: 335, end: 365 },
 ];
 
-export const WEEKS_45: PlanPeriod[] = [
+const WEEKS_45: PlanPeriod[] = [
   { label: "Week 1", sub: "Model internals", start: 1, end: 7 },
   { label: "Week 2", sub: "Fine-tuning", start: 8, end: 14 },
   { label: "Week 3", sub: "Embeddings and RAG", start: 15, end: 21 },
@@ -119,39 +117,3 @@ export function periodsForPlan(plan: Plan, scope: string): PlanPeriod[] | null {
   return found.periods;
 }
 
-/** @deprecated Prefer plans map — kept for WeeklyView/LogView transitional imports. */
-export const DAYS_365 = createBuiltin365().days;
-export const DAYS_45 = createBuiltin45().days;
-
-/** Temporary shim while UI migrates off CAMPAIGNS. */
-export const CAMPAIGNS = {
-  main: {
-    key: "main" as const,
-    name: "OPERATION LONGHAUL",
-    subtitle: "365-Day Full-Stack & Systems Campaign",
-    days: DAYS_365,
-    unit: "day",
-    totalDays: 365,
-  },
-  sprint: {
-    key: "sprint" as const,
-    name: "OPERATION FASTBURN",
-    subtitle: "45-Day AI / LLM Engineer Intensive",
-    days: DAYS_45,
-    unit: "day",
-    totalDays: 45,
-  },
-};
-
-export function periodsFor(campaignKey: "main" | "sprint", scope: string, totalDays: number) {
-  if (campaignKey === "main") {
-    return periodsForPlan(createBuiltin365(), scope);
-  }
-  return periodsForPlan(createBuiltin45(), scope) ?? (scope === "week" ? buildWeeks(totalDays) : null);
-}
-
-export function scopesFor(campaignKey: "main" | "sprint") {
-  return campaignKey === "main"
-    ? scopesForPlan(createBuiltin365())
-    : scopesForPlan(createBuiltin45());
-}

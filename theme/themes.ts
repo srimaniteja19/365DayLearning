@@ -43,7 +43,7 @@ export const DOMAIN_PALETTES: Record<PaletteMode, Record<string, string>> = {
   },
 };
 
-export const FONT_STACKS = {
+const FONT_STACKS = {
   mono: "var(--font-jetbrains), ui-monospace, monospace",
   sans: "var(--font-space), sans-serif",
   serif: "var(--font-literata), Georgia, serif",

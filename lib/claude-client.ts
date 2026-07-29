@@ -27,7 +27,6 @@ export function willUseManagedAi(): boolean {
 }
 
 export {
-  getSessionPreferredModel,
   clearSessionPreferredModel,
 } from "@/lib/providers/openrouter";
 

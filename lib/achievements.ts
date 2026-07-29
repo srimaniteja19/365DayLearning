@@ -139,6 +139,3 @@ export function computeBadges(input: ComputeBadgesInput): BadgeStatus[] {
   });
 }
 
-export function unlockedBadgeIds(statuses: BadgeStatus[]): string[] {
-  return statuses.filter((s) => s.unlocked).map((s) => s.badge.id);
-}

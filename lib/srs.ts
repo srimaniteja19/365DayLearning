@@ -2,7 +2,7 @@ import type { DayEntry, SrsEntry, SrsMap } from "@/lib/types";
 
 export const DAY_MS = 86400000;
 export const SRS_INTERVALS = [7, 30, 90, 180];
-export const LAPSE_DAYS = 3;
+const LAPSE_DAYS = 3;
 
 export function seedReview(now: number): SrsEntry {
   return { idx: 0, due: now + SRS_INTERVALS[0] * DAY_MS, graduated: false, reps: 0, last: now };

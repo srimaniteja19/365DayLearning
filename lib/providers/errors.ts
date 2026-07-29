@@ -34,7 +34,7 @@ export class QuotaError extends ProviderError {
   }
 }
 
-export class NetworkError extends ProviderError {
+class NetworkError extends ProviderError {
   constructor(
     message = "Network or CORS failure. This provider may block browser calls — try OpenRouter or a local proxy.",
   ) {
@@ -64,7 +64,7 @@ type ParsedProviderBody = {
 };
 
 /** Pull a human message out of plain text or OpenRouter-style JSON error bodies. */
-export function extractProviderErrorMessage(bodyText: string): ParsedProviderBody {
+function extractProviderErrorMessage(bodyText: string): ParsedProviderBody {
   const trimmed = bodyText.trim();
   if (!trimmed) return { message: "" };
 
@@ -89,7 +89,7 @@ export function extractProviderErrorMessage(bodyText: string): ParsedProviderBod
 }
 
 /** Friendlier copy for common OpenRouter limit cases. */
-export function humanizeProviderMessage(raw: string): string {
+function humanizeProviderMessage(raw: string): string {
   const msg = raw.trim();
   if (!msg) return "";
 
@@ -161,7 +161,7 @@ function parseRetryAfter(header?: string | null): number | undefined {
   return undefined;
 }
 
-export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(signal.reason ?? new DOMException("Aborted", "AbortError"));

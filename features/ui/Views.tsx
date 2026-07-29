@@ -63,7 +63,7 @@ const SAVE_COPY = {
   off: "Storage unavailable - this session only",
 };
 
-export function SaveIndicator({ status, compact = false }) {
+function SaveIndicator({ status, compact = false }) {
   const label = status === "saving" ? "Saving…"
     : status === "saved" ? "Saved"
     : status === "error" ? "Not saved"
@@ -87,7 +87,7 @@ export function SaveIndicator({ status, compact = false }) {
   );
 }
 
-export function ThemePicker({ themeKey, setThemeKey }) {
+function ThemePicker({ themeKey, setThemeKey }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
   const resolved = resolveThemeKey(themeKey);
@@ -153,7 +153,7 @@ export function ThemePicker({ themeKey, setThemeKey }) {
   );
 }
 
-export function FontPicker({ fontKey, setFontKey }) {
+function FontPicker({ fontKey, setFontKey }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
   const resolved = resolveFontKey(fontKey);
@@ -490,11 +490,6 @@ export function PlanSwitcher({
       </button>
     </div>
   );
-}
-
-/** @deprecated Use PlanSwitcher */
-export function CampaignSwitcher(props) {
-  return <PlanSwitcher {...props} onNewPlan={props.onNewPlan || (() => {})} />;
 }
 
 /* ============================== LANDING PAGE ============================== */
@@ -893,7 +888,7 @@ export function CampaignHero({ campaign, stats, progress, onToggle }) {
   );
 }
 
-export function Metric({ label, value, icon, tone = "mint" }) {
+function Metric({ label, value, icon, tone = "mint" }) {
   return (
     <div className={classNames("metric", `metric-tone-${tone}`)} role="listitem">
       <div className="metric-label">{label}</div>
@@ -903,7 +898,7 @@ export function Metric({ label, value, icon, tone = "mint" }) {
 }
 
 /** Segmented progress — readable without color alone (waffle / bullet chart). */
-export function BulletTrack({ pct, segments = 20 }) {
+function BulletTrack({ pct, segments = 20 }) {
   const filled = Math.round((Math.min(100, Math.max(0, pct)) / 100) * segments);
   return (
     <div
@@ -917,26 +912,6 @@ export function BulletTrack({ pct, segments = 20 }) {
           className={classNames("bullet-seg", i < filled && "bullet-seg-on")}
         />
       ))}
-    </div>
-  );
-}
-
-export function ProgressRing({ pct, accent }) {
-  const r = 42;
-  const c = 2 * Math.PI * r;
-  const offset = c - (pct / 100) * c;
-  return (
-    <div className="progress-ring-wrap">
-      <svg width="96" height="96" viewBox="0 0 104 104">
-        <circle cx="52" cy="52" r={r} fill="none" stroke="var(--track)" strokeWidth="7" />
-        <circle
-          cx="52" cy="52" r={r} fill="none" stroke={accent} strokeWidth="7"
-          strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="square"
-          transform="rotate(-90 52 52)"
-          style={{ transition: "stroke-dashoffset 0.35s ease-out" }}
-        />
-      </svg>
-      <div className="progress-ring-label">{pct}%</div>
     </div>
   );
 }
@@ -984,7 +959,7 @@ export function OnThisDayCard({ memory, onDismiss }) {
 }
 
 /* ============================== BADGES ============================== */
-export function BadgesPanel({ statuses, onClose }) {
+function BadgesPanel({ statuses, onClose }) {
   const unlockedCount = statuses.filter((s) => s.unlocked).length;
   return (
     <div className="settings-panel badges-panel">
@@ -1047,7 +1022,7 @@ function UsageBar({ label, used, limit }) {
   );
 }
 
-export function PricingPanel({ onClose, onOpenAccount }) {
+function PricingPanel({ onClose, onOpenAccount }) {
   const { data: session } = useSession();
   const [usage, setUsage] = useState(null);
   const [loadingUsage, setLoadingUsage] = useState(false);
@@ -1869,7 +1844,7 @@ function DayMission({
   );
 }
 
-export function NoteEditor({ value, onChange, dayNum }) {
+function NoteEditor({ value, onChange, dayNum }) {
   const taRef = useRef(null);
 
   useEffect(() => {
@@ -1899,7 +1874,7 @@ export function NoteEditor({ value, onChange, dayNum }) {
   );
 }
 
-export function RelatedDays({ related, onJump }) {
+function RelatedDays({ related, onJump }) {
   if (!related || related.length === 0) return null;
   return (
     <div className="related-block">
@@ -1919,12 +1894,7 @@ export function RelatedDays({ related, onJump }) {
   );
 }
 
-export function DomainDot({ domain }) {
-  const color = useDomainColor(domain);
-  return <span className="domain-dot" style={{ background: color }} />;
-}
-
-export function DomainTag({ domain }) {
+function DomainTag({ domain }) {
   const color = useDomainColor(domain);
   const meta = DOMAIN_META[domain] || DOMAIN_META["systems-eng"];
   return (
@@ -1934,7 +1904,7 @@ export function DomainTag({ domain }) {
   );
 }
 
-export function EmptyState() {
+function EmptyState() {
   return (
     <div className="empty-state">
       <Icon.Search size={28} />
@@ -2425,7 +2395,7 @@ export function LogView({ campaign, stats, progress, notes }) {
   );
 }
 
-export function SummaryCard({ label, value, sub, accent, tone = "mint" }) {
+function SummaryCard({ label, value, sub, accent, tone = "mint" }) {
   return (
     <div className={classNames("summary-card", `summary-card-tone-${tone}`)} style={{ "--accent": accent }}>
       <div className="summary-card-label">{label}</div>
@@ -2566,7 +2536,7 @@ function linkifyPlain(text, keyBase, startKey) {
   return parts.length ? parts : [text];
 }
 
-export function inlineFormat(text, keyBase) {
+function inlineFormat(text, keyBase) {
   const parts = [];
   let last = 0;
   let m;
@@ -2680,7 +2650,7 @@ const NOTE_STYLES = [
   { key: "failure", label: "Failure modes", hint: "What breaks in production" },
 ];
 
-export function NotesGenPanel({ day, existing, onSaveRef, onAppendNote, fireToast }) {
+function NotesGenPanel({ day, existing, onSaveRef, onAppendNote, fireToast }) {
   const [topicIdx, setTopicIdx] = useState(0);
   const [style, setStyle] = useState("explainer");
   const [state, setState] = useState(existing ? "ready" : "idle");
@@ -2795,7 +2765,7 @@ Requirements:
 }
 
 /* ---------- reference block shown inside a day ---------- */
-export function ReferenceBlock({ data, onClear, onRegenerate }) {
+function ReferenceBlock({ data, onClear, onRegenerate }) {
   const [open, setOpen] = useState(false);
   if (!data) return null;
   return (
@@ -2819,7 +2789,7 @@ export function ReferenceBlock({ data, onClear, onRegenerate }) {
   );
 }
 
-export function QuizPanel({ day, note }) {
+function QuizPanel({ day, note }) {
   const [state, setState] = useState("idle"); // idle | loading | ready | error
   const [questions, setQuestions] = useState([]);
   const [shown, setShown] = useState({});
@@ -2881,7 +2851,7 @@ Respond with ONLY a JSON array, no preamble and no markdown fences:
   );
 }
 
-export function LinkedInPanel({ day, note, fireToast }) {
+function LinkedInPanel({ day, note, fireToast }) {
   const [state, setState] = useState("idle");
   const [draft, setDraft] = useState("");
   const [err, setErr] = useState("");
@@ -2949,7 +2919,7 @@ Pick whichever of the two topics makes the better standalone post. Return only t
   );
 }
 
-export function DataPanel({
+function DataPanel({
   progress,
   notes,
   refs,

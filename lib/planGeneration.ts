@@ -12,7 +12,7 @@ import { ContentError } from "@/lib/providers/errors";
 
 /** How many period day-gens to run at once. Cuts wall-clock without huge prompt drift. */
 const PERIOD_CONCURRENCY = 3;
-export const outlinePeriodSchema = z.object({
+const outlinePeriodSchema = z.object({
   label: z.coerce.string().transform((s) => s.trim() || "Period"),
   theme: z.coerce.string().transform((s) => s.trim() || "Core topics"),
   start: z.coerce.number().int().positive(),
@@ -20,12 +20,12 @@ export const outlinePeriodSchema = z.object({
   domainMix: z.array(z.coerce.string()).optional(),
 });
 
-export const outlineSchema = z.object({
+const outlineSchema = z.object({
   periods: z.array(outlinePeriodSchema).min(1),
 });
 
 /** Topics may be empty — validatePeriodDays pads placeholders. */
-export const generatedDaySchema = z.object({
+const generatedDaySchema = z.object({
   day: z.coerce.number().int().positive(),
   topics: z.array(z.coerce.string()).default([]),
   domains: z.array(z.coerce.string()).optional(),
@@ -202,7 +202,7 @@ type RawGenDay = { day: number; topics: string[]; domains?: string[] };
  * Models often number days 1..N inside a period even when the period is
  * days 15–21. Remap relative sequences onto the absolute period range.
  */
-export function alignDaysToPeriod(
+function alignDaysToPeriod(
   days: RawGenDay[],
   period: OutlinePeriod,
 ): RawGenDay[] {
@@ -977,7 +977,7 @@ Return corrected JSON only.`,
 }
 
 /** Persist/resume helpers for draft generation state. */
-export const DRAFT_GEN_KEY = "dualtrack:gen-draft";
+const DRAFT_GEN_KEY = "dualtrack:gen-draft";
 
 export type PersistedGenDraft = {
   draft: BuilderDraft;

@@ -4,7 +4,7 @@ const STOPWORDS = new Set(["the","and","for","with","from","into","that","this",
   "how","why","what","when","design","designs","patterns","pattern","internals","internal","deep","dive",
   "advanced","modern","production","systems","system","using","use","based","across","over","under","vs"]);
 
-export function tokenizeTopic(t: string): string[] {
+function tokenizeTopic(t: string): string[] {
   return t.toLowerCase()
     .replace(/[^a-z0-9+#.\- ]/g, " ")
     .split(/[\s\-]+/)

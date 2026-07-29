@@ -13,10 +13,6 @@ export const ThemeCtx = createContext<ThemeContextValue>({
   domainColors: DOMAIN_PALETTES.light,
 });
 
-export function useTheme() {
-  return useContext(ThemeCtx);
-}
-
 export function useDomainColor(domain: string): string {
   const { domainColors } = useContext(ThemeCtx);
   return domainColors[domain] || domainColors["systems-eng"] || "#94A3B8";

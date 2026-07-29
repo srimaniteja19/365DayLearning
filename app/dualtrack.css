@@ -284,18 +284,6 @@
   min-height: 34px;
   box-shadow: 2px 2px 0 color-mix(in srgb, var(--text) 14%, transparent);
 }
-.data-btn { cursor: pointer; transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease; }
-.data-btn:hover {
-  border-color: var(--text);
-  color: var(--text);
-  background: color-mix(in srgb, var(--accent-main) 10%, var(--bg));
-  transform: translate(-1px, -1px);
-  box-shadow: 3px 3px 0 color-mix(in srgb, var(--text) 24%, transparent);
-}
-.stat-chip-label {
-  color: var(--text-faint); font-size: 10px; letter-spacing: 0.06em; font-weight: 800; text-transform: uppercase;
-  font-family: var(--mono);
-}
 .stat-chip-val { color: var(--text); font-weight: 800; }
 .level-badge {
   background: var(--accent-main);
@@ -796,12 +784,6 @@
   gap: 5px;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
-}
-.progress-ring-wrap { position: relative; width: 96px; height: 96px; flex-shrink: 0; }
-.progress-ring-wrap svg { width: 96px; height: 96px; }
-.progress-ring-label {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  font-family: var(--display); font-weight: 800; font-size: 18px; color: var(--text); letter-spacing: -0.02em;
 }
 .hero-dispatch {
   position: relative;
@@ -1328,22 +1310,6 @@
   font-weight: 650;
   color: var(--text-faint);
 }
-
-/* keep old domain-chip for any residual use */
-.domain-chip {
-  display: flex; align-items: center; gap: 5px;
-  font-size: 11px; font-weight: 600; color: var(--text-faint);
-  background: transparent; border: 1px solid transparent; border-radius: var(--r-ctl);
-  padding: 5px 8px 5px 7px; cursor: pointer;
-}
-.domain-chip-active {
-  color: var(--text);
-  background: color-mix(in srgb, var(--dot, var(--accent)) 12%, transparent);
-  border-color: color-mix(in srgb, var(--dot, var(--accent)) 35%, transparent);
-  font-weight: 700;
-}
-.domain-chip-dot { width: 6px; height: 6px; border-radius: 1px; background: var(--dot); opacity: 0.9; }
-.domain-chip-pct { color: inherit; opacity: 0.65; font-weight: 600; font-family: var(--mono); font-size: 10px; }
 
 /* ---------- console view (list / index / spine) ---------- */
 .console-shell { position: relative; z-index: 2; }
@@ -1919,7 +1885,6 @@
   background: var(--accent);
   border-color: var(--text);
 }
-.day-tile-live { display: none; }
 .day-tile-meta {
   display: flex;
   align-items: center;
@@ -2089,11 +2054,6 @@
 .topic-line-done .topic-checkbox { background: var(--accent); border-color: var(--accent); }
 .topic-text { flex: 1; font-size: 13.5px; color: var(--text); }
 .topic-line-done .topic-text { color: var(--text-faint); text-decoration: line-through; }
-.domain-dot {
-  width: 7px; height: 7px; border-radius: 1px; flex-shrink: 0;
-  margin-top: 5px;
-  box-shadow: none;
-}
 .domain-tag {
   font-family: var(--mono); font-size: 9.5px; font-weight: 700;
   padding: 3px 7px; border-radius: 2px; border: 1px solid; white-space: nowrap;
@@ -2513,10 +2473,6 @@
   background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-ctl); padding: 6px 12px;
 }
 .tool-btn:hover { color: var(--text); border-color: var(--accent); }
-.data-btn { cursor: pointer; }
-.data-btn:hover { border-color: var(--border-hover); }
-.account-btn-active { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); color: var(--accent); }
-
 /* ---------- review view ---------- */
 .review-view { position: relative; z-index: 2; padding: 14px 28px 24px; max-width: 760px; }
 .review-ops {
@@ -2939,36 +2895,6 @@
 .no-fx .modal-close,
 .no-fx .primary-btn,
 .no-fx .secondary-btn { box-shadow: none; }
-
-/* ---------- empty-plans onboarding (picker section inside the landing page) ---------- */
-.empty-plans-head { max-width: 520px; margin: 0 auto 32px; text-align: center; }
-.empty-plans-title { font-family: var(--display); font-size: 28px; font-weight: 700; color: var(--text); margin: 0 0 10px; }
-.empty-plans-lead { font-size: 14px; line-height: 1.65; color: var(--text-dim); margin: 0; }
-.empty-plans-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; width: 100%; margin-bottom: 26px;
-}
-.empty-plan-card {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 8px; text-align: left;
-  padding: 20px 20px 18px; border-radius: 16px; background: var(--bg-panel); border: 1px solid var(--border);
-  border-top: 3px solid var(--border); transition: transform 0.18s ease, border-color 0.18s ease;
-}
-.empty-plan-card:hover { transform: translateY(-2px); }
-.empty-plan-card-mint { border-top-color: #6fe3b0; }
-.empty-plan-card-coral { border-top-color: #ff8a73; }
-.empty-plan-days {
-  font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
-  color: var(--accent);
-}
-.empty-plan-name { font-family: var(--display); font-size: 17px; font-weight: 700; color: var(--text); margin: 0; }
-.empty-plan-sub { font-size: 12px; color: var(--text-faint); margin: 0; }
-.empty-plan-blurb { font-size: 12.5px; line-height: 1.6; color: var(--text-dim); margin: 2px 0 10px; }
-.empty-plan-card .primary-btn { align-self: stretch; text-align: center; }
-.empty-plans-or {
-  font-family: var(--mono); font-size: 10.5px; letter-spacing: 1.5px; text-transform: uppercase;
-  color: var(--text-faint); margin-bottom: 14px; text-align: center; width: 100%;
-}
-.empty-plans-builder-btn { padding: 10px 22px; display: block; margin: 0 auto; }
-.guest-btn { display: block; width: 100%; text-align: center; padding: 10px 16px; }
 
 /* ---------- landing page (Bloom · vibrant block layout) ---------- */
 .landing {
@@ -5522,8 +5448,6 @@ select.settings-input { cursor: pointer; }
   padding: 8px 11px;
 }
 .sync-status-row strong { color: var(--text); }
-.account-plans-btn { display: flex; align-items: center; justify-content: center; gap: 6px; }
-
 /* ---------- account / sign-in (Bloom block layout) ---------- */
 .modal-account {
   max-width: min(460px, 96vw);
@@ -6258,11 +6182,6 @@ select.settings-input { cursor: pointer; }
   .settings-btn,
   .account-btn { width: 100%; min-height: 48px; }
   .pricing-card-btn { width: 100%; min-height: 48px; }
-
-  /* Empty / auth surfaces */
-  .empty-plans-head { padding: 0 4px; }
-  .empty-plans-title { font-size: 22px; }
-  .empty-plans-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {

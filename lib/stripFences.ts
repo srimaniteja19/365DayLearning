@@ -224,7 +224,7 @@ export function escapeBrokenStringQuotes(input: string): string {
 }
 
 /** Normalize unicode / JS-style key separators before structural repair. */
-export function normalizeJsonPunctuation(input: string): string {
+function normalizeJsonPunctuation(input: string): string {
   let out = "";
   let inString = false;
   let escape = false;
@@ -262,7 +262,7 @@ export function normalizeJsonPunctuation(input: string): string {
  * Convert single-quoted strings to double-quoted JSON strings.
  * Skips content already inside double quotes (so apostrophes in values survive).
  */
-export function normalizeSingleQuotedStrings(input: string): string {
+function normalizeSingleQuotedStrings(input: string): string {
   let out = "";
   let inDouble = false;
   let escape = false;
@@ -330,7 +330,7 @@ export function normalizeSingleQuotedStrings(input: string): string {
 }
 
 /** Quote bare object keys: `{ label: "x" }` → `{ "label": "x" }`. */
-export function quoteBareKeys(input: string): string {
+function quoteBareKeys(input: string): string {
   let out = "";
   let inString = false;
   let escape = false;
@@ -517,13 +517,8 @@ export function insertMissingSeparators(input: string): string {
   return out;
 }
 
-/** @deprecated Use insertMissingSeparators — kept for older imports/tests. */
-export function insertMissingCommas(input: string): string {
-  return insertMissingSeparators(input);
-}
-
 /** Strip // line comments and block comments outside of strings. */
-export function stripJsonComments(input: string): string {
+function stripJsonComments(input: string): string {
   let out = "";
   let inString = false;
   let escape = false;

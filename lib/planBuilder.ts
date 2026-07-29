@@ -58,7 +58,7 @@ export function slugifyDomain(label: string): string {
     .slice(0, 40) || "domain";
 }
 
-export function linesToList(text: string): string[] {
+function linesToList(text: string): string[] {
   return text
     .split("\n")
     .map((l) => l.trim())
