@@ -1173,18 +1173,31 @@
 .controls-row {
   position: relative; z-index: 2;
   display: grid;
-  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
-  gap: 14px;
-  align-items: start;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(0, 2.1fr);
+  gap: 12px 16px;
+  align-items: stretch;
   padding: 12px 14px 14px;
   border-top: 2px solid var(--text);
   background: color-mix(in srgb, var(--text) 2.5%, transparent);
+}
+.ops-search-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.ops-search-head {
+  display: flex;
+  align-items: center;
+  min-height: 18px;
 }
 .ops-search {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
   min-width: 0;
+  min-height: 0;
   padding: 0 6px 0 0;
   border: 2px solid var(--text);
   background: var(--bg);
@@ -1251,7 +1264,7 @@
 .search-input { background: transparent; border: none; outline: none; color: var(--text); font-size: 13px; font-weight: 500; width: 100%; }
 .search-input::placeholder { color: var(--text-faint); }
 
-.domain-legend { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.domain-legend { display: flex; flex-direction: column; gap: 8px; min-width: 0; height: 100%; }
 .domain-legend-head {
   display: flex;
   align-items: center;
@@ -1276,8 +1289,18 @@
 .domain-legend-clear:hover { transform: translate(-0.5px, -0.5px); }
 .domain-legend-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
   gap: 8px;
+  flex: 1;
+  align-content: stretch;
+}
+.domain-legend-grid > .ops-tip-anchor {
+  display: flex;
+  min-width: 0;
+}
+.domain-legend-grid .domain-meter {
+  width: 100%;
+  height: 100%;
 }
 .domain-meter {
   display: flex;
@@ -6502,7 +6525,13 @@ select.settings-input { cursor: pointer; }
     padding: 12px;
     gap: 12px;
   }
-  .ops-search { min-height: 44px; }
+  .ops-search {
+    flex: 0 0 auto;
+    min-height: 44px;
+  }
+  .domain-legend-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
   .console-layout-bar { margin-left: 14px; margin-right: 14px; }
   .console-view,
   .grid-view,

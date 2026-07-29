@@ -951,30 +951,38 @@ export default function DualTrackConsole() {
               activeDayNum={activeDayNum}
             />
             <div className="controls-row">
-              <label className="ops-search">
-                <Tip content="Filter days by topic text or notes. Cleared when you leave." stamp="FIND" tone="sky" side="bottom">
-                  <span className="ops-search-label">Find</span>
-                </Tip>
-                <Icon.Search size={14} />
-                <input
-                  className="ops-search-input"
-                  placeholder={`Search ${campaign.totalDays} days of topics…`}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-                {query.trim() && (
-                  <Tip content="Clear the search filter" stamp="CLR" tone="coral" side="bottom">
-                    <button
-                      type="button"
-                      className="ops-search-clear"
-                      aria-label="Clear search"
-                      onClick={() => setQuery("")}
-                    >
-                      <Icon.X size={14} />
-                    </button>
+              <div className="ops-search-col">
+                <div className="ops-search-head" aria-hidden="true">
+                  <span className="field-ops-kicker">
+                    <span className="field-ops-kicker-mark" />
+                    <span>Query</span>
+                  </span>
+                </div>
+                <label className="ops-search">
+                  <Tip content="Filter days by topic text or notes. Cleared when you leave." stamp="FIND" tone="sky" side="bottom">
+                    <span className="ops-search-label">Find</span>
                   </Tip>
-                )}
-              </label>
+                  <Icon.Search size={14} />
+                  <input
+                    className="ops-search-input"
+                    placeholder={`Search ${campaign.totalDays} days of topics…`}
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                  {query.trim() && (
+                    <Tip content="Clear the search filter" stamp="CLR" tone="coral" side="bottom">
+                      <button
+                        type="button"
+                        className="ops-search-clear"
+                        aria-label="Clear search"
+                        onClick={() => setQuery("")}
+                      >
+                        <Icon.X size={14} />
+                      </button>
+                    </Tip>
+                  )}
+                </label>
+              </div>
               <DomainLegend
                 tally={stats.domainTally}
                 active={domainFilter}
