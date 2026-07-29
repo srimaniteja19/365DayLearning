@@ -276,8 +276,11 @@ export function TopBar({
       <div className="topbar-row">
         <div className="topbar-left">
           <button className="brand brand-btn" onClick={onGoHome} title="Back to home" type="button">
-            <span className="brand-mark">◈</span>
-            <span className="brand-text">REFRAIN<span className="brand-accent">LY</span></span>
+            <span className="brand-mark" aria-hidden="true" />
+            <span className="brand-stack">
+              <span className="brand-kicker">Field ops</span>
+              <span className="brand-text">REFRAIN<span className="brand-accent">LY</span></span>
+            </span>
           </button>
         </div>
 
@@ -452,7 +455,7 @@ export function PlanSwitcher({
                   role="tab"
                   aria-selected={isActive}
                   className={classNames("switcher-tab", isActive && "switcher-tab-active")}
-                  style={isActive ? { "--accent": c.accent, "--glow": c.glow } : undefined}
+                  style={{ "--accent": c.accent, "--glow": c.glow }}
                   onClick={() => setActive(planId)}
                   title={c.subtitle || c.name}
                 >
@@ -820,9 +823,12 @@ export function CampaignHero({ campaign, stats, progress, onToggle }) {
   return (
     <header className="hero" style={{ "--accent": campaign.accent, "--glow": campaign.glow }}>
       <div className="hero-mast">
-        <div className="hero-kicker">
-          <span className="hero-kicker-mark" aria-hidden="true" />
-          <span>Field log · active campaign</span>
+        <div className="hero-mast-head">
+          <div className="hero-kicker">
+            <span className="hero-kicker-mark" aria-hidden="true" />
+            <span>Field log · active campaign</span>
+          </div>
+          <span className="hero-live-stamp">Live</span>
         </div>
         <div className="hero-mast-row">
           <div className="hero-identity">
@@ -836,11 +842,12 @@ export function CampaignHero({ campaign, stats, progress, onToggle }) {
         </div>
         <BulletTrack pct={stats.pct} />
         <div className="hero-statstrip" role="list">
-          <Metric label="Days" value={`${stats.daysComplete}/${stats.totalDays}`} />
-          <Metric label="Topics" value={`${stats.doneTopics}/${stats.totalTopics}`} />
+          <Metric label="Days" value={`${stats.daysComplete}/${stats.totalDays}`} tone="mint" />
+          <Metric label="Topics" value={`${stats.doneTopics}/${stats.totalTopics}`} tone="sky" />
           <Metric
             label="Streak"
             value={`${stats.streak}d`}
+            tone="coral"
             icon={stats.streak > 0 ? <Icon.Flame size={13} /> : null}
           />
         </div>
@@ -849,8 +856,10 @@ export function CampaignHero({ campaign, stats, progress, onToggle }) {
         <aside className="hero-dispatch">
           <div className="hero-dispatch-frame" aria-hidden="true" />
           <div className="next-mission-label">
-            <Icon.Target size={13} />
-            <span>Next dispatch</span>
+            <span className="next-mission-kicker">
+              <Icon.Target size={13} />
+              <span>Next dispatch</span>
+            </span>
             <span className="next-mission-day">Day {String(activeDay.day).padStart(3, "0")}</span>
           </div>
           <ol className="next-mission-topics">
@@ -867,6 +876,7 @@ export function CampaignHero({ campaign, stats, progress, onToggle }) {
                     <span className="topic-checkbox">
                       {isDone && <Icon.Check size={11} />}
                     </span>
+                    <span className="next-mission-idx">{i + 1}</span>
                     <span className="topic-text">{t}</span>
                   </label>
                 </li>
@@ -874,7 +884,8 @@ export function CampaignHero({ campaign, stats, progress, onToggle }) {
             })}
           </ol>
           <div className="next-mission-foot" aria-live="polite">
-            <span>{doneCount}/{activeDay.topics.length} marked</span>
+            <span className="next-mission-foot-stamp">{doneCount}/{activeDay.topics.length}</span>
+            <span>marked</span>
           </div>
         </aside>
       )}
@@ -882,9 +893,9 @@ export function CampaignHero({ campaign, stats, progress, onToggle }) {
   );
 }
 
-export function Metric({ label, value, icon }) {
+export function Metric({ label, value, icon, tone = "mint" }) {
   return (
-    <div className="metric" role="listitem">
+    <div className={classNames("metric", `metric-tone-${tone}`)} role="listitem">
       <div className="metric-label">{label}</div>
       <div className="metric-value">{icon}{value}</div>
     </div>
@@ -1932,38 +1943,61 @@ export function EmptyState() {
 
 /* ============================== GRID VIEW (heatmap / signature element) ============================== */
 export function GridView({ campaign, days, progress, isDayComplete, topicsDoneCount, notes, onOpenDay }) {
+  const completeCount = days.filter((d) => isDayComplete(d)).length;
+  const notedCount = days.filter((d) => notes[d.id]).length;
   return (
     <div className="grid-view">
-      <div className="grid-view-caption">
-        Each cell is one day · color = completion · corner mark = has notes · click to open
-      </div>
-      <div className="heatmap">
-        {days.map((day) => {
-          const done = topicsDoneCount(day);
-          const complete = isDayComplete(day);
-          const level = done === 0 ? 0 : done === day.topics.length ? 2 : 1;
-          return (
-            <button
-              key={day.id}
-              className={classNames("heat-cell", `heat-level-${level}`)}
-              style={{ "--accent": campaign.accent }}
-              onClick={() => onOpenDay(day)}
-              title={`Day ${day.day}: ${day.topics.join(" · ")}${notes[day.id] ? " — has notes" : ""}`}
-            >
-              <span className="heat-cell-num">{day.day}</span>
-              {complete && <span className="heat-cell-check"><Icon.Check size={9} /></span>}
-              {notes[day.id] && <span className="heat-cell-note" />}
-            </button>
-          );
-        })}
-      </div>
-      <div className="heat-legend">
-        <span>Less</span>
-        <span className="heat-cell heat-level-0 heat-legend-swatch" style={{ "--accent": campaign.accent }} />
-        <span className="heat-cell heat-level-1 heat-legend-swatch" style={{ "--accent": campaign.accent }} />
-        <span className="heat-cell heat-level-2 heat-legend-swatch" style={{ "--accent": campaign.accent }} />
-        <span>More</span>
-      </div>
+      <section className="grid-ops" style={{ "--accent": campaign.accent }} aria-label="Day completion grid">
+        <div className="grid-ops-mast">
+          <div className="grid-ops-mast-text">
+            <span className="grid-ops-title">Day grid</span>
+            <span className="grid-ops-sub">
+              Each cell is one day · fill = completion · corner mark = notes · click to open
+            </span>
+          </div>
+          <div className="grid-ops-stats" aria-hidden="true">
+            <span className="grid-ops-stat">
+              <em>{completeCount}</em> cleared
+            </span>
+            <span className="grid-ops-stat">
+              <em>{notedCount}</em> noted
+            </span>
+            <span className="grid-ops-stat">
+              <em>{days.length}</em> shown
+            </span>
+          </div>
+        </div>
+        <div className="heatmap">
+          {days.map((day) => {
+            const done = topicsDoneCount(day);
+            const complete = isDayComplete(day);
+            const level = done === 0 ? 0 : done === day.topics.length ? 2 : 1;
+            return (
+              <button
+                key={day.id}
+                type="button"
+                className={classNames("heat-cell", `heat-level-${level}`)}
+                onClick={() => onOpenDay(day)}
+                title={`Day ${day.day}: ${day.topics.join(" · ")}${notes[day.id] ? " — has notes" : ""}`}
+              >
+                <span className="heat-cell-num">{day.day}</span>
+                {complete && <span className="heat-cell-check"><Icon.Check size={9} /></span>}
+                {notes[day.id] && <span className="heat-cell-note" />}
+              </button>
+            );
+          })}
+        </div>
+        <div className="heat-legend">
+          <span className="heat-legend-label">Less</span>
+          <span className="heat-cell heat-level-0 heat-legend-swatch" />
+          <span className="heat-cell heat-level-1 heat-legend-swatch" />
+          <span className="heat-cell heat-level-2 heat-legend-swatch" />
+          <span className="heat-legend-label">More</span>
+          <span className="heat-legend-key">
+            <span className="heat-cell-note heat-legend-note" /> notes
+          </span>
+        </div>
+      </section>
     </div>
   );
 }
@@ -2142,15 +2176,21 @@ export function WeeklyView({ log, notes, progress, srs, campaigns, activeCampaig
   return (
     <div className="weekly-view">
       <div className="weekly-strip">
-        <SummaryCard label="Topics This Week" value={weekEvents.length} sub="last 7 days" accent={campaign.accent} />
-        <SummaryCard label="Active Day Streak" value={activeDayStreak} sub={activeDayStreak === 1 ? "day" : "days"} accent={campaign.accent} />
-        <SummaryCard label="Due For Review" value={dueNow} sub="in the queue" accent={campaign.accent} />
-        <SummaryCard label="Open Questions" value={openQuestions.length} sub="flagged in notes" accent={campaign.accent} />
+        <SummaryCard label="Topics This Week" value={weekEvents.length} sub="last 7 days" accent={campaign.accent} tone="mint" />
+        <SummaryCard label="Active Day Streak" value={activeDayStreak} sub={activeDayStreak === 1 ? "day" : "days"} accent={campaign.accent} tone="sky" />
+        <SummaryCard label="Due For Review" value={dueNow} sub="in the queue" accent={campaign.accent} tone="lemon" />
+        <SummaryCard label="Open Questions" value={openQuestions.length} sub="flagged in notes" accent={campaign.accent} tone="coral" />
       </div>
 
       <div className="weekly-grid">
         <div className="log-panel">
-          <div className="log-panel-title">LAST 7 DAYS</div>
+          <div className="log-panel-head">
+            <span className="field-ops-kicker" aria-hidden="true">
+              <span className="field-ops-kicker-mark" />
+              <span>Pulse</span>
+            </span>
+            <div className="log-panel-title">Last 7 days</div>
+          </div>
           <div className="week-bars">
             {byDay.map((b) => (
               <div key={b.key} className="week-bar-col">
@@ -2168,7 +2208,13 @@ export function WeeklyView({ log, notes, progress, srs, campaigns, activeCampaig
         </div>
 
         <div className="log-panel">
-          <div className="log-panel-title">DOMAINS TOUCHED</div>
+          <div className="log-panel-head">
+            <span className="field-ops-kicker" aria-hidden="true">
+              <span className="field-ops-kicker-mark" />
+              <span>Sectors</span>
+            </span>
+            <div className="log-panel-title">Domains touched</div>
+          </div>
           <div className="log-panel-body">
             {domainTally.length === 0 && <div className="weekly-empty">Nothing completed in the last 7 days.</div>}
             {domainTally.map(([dom, count]) => {
@@ -2177,11 +2223,13 @@ export function WeeklyView({ log, notes, progress, srs, campaigns, activeCampaig
               const pct = Math.round((count / weekEvents.length) * 100);
               return (
                 <div key={dom} className="log-bar-row">
-                  <span className="log-bar-label" style={{ color }}>{meta.label}</span>
+                  <span className="log-bar-dot" style={{ background: color }} aria-hidden="true" />
+                  <span className="log-bar-label">{meta.label}</span>
                   <div className="log-bar-track">
                     <div className="log-bar-fill" style={{ width: pct + "%", background: color }} />
                   </div>
                   <span className="log-bar-val">{count}</span>
+                  <span className="log-bar-pct">{pct}%</span>
                 </div>
               );
             })}
@@ -2191,7 +2239,13 @@ export function WeeklyView({ log, notes, progress, srs, campaigns, activeCampaig
 
       <div className="weekly-grid">
         <div className="log-panel">
-          <div className="log-panel-title">OPEN QUESTIONS IN YOUR NOTES</div>
+          <div className="log-panel-head">
+            <span className="field-ops-kicker" aria-hidden="true">
+              <span className="field-ops-kicker-mark" />
+              <span>Flags</span>
+            </span>
+            <div className="log-panel-title">Open questions in your notes</div>
+          </div>
           <div className="log-panel-body">
             {openQuestions.length === 0 && (
               <div className="weekly-empty">Nothing flagged. Lines with a question mark or TODO show up here.</div>
@@ -2206,7 +2260,13 @@ export function WeeklyView({ log, notes, progress, srs, campaigns, activeCampaig
         </div>
 
         <div className="log-panel">
-          <div className="log-panel-title">NEXT UP IN {campaign.name}</div>
+          <div className="log-panel-head">
+            <span className="field-ops-kicker" aria-hidden="true">
+              <span className="field-ops-kicker-mark" />
+              <span>Next</span>
+            </span>
+            <div className="log-panel-title">Next up in {campaign.name}</div>
+          </div>
           <div className="log-panel-body">
             {upcoming.length === 0 && <div className="weekly-empty">Campaign complete.</div>}
             {upcoming.map((d) => (
@@ -2259,16 +2319,32 @@ export function LogView({ campaign, stats, progress, notes }) {
 
   const velocityTitle =
     velocityScope?.key === "month"
-      ? "MONTHLY VELOCITY"
+      ? "Monthly velocity"
       : velocityScope?.key === "week"
-        ? "WEEKLY VELOCITY"
-        : "PERIOD VELOCITY";
+        ? "Weekly velocity"
+        : "Period velocity";
 
   return (
-    <div className="log-view">
+    <div className="log-view" style={{ "--accent": campaign.accent }}>
+      <div className="log-ops-mast">
+        <span className="log-ops-title">Analytics</span>
+        <span className="log-ops-sub">Domain coverage · velocity · campaign readout</span>
+      </div>
+      <div className="log-summary-strip">
+        <SummaryCard label="Topics Mastered" value={stats.doneTopics} sub={`of ${stats.totalTopics}`} accent={campaign.accent} tone="mint" />
+        <SummaryCard label="Days Fully Cleared" value={stats.daysComplete} sub={`of ${stats.totalDays}`} accent={campaign.accent} tone="sky" />
+        <SummaryCard label="Completion" value={`${stats.pct}%`} sub="overall" accent={campaign.accent} tone="lemon" />
+        <SummaryCard label="Days With Notes" value={campaign.days.filter((d) => notes[d.id]).length} sub={`streak ${stats.streak}`} accent={campaign.accent} tone="coral" />
+      </div>
       <div className="log-grid">
         <div className="log-panel">
-          <div className="log-panel-title">DOMAIN COVERAGE</div>
+          <div className="log-panel-head">
+            <span className="field-ops-kicker" aria-hidden="true">
+              <span className="field-ops-kicker-mark" />
+              <span>Sectors</span>
+            </span>
+            <div className="log-panel-title">Domain coverage</div>
+          </div>
           <div className="log-panel-body">
             {domainRows.map(([dom, t]) => {
               const meta = DOMAIN_META[dom] || DOMAIN_META["systems-eng"];
@@ -2276,19 +2352,30 @@ export function LogView({ campaign, stats, progress, notes }) {
               const pct = Math.round((t.done / t.total) * 100);
               return (
                 <div key={dom} className="log-bar-row">
-                  <span className="log-bar-label" style={{ color }}>{meta.label}</span>
+                  <span className="log-bar-dot" style={{ background: color }} aria-hidden="true" />
+                  <span className="log-bar-label">{meta.label}</span>
                   <div className="log-bar-track">
                     <div className="log-bar-fill" style={{ width: pct + "%", background: color }} />
                   </div>
                   <span className="log-bar-val">{t.done}/{t.total}</span>
+                  <span className="log-bar-pct">{pct}%</span>
                 </div>
               );
             })}
           </div>
         </div>
         <div className="log-panel">
-          <div className="log-panel-title">{velocityTitle}</div>
+          <div className="log-panel-head">
+            <span className="field-ops-kicker" aria-hidden="true">
+              <span className="field-ops-kicker-mark" />
+              <span>Tempo</span>
+            </span>
+            <div className="log-panel-title">{velocityTitle}</div>
+          </div>
           <div className="log-panel-body">
+            {buckets.length === 0 && (
+              <div className="weekly-empty">No period buckets on this plan.</div>
+            )}
             {buckets.map((b) => (
               <div key={b.label} className="log-bar-row">
                 <span className="log-bar-label log-bar-label-mono">{b.label}</span>
@@ -2296,26 +2383,21 @@ export function LogView({ campaign, stats, progress, notes }) {
                   <div className="log-bar-fill" style={{ width: b.pct + "%", background: campaign.accent }} />
                 </div>
                 <span className="log-bar-val">{b.done}/{b.total}</span>
+                <span className="log-bar-pct">{b.pct}%</span>
               </div>
             ))}
           </div>
         </div>
       </div>
-      <div className="log-summary-strip">
-        <SummaryCard label="Topics Mastered" value={stats.doneTopics} sub={`of ${stats.totalTopics}`} accent={campaign.accent} />
-        <SummaryCard label="Days Fully Cleared" value={stats.daysComplete} sub={`of ${stats.totalDays}`} accent={campaign.accent} />
-        <SummaryCard label="Completion" value={`${stats.pct}%`} sub="overall" accent={campaign.accent} />
-        <SummaryCard label="Days With Notes" value={campaign.days.filter((d) => notes[d.id]).length} sub={`streak ${stats.streak}`} accent={campaign.accent} />
-      </div>
     </div>
   );
 }
 
-export function SummaryCard({ label, value, sub, accent }) {
+export function SummaryCard({ label, value, sub, accent, tone = "mint" }) {
   return (
-    <div className="summary-card" style={{ "--accent": accent }}>
-      <div className="summary-card-value">{value}</div>
+    <div className={classNames("summary-card", `summary-card-tone-${tone}`)} style={{ "--accent": accent }}>
       <div className="summary-card-label">{label}</div>
+      <div className="summary-card-value">{value}</div>
       <div className="summary-card-sub">{sub}</div>
     </div>
   );
