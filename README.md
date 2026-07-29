@@ -78,6 +78,7 @@ npm run db:studio    # browse the database with Drizzle Studio
 - Custom plans from the builder; plan generation (outline → periods), edit-before-save, cancel/resume
 - Multi-plan switcher; delete purges that plan’s progress/notes/refs/srs
 - **Other things I learned** — calendar journal with markdown notes, rich links, and AI insights
+- **Bookmarks** — save articles, YouTube/Vimeo, docs, and repos with compact link previews when available
 - Optional **accounts + cloud sync** (Neon Postgres + Auth.js) — sign in to sync across devices
 - **Subscriptions** — Recruit (free OpenRouter BYOK) is live; Operator/Architect managed AI is planned (checkout not connected)
 - Themes (10) via CSS custom properties — Signal, Folio, Afterburn, Chlorophyll, Oxide, Ion, Cinnabar, Halide, Voltaic, Marina

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type {
   LearnedMap,
+  BookmarksList,
   LogEntry,
   NotesMap,
   Plan,
@@ -14,6 +15,7 @@ import type {
 import { createPlanId } from "@/lib/planGeneration";
 import { migrateUserData } from "@/lib/migration";
 import { sanitizeLearned } from "@/lib/learned";
+import { mergeBookmarks, sanitizeBookmarks } from "@/lib/bookmarks";
 import { seedBuiltinPlans } from "@/data/builtinPlans";
 import { resolveThemeKey } from "@/theme/themes";
 import {
@@ -47,6 +49,7 @@ export type FullBackupFile = {
   srs: SrsMap;
   log: LogEntry[];
   learned?: LearnedMap;
+  bookmarks?: BookmarksList;
   themeKey?: ThemeKey;
   plans: PlansState;
   activePlanId?: string;
@@ -66,6 +69,7 @@ export type AppDataSlice = {
   srs: SrsMap;
   log: LogEntry[];
   learned: LearnedMap;
+  bookmarks: BookmarksList;
   themeKey: ThemeKey;
   activePlanId: string;
 };
@@ -125,6 +129,7 @@ export function exportAll(slice: {
     srs: slice.userdata.srs,
     log: slice.userdata.log,
     learned: slice.userdata.learned || {},
+    bookmarks: slice.userdata.bookmarks || [],
     themeKey: slice.themeKey,
     plans: slice.plans,
     activePlanId: slice.activePlanId,
@@ -249,7 +254,7 @@ export function detectImport(raw: unknown): DetectedImport {
   }
 
   const hasUser =
-    data.progress || data.notes || data.refs || data.srs || data.log || data.learned || data.plans;
+    data.progress || data.notes || data.refs || data.srs || data.log || data.learned || data.bookmarks || data.plans;
   if (!hasUser && data.kind !== "dualtrack-full") {
     throw new Error("No progress, notes, or plans found in that file");
   }
@@ -261,6 +266,7 @@ export function detectImport(raw: unknown): DetectedImport {
     srs: sanitizeRecord(data.srs, srsEntrySchema) as SrsMap,
     log: sanitizeLog(data.log),
     learned: sanitizeLearned(data.learned),
+    bookmarks: sanitizeBookmarks(data.bookmarks),
   });
 
   const plans: PlansState = sanitizePlans(data.plans);
@@ -281,6 +287,7 @@ export function detectImport(raw: unknown): DetectedImport {
       srs: userdata.srs,
       log: userdata.log,
       learned: userdata.learned,
+      bookmarks: userdata.bookmarks,
       themeKey: data.themeKey != null ? resolveThemeKey(data.themeKey) : undefined,
       plans,
       activePlanId:
@@ -345,6 +352,7 @@ export function applyFullImport(
       srs: backup.srs || {},
       log: Array.isArray(backup.log) ? backup.log : [],
       learned: backup.learned || {},
+      bookmarks: backup.bookmarks || [],
       themeKey: resolveThemeKey(backup.themeKey || current.themeKey),
       activePlanId,
     };
@@ -360,6 +368,7 @@ export function applyFullImport(
     srs: mergeRecords(current.srs, backup.srs || {}),
     log: [...current.log, ...(Array.isArray(backup.log) ? backup.log : [])],
     learned: mergeLearned(current.learned || {}, backup.learned || {}),
+    bookmarks: mergeBookmarks(current.bookmarks || [], backup.bookmarks || []),
     themeKey: resolveThemeKey(backup.themeKey || current.themeKey),
     activePlanId:
       backup.activePlanId && plans[backup.activePlanId]

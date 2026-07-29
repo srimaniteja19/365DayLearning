@@ -85,6 +85,15 @@ describe("day id migration", () => {
             { id: "l1", title: "Keep me", body: "journal", createdAt: 1 },
           ],
         },
+        bookmarks: [
+          {
+            id: "b1",
+            url: "https://example.com",
+            kind: "link",
+            title: "Keep clip",
+            createdAt: 1,
+          },
+        ],
       },
       BUILTIN_365_ID,
     );
@@ -97,6 +106,7 @@ describe("day id migration", () => {
     expect(next.log).toHaveLength(1);
     expect(next.log[0].d).toBe(`${BUILTIN_45_ID}:1`);
     expect(next.learned["2026-07-27"]?.[0]?.title).toBe("Keep me");
+    expect(next.bookmarks?.[0]?.title).toBe("Keep clip");
   });
 
   it("migrateUserData is idempotent (second pass is a no-op)", () => {

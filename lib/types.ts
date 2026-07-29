@@ -109,6 +109,34 @@ export type LearnedItem = {
 };
 export type LearnedMap = Record<string, LearnedItem[]>;
 
+/** Saved links — articles, videos, repos — with optional OG / embed preview. */
+export type BookmarkKind = "youtube" | "vimeo" | "article" | "repo" | "doc" | "link";
+
+export type BookmarkPreview = {
+  title?: string;
+  description?: string;
+  image?: string;
+  siteName?: string;
+  favicon?: string;
+  embedId?: string;
+  embedProvider?: "youtube" | "vimeo";
+  fetchedAt?: number;
+};
+
+export type BookmarkItem = {
+  id: string;
+  url: string;
+  kind: BookmarkKind;
+  title: string;
+  note?: string;
+  tags?: string[];
+  preview?: BookmarkPreview;
+  insight?: string;
+  createdAt: number;
+};
+
+export type BookmarksList = BookmarkItem[];
+
 export type UserDataState = {
   progress: ProgressMap;
   notes: NotesMap;
@@ -116,6 +144,7 @@ export type UserDataState = {
   srs: SrsMap;
   log: LogEntry[];
   learned: LearnedMap;
+  bookmarks: BookmarksList;
 };
 
 export type MetaState = {
@@ -143,6 +172,7 @@ export type PersistedState = {
   srs: SrsMap;
   log: LogEntry[];
   learned?: LearnedMap;
+  bookmarks?: BookmarksList;
   themeKey: ThemeKey;
   updatedAt?: number;
   schemaVersion?: number;
@@ -160,13 +190,14 @@ export type BackupFile = {
   srs: SrsMap;
   log: LogEntry[];
   learned?: LearnedMap;
+  bookmarks?: BookmarksList;
   themeKey: ThemeKey;
   plans?: PlansState;
   activePlanId?: string;
   schemaVersion?: number;
 };
 
-export type ViewKey = "console" | "grid" | "review" | "weekly" | "log" | "learned";
+export type ViewKey = "console" | "grid" | "review" | "weekly" | "log" | "learned" | "bookmarks";
 export type ScopeKey = "all" | "quarter" | "month" | "week";
 export type ModalState = { kind: string; day?: PlanDay } | null;
 export type SaveStatus = "loading" | "idle" | "saving" | "saved" | "error" | "off";

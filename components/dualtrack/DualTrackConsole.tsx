@@ -71,6 +71,8 @@ import {
   OnThisDayCard,
 } from "@/features/ui/Views";
 import { LearnedView } from "@/features/learned/LearnedView";
+import { BookmarksView } from "@/features/bookmarks/BookmarksView";
+import { sanitizeBookmarks } from "@/lib/bookmarks";
 
 const GUEST_MODE_KEY = "dualtrack:guest";
 const PAGE_KEY = "dualtrack:page";
@@ -81,6 +83,7 @@ export default function DualTrackConsole() {
   const [progress, setProgress] = useState({});
   const [notes, setNotes] = useState({});
   const [learned, setLearned] = useState({});
+  const [bookmarks, setBookmarks] = useState([]);
   const [view, setView] = useState("console");
   const [query, setQuery] = useState("");
   const [domainFilter, setDomainFilter] = useState(null);
@@ -218,9 +221,9 @@ export default function DualTrackConsole() {
         updatedAt: Date.now(),
       },
       plans,
-      userdata: { progress, notes, refs, srs, log, learned },
+      userdata: { progress, notes, refs, srs, log, learned, bookmarks },
     }),
-    [activePlanId, themeKey, fontKey, plans, progress, notes, refs, srs, log, learned],
+    [activePlanId, themeKey, fontKey, plans, progress, notes, refs, srs, log, learned, bookmarks],
   );
 
   const fireToast = useCallback((msg, kind) => {
@@ -256,6 +259,7 @@ export default function DualTrackConsole() {
         setSrs(snap.userdata.srs);
         setLog(snap.userdata.log);
         setLearned(snap.userdata.learned || {});
+        setBookmarks(sanitizeBookmarks(snap.userdata.bookmarks));
         if (snap.meta.themeKey) {
           setThemeKey(resolveThemeKey(snap.meta.themeKey));
         }
@@ -292,6 +296,7 @@ export default function DualTrackConsole() {
         setSrs(snap.userdata.srs || {});
         setLog(snap.userdata.log || []);
         setLearned(snap.userdata.learned || {});
+        setBookmarks(sanitizeBookmarks(snap.userdata.bookmarks));
         if (snap.meta.themeKey) setThemeKey(resolveThemeKey(snap.meta.themeKey));
         if (snap.meta.fontKey) setFontKey(resolveFontKey(snap.meta.fontKey));
         if (storageOk.current) await saveAppSnapshot(snap);
@@ -321,7 +326,7 @@ export default function DualTrackConsole() {
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [progress, notes, refs, srs, log, learned, themeKey, fontKey, plans, activePlanId, cloudUserId, buildSnapshot]);
+  }, [progress, notes, refs, srs, log, learned, bookmarks, themeKey, fontKey, plans, activePlanId, cloudUserId, buildSnapshot]);
 
   useEffect(() => {
     if (!campaign) return;
@@ -383,6 +388,18 @@ export default function DualTrackConsole() {
     });
   }, []);
 
+  const addBookmark = useCallback((item) => {
+    setBookmarks((prev) => [item, ...(prev || [])]);
+  }, []);
+
+  const updateBookmark = useCallback((item) => {
+    setBookmarks((prev) => (prev || []).map((x) => (x.id === item.id ? item : x)));
+  }, []);
+
+  const removeBookmark = useCallback((id) => {
+    setBookmarks((prev) => (prev || []).filter((x) => x.id !== id));
+  }, []);
+
   const handleReset = useCallback(async () => {
     setProgress({});
     setNotes({});
@@ -390,6 +407,7 @@ export default function DualTrackConsole() {
     setSrs({});
     setLog([]);
     setLearned({});
+    setBookmarks([]);
     await clearUserData();
     if (cloudUserId) {
       pushCloudSnapshot({
@@ -404,7 +422,7 @@ export default function DualTrackConsole() {
           updatedAt: Date.now(),
         },
         plans,
-        userdata: { progress: {}, notes: {}, refs: {}, srs: {}, log: [], learned: {} },
+        userdata: { progress: {}, notes: {}, refs: {}, srs: {}, log: [], learned: {}, bookmarks: [] },
       });
     }
     setConfirmReset(false);
@@ -433,7 +451,7 @@ export default function DualTrackConsole() {
       return next;
     });
     const purged = purgePlanUserData(
-      { progress, notes, refs, srs, log, learned },
+      { progress, notes, refs, srs, log, learned, bookmarks },
       planId,
     );
     setProgress(purged.progress);
@@ -442,13 +460,14 @@ export default function DualTrackConsole() {
     setSrs(purged.srs);
     setLog(purged.log);
     setLearned(purged.learned || {});
+    setBookmarks(purged.bookmarks || []);
     if (activePlanId === planId) {
       const remaining = Object.values(plans).filter((p) => p.id !== planId && !p.hidden);
       setActivePlanId(remaining[0]?.id || BUILTIN_365_ID);
     }
     setConfirmDeletePlanId(null);
     fireToast("Plan deleted", "xp");
-  }, [plans, activePlanId, progress, notes, refs, srs, log, learned, fireToast]);
+  }, [plans, activePlanId, progress, notes, refs, srs, log, learned, bookmarks, fireToast]);
 
   // "OPERATION LONGHAUL"/"OPERATION FASTBURN" are curated example curricula,
   // not auto-assigned to every account — offered as opt-in starting points.
@@ -679,6 +698,7 @@ export default function DualTrackConsole() {
       setSrs(s.srs);
       setLog(s.log);
       setLearned(s.learned || {});
+      setBookmarks(sanitizeBookmarks(s.bookmarks));
       if (s.themeKey) setThemeKey(resolveThemeKey(s.themeKey));
       if (s.activePlanId) setActivePlanId(s.activePlanId);
       return;
@@ -820,6 +840,7 @@ export default function DualTrackConsole() {
             srs={srs}
             log={log}
             learned={learned}
+            bookmarks={bookmarks}
             themeKey={themeKey}
             onImport={applyImport}
             fireToast={fireToast}
@@ -1012,6 +1033,16 @@ export default function DualTrackConsole() {
             fireToast={fireToast}
           />
         )}
+        {view === "bookmarks" && (
+          <BookmarksView
+            bookmarks={bookmarks}
+            onAdd={addBookmark}
+            onUpdate={updateBookmark}
+            onRemove={removeBookmark}
+            accent={campaign.accent}
+            fireToast={fireToast}
+          />
+        )}
         {view === "log" && (
           <LogView
             campaign={campaign}
@@ -1033,6 +1064,7 @@ export default function DualTrackConsole() {
             srs={srs}
             log={log}
             learned={learned}
+            bookmarks={bookmarks}
             themeKey={themeKey}
             onImport={applyImport}
             fireToast={fireToast}

@@ -553,6 +553,13 @@ const LANDING_FEATURES = [
     copy: "Field notes for tangents — an evidence board of slips, markdown, and AI summaries.",
   },
   {
+    id: "clips",
+    tone: "blue",
+    icon: Icon.Link,
+    title: "Bookmarks",
+    copy: "Save articles, videos, and docs — compact link previews when metadata is available.",
+  },
+  {
     id: "onthisday",
     tone: "blue",
     icon: Icon.Calendar,
@@ -1162,6 +1169,7 @@ export function ViewTabs({ view, setView, dueCount }) {
     { key: "review", label: "Review", icon: Icon.Rotate, badge: dueCount },
     { key: "weekly", label: "Weekly", icon: Icon.Calendar },
     { key: "learned", label: "Learned", icon: Icon.Note },
+    { key: "bookmarks", label: "Bookmarks", icon: Icon.Link },
     { key: "log", label: "Analytics", icon: Icon.List },
   ];
   return (
@@ -2227,7 +2235,7 @@ export function SummaryCard({ label, value, sub, accent }) {
 }
 
 /* ============================== MODALS ============================== */
-export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, progress, srs, log, learned, themeKey, onImport, fireToast, plans, activePlanId, onPlanCreated, badgeStatuses, onAccountAuthenticated, onAccountGuest, onOpenPricing, onOpenAccount }) {
+export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, progress, srs, log, learned, bookmarks, themeKey, onImport, fireToast, plans, activePlanId, onPlanCreated, badgeStatuses, onAccountAuthenticated, onAccountGuest, onOpenPricing, onOpenAccount }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKey);
@@ -2318,6 +2326,7 @@ export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, pro
               srs={srs}
               log={log}
               learned={learned}
+              bookmarks={bookmarks}
               themeKey={themeKey}
               onImport={onImport}
               fireToast={fireToast}
@@ -2746,6 +2755,7 @@ export function DataPanel({
   srs,
   log,
   learned,
+  bookmarks,
   themeKey,
   onImport,
   fireToast,
@@ -2778,7 +2788,7 @@ export function DataPanel({
     try {
       const payload = exportAll({
         plans: plans || seedBuiltinPlans(),
-        userdata: { progress, notes, refs, srs, log, learned: learned || {} },
+        userdata: { progress, notes, refs, srs, log, learned: learned || {}, bookmarks: bookmarks || [] },
         themeKey,
         activePlanId,
       });
@@ -2850,6 +2860,7 @@ export function DataPanel({
           srs,
           log,
           learned: learned || {},
+          bookmarks: bookmarks || [],
           themeKey,
           activePlanId,
         },

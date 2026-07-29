@@ -8,6 +8,7 @@ import type {
 } from "@/lib/types";
 import { BUILTIN_365_ID, BUILTIN_45_ID } from "@/lib/types";
 import { sanitizeLearned } from "@/lib/learned";
+import { sanitizeBookmarks } from "@/lib/bookmarks";
 
 /** Rewrite legacy day ids: `365-12` → `builtin-365:12`, `45-3` → `builtin-45:3`. */
 export function migrateDayId(id: string): string {
@@ -61,6 +62,7 @@ export function migrateUserData(raw: Partial<UserDataState> | null | undefined):
     srs: migrateSrs(raw?.srs),
     log: migrateLog(raw?.log),
     learned: sanitizeLearned(raw?.learned),
+    bookmarks: sanitizeBookmarks(raw?.bookmarks),
   };
 }
 
@@ -80,7 +82,8 @@ export function purgePlanUserData(userdata: UserDataState, planId: string): User
     refs: strip(userdata.refs),
     srs: strip(userdata.srs),
     log: userdata.log.filter((e) => !e.d.startsWith(prefix)),
-    // Calendar journal is global — keep across plan deletes.
+    // Calendar journal + clip deck are global — keep across plan deletes.
     learned: userdata.learned || {},
+    bookmarks: userdata.bookmarks || [],
   };
 }
