@@ -1559,12 +1559,10 @@ function DayTile({
   refs,
   setRef,
 }) {
-  const colorA = useDomainColor(day.domains?.[0] || "systems-eng");
-  const colorB = useDomainColor(day.domains?.[1] || day.domains?.[0] || "systems-eng");
   const total = day.topics.length || 1;
   const pct = Math.round((done / total) * 100);
-  const previewTopics = day.topics.slice(0, 2);
-  const extraCount = Math.max(0, day.topics.length - 2);
+  const previewTopics = day.topics.slice(0, 4);
+  const extraCount = Math.max(0, day.topics.length - 4);
   const noteMatch =
     query &&
     query.trim() &&
@@ -1579,14 +1577,8 @@ function DayTile({
         isExpanded && "day-tile-expanded",
         isCurrent && !complete && "day-tile-current",
       )}
-      style={{
-        "--accent": campaign.accent,
-        "--tile-a": colorA,
-        "--tile-b": colorB,
-      }}
+      style={{ "--accent": campaign.accent }}
     >
-      <div className="day-tile-rule" aria-hidden="true" />
-
       <button
         type="button"
         className="day-tile-face"
@@ -1619,20 +1611,26 @@ function DayTile({
           </div>
         </div>
 
-        <ul className="day-tile-topics">
+        <ul className="day-tile-stickers">
           {previewTopics.map((t, i) => {
             const topicDone = !!(progress[day.id] && progress[day.id][i]);
+            const tone = stickerTone(day.domains[i] || "systems-eng", i + day.day);
             return (
               <li
                 key={i}
-                className={classNames("day-tile-topic", topicDone && "day-tile-topic-done")}
+                className={classNames(
+                  "topic-sticker",
+                  `topic-sticker-${tone}`,
+                  topicDone && "topic-sticker-done",
+                )}
+                title={t}
               >
-                <DomainDot domain={day.domains[i]} />
-                <span>{t}</span>
+                {topicDone && <Icon.Check size={11} />}
+                <span className="topic-sticker-label">{t}</span>
               </li>
             );
           })}
-          {extraCount > 0 && <li className="day-tile-more">+{extraCount} more</li>}
+          {extraCount > 0 && <li className="day-tile-more">+{extraCount}</li>}
         </ul>
 
         <div className="day-tile-progress" aria-hidden="true" title={`${pct}%`}>
@@ -1661,6 +1659,19 @@ function DayTile({
   );
 }
 
+/** Neo-brutal pastel tones for Index topic stickers. */
+const STICKER_TONES = [
+  "mint", "lemon", "coral", "sky", "lilac", "butter", "seafoam", "peach",
+  "rose", "lime", "indigo", "amber", "cyan", "magenta", "olive", "slate",
+];
+
+function stickerTone(domain, index) {
+  const s = String(domain || "");
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return STICKER_TONES[Math.abs(h + index * 5) % STICKER_TONES.length];
+}
+
 function DayMission({
   day,
   campaign,
@@ -1681,8 +1692,6 @@ function DayMission({
   setRef,
   side,
 }) {
-  const colorA = useDomainColor(day.domains?.[0] || "systems-eng");
-  const colorB = useDomainColor(day.domains?.[1] || day.domains?.[0] || "systems-eng");
   const total = day.topics.length || 1;
   const pct = Math.round((done / total) * 100);
   const noteMatch =
@@ -1700,11 +1709,7 @@ function DayMission({
         isExpanded && "mission-node-expanded",
         isCurrent && !complete && "mission-node-current",
       )}
-      style={{
-        "--accent": campaign.accent,
-        "--tile-a": colorA,
-        "--tile-b": colorB,
-      }}
+      style={{ "--accent": campaign.accent }}
     >
       <div className="mission-rail" aria-hidden="true">
         <span className={classNames("mission-dot", complete && "mission-dot-done", isCurrent && !complete && "mission-dot-live")}>
@@ -1730,13 +1735,22 @@ function DayMission({
               <span className="mission-card-frac">{done}/{day.topics.length}</span>
             </div>
           </div>
-          <ul className="mission-card-topics">
+          <ul className="mission-card-stickers">
             {day.topics.map((t, i) => {
               const topicDone = !!(progress[day.id] && progress[day.id][i]);
+              const tone = stickerTone(day.domains[i] || "systems-eng", i + day.day);
               return (
-                <li key={i} className={classNames("mission-card-topic", topicDone && "mission-card-topic-done")}>
-                  <DomainDot domain={day.domains[i]} />
-                  <span>{t}</span>
+                <li
+                  key={i}
+                  className={classNames(
+                    "topic-sticker",
+                    `topic-sticker-${tone}`,
+                    topicDone && "topic-sticker-done",
+                  )}
+                  title={t}
+                >
+                  {topicDone && <Icon.Check size={11} />}
+                  <span className="topic-sticker-label">{t}</span>
                 </li>
               );
             })}
