@@ -13,21 +13,22 @@ import { ContentError } from "@/lib/providers/errors";
 /** How many period day-gens to run at once. Cuts wall-clock without huge prompt drift. */
 const PERIOD_CONCURRENCY = 3;
 export const outlinePeriodSchema = z.object({
-  label: z.string().min(1),
-  theme: z.string().min(1),
-  start: z.number().int().positive(),
-  end: z.number().int().positive(),
-  domainMix: z.array(z.string()).optional(),
+  label: z.coerce.string().transform((s) => s.trim() || "Period"),
+  theme: z.coerce.string().transform((s) => s.trim() || "Core topics"),
+  start: z.coerce.number().int().positive(),
+  end: z.coerce.number().int().positive(),
+  domainMix: z.array(z.coerce.string()).optional(),
 });
 
 export const outlineSchema = z.object({
   periods: z.array(outlinePeriodSchema).min(1),
 });
 
+/** Topics may be empty — validatePeriodDays pads placeholders. */
 export const generatedDaySchema = z.object({
-  day: z.number().int().positive(),
-  topics: z.array(z.string().min(1)).min(1),
-  domains: z.array(z.string()).optional(),
+  day: z.coerce.number().int().positive(),
+  topics: z.array(z.coerce.string()).default([]),
+  domains: z.array(z.coerce.string()).optional(),
 });
 
 export const periodDaysSchema = z.object({
@@ -436,38 +437,177 @@ export async function parseJsonWithRepair<T>(
   repair: (error: string, raw: string) => Promise<string>,
 ): Promise<T> {
   const tryParse = (text: string): T => {
-    const data = parseJsonText(text);
+    const data = coercePlanAiPayload(parseJsonText(text));
     return schema.parse(data);
   };
 
   try {
     return tryParse(raw);
   } catch (first) {
-    const msg = first instanceof Error ? first.message : String(first);
+    const msg = formatParseError(first);
     const seed = sanitizeJsonText(raw);
     let repaired: string;
     try {
       repaired = await repair(msg, seed || raw);
     } catch {
       throw new ContentError(
-        `Could not parse the AI response as JSON (${msg}). Try again.`,
+        "The AI returned malformed plan data that could not be repaired. Try again.",
       );
     }
     try {
       return tryParse(repaired);
-    } catch (second) {
-      // One more local pass in case the repair model added fences/prose
-      // but left fixable comma issues.
-      try {
-        return tryParse(repaired);
-      } catch {
-        const detail = second instanceof Error ? second.message : "JSON repair failed.";
-        throw new ContentError(
-          `Could not parse the AI response as JSON (${detail}). Try again.`,
-        );
-      }
+    } catch {
+      throw new ContentError(
+        "The AI returned malformed plan data that could not be repaired. Try again.",
+      );
     }
   }
+}
+
+/** Human-readable Zod / JSON errors for repair prompts and toasts. */
+export function formatParseError(err: unknown): string {
+  if (err instanceof z.ZodError) {
+    return err.issues
+      .slice(0, 8)
+      .map((issue) => {
+        const path = issue.path.length ? issue.path.join(".") : "root";
+        if (issue.code === "too_small" && String(path).includes("topics")) {
+          return `${path}: needs at least one topic`;
+        }
+        if (issue.code === "too_small" && String(path).includes("days")) {
+          return `${path}: needs at least one day`;
+        }
+        if (issue.code === "too_small" && String(path).includes("periods")) {
+          return `${path}: needs at least one period`;
+        }
+        return `${path}: ${issue.message}`;
+      })
+      .join("; ");
+  }
+  if (err instanceof SyntaxError) {
+    const m = err.message;
+    if (/Expected ':' after property name/i.test(m)) {
+      return "missing ':' after a property name";
+    }
+    if (/Expected ',' or ']'|Expected ',' or '}'/i.test(m)) {
+      return "missing comma between values";
+    }
+    if (/Unterminated string/i.test(m)) return "unterminated string";
+    if (/Unexpected (token|end)/i.test(m)) return "unexpected token in JSON";
+    return "invalid JSON";
+  }
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+function coerceStringList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((x) => String(x ?? "").trim()).filter(Boolean);
+  }
+  if (typeof value === "string" && value.trim()) return [value.trim()];
+  return [];
+}
+
+function coerceGeneratedDay(item: unknown, index: number): {
+  day: number;
+  topics: string[];
+  domains?: string[];
+} {
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    return { day: index + 1, topics: [] };
+  }
+  const d = item as Record<string, unknown>;
+  const dayNum = Number(d.day);
+  let topics = coerceStringList(d.topics);
+  if (!topics.length) topics = coerceStringList(d.topic);
+  const domains = coerceStringList(d.domains);
+  if (!domains.length) {
+    const singular = coerceStringList(d.domain);
+    if (singular.length) domains.push(...singular);
+  }
+  return {
+    day: Number.isFinite(dayNum) && dayNum > 0 ? Math.trunc(dayNum) : index + 1,
+    topics,
+    ...(domains.length ? { domains } : {}),
+  };
+}
+
+function coerceOutlinePeriod(item: unknown, index: number): Record<string, unknown> {
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    return {
+      label: `Period ${index + 1}`,
+      theme: "Core topics",
+      start: index + 1,
+      end: index + 1,
+    };
+  }
+  const d = item as Record<string, unknown>;
+  let start = Math.trunc(Number(d.start));
+  let end = Math.trunc(Number(d.end));
+  if (!Number.isFinite(start) || start < 1) start = index + 1;
+  if (!Number.isFinite(end) || end < 1) end = start;
+  if (end < start) {
+    const swap = start;
+    start = end;
+    end = swap;
+  }
+  const domainMix = coerceStringList(d.domainMix ?? d.domains);
+  return {
+    label: String(d.label ?? "").trim() || `Period ${index + 1}`,
+    theme: String(d.theme ?? "").trim() || "Core topics",
+    start,
+    end,
+    ...(domainMix.length ? { domainMix } : {}),
+  };
+}
+
+/**
+ * Local structural repairs so flaky model JSON still validates.
+ * Empty topics stay empty — validatePeriodDays pads placeholders later.
+ */
+export function coercePlanAiPayload(data: unknown): unknown {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return data;
+  const obj = { ...(data as Record<string, unknown>) };
+
+  if (Array.isArray(obj.days)) {
+    obj.days = obj.days.map((item, i) => coerceGeneratedDay(item, i));
+  }
+
+  if (Array.isArray(obj.periods)) {
+    obj.periods = obj.periods.map((item, i) => coerceOutlinePeriod(item, i));
+  }
+
+  // Single-day regenerate shape: { topics, domains }
+  if ("topics" in obj && !("days" in obj) && !("periods" in obj)) {
+    let topics = coerceStringList(obj.topics);
+    if (!topics.length) topics = coerceStringList(obj.topic);
+    obj.topics = topics;
+    let domains = coerceStringList(obj.domains);
+    if (!domains.length) domains = coerceStringList(obj.domain);
+    if (domains.length) obj.domains = domains;
+    else delete obj.domains;
+  }
+
+  // Domain suggest shape: { domains: [{ label, weight }] }
+  if (Array.isArray(obj.domains) && obj.domains.some((d) => d && typeof d === "object" && !Array.isArray(d))) {
+    obj.domains = obj.domains
+      .map((item) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+        const d = item as Record<string, unknown>;
+        const label = String(d.label ?? d.name ?? d.id ?? "").trim();
+        if (!label) return null;
+        const rawWeight = String(d.weight ?? "medium").toLowerCase();
+        const weight =
+          rawWeight === "small" || rawWeight === "large" || rawWeight === "medium"
+            ? rawWeight
+            : "medium";
+        const id = String(d.id ?? "").trim();
+        return id ? { id, label, weight } : { label, weight };
+      })
+      .filter(Boolean);
+  }
+
+  return obj;
 }
 
 const PLAN_SYSTEM = `You are a senior curriculum designer who builds daily technical learning plans for working engineers.

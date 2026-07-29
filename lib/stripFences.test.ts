@@ -90,6 +90,56 @@ describe("stripFences / sanitizeJsonText", () => {
     });
   });
 
+  it("inserts missing colons before bare numbers and arrays", () => {
+    const raw = `{"days":[{"day" 1,"topics" ["Raft Leader Election","Log Replication"]}]}`;
+    expect(() => JSON.parse(raw)).toThrow(/Expected ':' after property name/);
+    expect(parseJsonText(raw)).toEqual({
+      days: [{ day: 1, topics: ["Raft Leader Election", "Log Replication"] }],
+    });
+  });
+
+  it("normalizes = / => / fullwidth colons between keys and values", () => {
+    expect(parseJsonText('{"day"=1,"topics"=["a","b"]}')).toEqual({
+      day: 1,
+      topics: ["a", "b"],
+    });
+    expect(parseJsonText('{"day" => 2, "topics" => ["c"]}')).toEqual({
+      day: 2,
+      topics: ["c"],
+    });
+    expect(parseJsonText('{"day"：3,"topics"：["d"]}')).toEqual({
+      day: 3,
+      topics: ["d"],
+    });
+  });
+
+  it("converts single-quoted JSON-like strings", () => {
+    expect(parseJsonText("{'day':1,'topics':['Raft Basics Intro']}")).toEqual({
+      day: 1,
+      topics: ["Raft Basics Intro"],
+    });
+  });
+
+  it("still escapes inner quotes inside values that look like literals", () => {
+    const raw = `{"topic":"Prefer "true" over false flags","day":1}`;
+    expect(parseJsonText(raw)).toEqual({
+      topic: 'Prefer "true" over false flags',
+      day: 1,
+    });
+  });
+
+  it("fills null for keys with no value before comma/brace", () => {
+    expect(parseJsonText('{"day":1,"orphan","topics":["a"]}')).toEqual({
+      day: 1,
+      orphan: null,
+      topics: ["a"],
+    });
+    expect(parseJsonText('{"day":1,"orphan"}')).toEqual({
+      day: 1,
+      orphan: null,
+    });
+  });
+
   it("does not break already-valid JSON", () => {
     const raw = `{"periods":[{"label":"W1","theme":"a","start":1,"end":7},{"label":"W2","theme":"b","start":8,"end":14}]}`;
     expect(sanitizeJsonText(raw)).toBe(raw);

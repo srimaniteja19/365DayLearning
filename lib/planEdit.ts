@@ -209,8 +209,8 @@ export function primaryPeriodScope(plan: Plan): {
 }
 
 const singleDaySchema = z.object({
-  topics: z.array(z.string()).min(1),
-  domains: z.array(z.string()).optional(),
+  topics: z.array(z.coerce.string()).default([]),
+  domains: z.array(z.coerce.string()).optional(),
 });
 
 const SINGLE_DAY_JSON_SCHEMA = {
@@ -266,7 +266,10 @@ Each topic 2–10 words. Never put double-quote characters inside topic text.`;
   });
 
   let topics = parsed.topics.map((t) => t.trim()).filter(Boolean);
-  while (topics.length < plan.topicsPerDay) topics.push("Additional depth topic");
+  if (!topics.length) {
+    topics = day.topics.slice();
+  }
+  while (topics.length < plan.topicsPerDay) topics.push(`Needs review follow-up ${dayNum}-${topics.length + 1}`);
   topics = topics.slice(0, plan.topicsPerDay);
   const domains = topics.map((t, i) => {
     const d = parsed.domains?.[i];

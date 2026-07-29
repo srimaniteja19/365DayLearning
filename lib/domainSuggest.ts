@@ -17,12 +17,24 @@ const suggestSchema = z.object({
     .array(
       z.object({
         id: z.string().optional(),
-        label: z.string().min(1),
-        weight: z.enum(["small", "medium", "large"]),
-      }),
+        label: z.coerce.string().transform((s) => s.trim()),
+        weight: z
+          .coerce.string()
+          .transform((s) => s.toLowerCase())
+          .pipe(z.enum(["small", "medium", "large"]))
+          .catch("medium"),
+      }).transform((d) => ({
+        ...d,
+        label: d.label || d.id || "Domain",
+      })),
     )
-    .min(2)
-    .max(8),
+    .min(1)
+    .max(8)
+    .transform((list) => {
+      const cleaned = list.filter((d) => d.label.trim());
+      return cleaned.length >= 2 ? cleaned.slice(0, 8) : cleaned;
+    })
+    .refine((list) => list.length >= 2, { message: "Need at least 2 domains" }),
 });
 
 const SUGGEST_JSON_SCHEMA = {

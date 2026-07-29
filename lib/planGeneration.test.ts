@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import {
+  coercePlanAiPayload,
   ensureContiguousDays,
+  formatParseError,
   normalizeTopic,
   parseJsonWithRepair,
+  periodDaysSchema,
   shouldRetryPeriod,
   skeletonOutlinePeriods,
   snapOutlineToSkeleton,
@@ -214,6 +217,41 @@ describe("topicIndex", () => {
   });
 });
 
+describe("coercePlanAiPayload", () => {
+  it("keeps empty topics arrays instead of failing validation", () => {
+    const coerced = coercePlanAiPayload({
+      days: [
+        { day: 1, topics: ["Raft Basics Intro"] },
+        { day: 2, topics: ["Leader Election Quorum"] },
+        { day: 3, topics: [] },
+      ],
+    }) as { days: { day: number; topics: string[] }[] };
+    expect(coerced.days[2].topics).toEqual([]);
+    expect(periodDaysSchema.parse(coerced).days[2].topics).toEqual([]);
+  });
+
+  it("normalizes singular topic, string day, and blank strings", () => {
+    const coerced = coercePlanAiPayload({
+      days: [{ day: "4", topic: "  Write Ahead Log  ", topics: ["", "  "] }],
+    }) as { days: { day: number; topics: string[] }[] };
+    expect(coerced.days[0]).toEqual({ day: 4, topics: ["Write Ahead Log"] });
+  });
+
+  it("fills blank outline labels and swaps inverted ranges", () => {
+    const coerced = coercePlanAiPayload({
+      periods: [{ label: "  ", theme: "", start: 7, end: 1 }],
+    }) as {
+      periods: { label: string; theme: string; start: number; end: number }[];
+    };
+    expect(coerced.periods[0]).toMatchObject({
+      label: "Period 1",
+      theme: "Core topics",
+      start: 1,
+      end: 7,
+    });
+  });
+});
+
 describe("JSON repair loop", () => {
   it("recovers from markdown fences via repair callback", async () => {
     const schema = z.object({ periods: z.array(z.object({ label: z.string(), start: z.number(), end: z.number(), theme: z.string() })) });
@@ -225,11 +263,75 @@ describe("JSON repair loop", () => {
     expect(parsed.periods[0].label).toBe("W1");
   });
 
+  it("accepts empty topics without calling repair", async () => {
+    const repair = vi.fn(async () => {
+      throw new Error("should not need repair");
+    });
+    const raw = JSON.stringify({
+      days: [
+        { day: 1, topics: ["Raft Basics Intro"] },
+        { day: 2, topics: [] },
+        { day: "3", topic: "Log Compaction Basics" },
+      ],
+    });
+    const parsed = await parseJsonWithRepair(raw, periodDaysSchema, repair);
+    expect(parsed.days).toHaveLength(3);
+    expect(parsed.days[1].topics).toEqual([]);
+    expect(parsed.days[2].topics).toEqual(["Log Compaction Basics"]);
+    expect(repair).not.toHaveBeenCalled();
+  });
+
   it("calls repair when JSON is invalid then succeeds", async () => {
     const schema = z.object({ ok: z.boolean() });
     const repair = vi.fn(async () => "{\"ok\":true}");
     const parsed = await parseJsonWithRepair("not-json {{{", schema, repair);
     expect(parsed.ok).toBe(true);
     expect(repair).toHaveBeenCalledOnce();
+  });
+
+  it("surfaces readable errors instead of raw Zod dumps", async () => {
+    const schema = z.object({ days: z.array(z.object({ day: z.number() })).min(1) });
+    await expect(
+      parseJsonWithRepair('{"days":[]}', schema, async () => {
+        throw new Error("repair unavailable");
+      }),
+    ).rejects.toThrow(/malformed plan data/i);
+
+    const zodFail = schema.safeParse({ days: [] });
+    expect(zodFail.success).toBe(false);
+    if (!zodFail.success) {
+      expect(formatParseError(zodFail.error)).toMatch(/days: needs at least one day/);
+      expect(formatParseError(zodFail.error)).not.toMatch(/"origin"/);
+    }
+  });
+
+  it("repairs missing-colon JSON locally without calling the model", async () => {
+    const repair = vi.fn(async () => {
+      throw new Error("should not need repair");
+    });
+    const raw = `{"days":[{"day" 1,"topics" ["Raft Leader Election","Log Compaction Basics"]}]}`;
+    const parsed = await parseJsonWithRepair(raw, periodDaysSchema, repair);
+    expect(parsed.days[0].day).toBe(1);
+    expect(parsed.days[0].topics).toHaveLength(2);
+    expect(repair).not.toHaveBeenCalled();
+  });
+});
+
+describe("validatePeriodDays pads empty topics", () => {
+  it("fills placeholders when a day has no topics", () => {
+    const result = validatePeriodDays({
+      days: [
+        { day: 1, topics: ["Raft Basics Intro", "Leader Election Quorum"] },
+        { day: 2, topics: [] },
+        { day: 3, topics: ["Log Compaction Basics", "Snapshot Transfer Flow"] },
+      ],
+      period: { label: "W1", theme: "consensus", start: 1, end: 3 },
+      topicsPerDay: 2,
+      exclusions: [],
+      seenTopics: new Set(),
+      domainIds: ["distributed-sys"],
+    });
+    expect(result.fixedDays[1].topics).toHaveLength(2);
+    expect(result.fixedDays[1].topics[0]).toMatch(/Needs review/i);
   });
 });
