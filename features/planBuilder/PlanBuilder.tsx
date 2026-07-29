@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { classNames } from "@/lib/classNames";
 import { Icon } from "@/components/Icon";
+import { Tip } from "@/components/Tip";
 import {
   type BuilderDraft,
   type BuilderStep,
@@ -336,15 +337,15 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
             <label className="gen-label">Grouping</label>
             <div className="seg-row">
               {GROUPING_OPTS.map((g) => (
-                <button
-                  key={g.key}
-                  type="button"
-                  className={classNames("seg-btn", draft.grouping === g.key && "seg-btn-active")}
-                  onClick={() => patch({ grouping: g.key })}
-                  title={g.hint}
-                >
-                  {g.label}
-                </button>
+                <Tip key={g.key} content={g.hint} stamp="GROUP" tone={draft.grouping === g.key ? "mint" : "ink"} side="top">
+                  <button
+                    type="button"
+                    className={classNames("seg-btn", draft.grouping === g.key && "seg-btn-active")}
+                    onClick={() => patch({ grouping: g.key })}
+                  >
+                    {g.label}
+                  </button>
+                </Tip>
               ))}
             </div>
             <div className="gen-hint">

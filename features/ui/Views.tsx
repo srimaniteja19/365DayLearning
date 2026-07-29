@@ -5,6 +5,7 @@ import React, { useState, useMemo, useCallback, useRef, useEffect, useContext } 
 import { useSession } from "next-auth/react";
 import DOMAIN_META from "@/data/domains.json";
 import { Icon } from "@/components/Icon";
+import { Tip } from "@/components/Tip";
 import { classNames } from "@/lib/classNames";
 import { ThemeCtx, useDomainColor } from "@/theme/ThemeContext";
 import { THEMES, THEME_ORDER, hexToRgba, resolveThemeKey } from "@/theme/themes";
@@ -71,19 +72,21 @@ function SaveIndicator({ status, compact = false }) {
     : status === "off" ? "Session only"
     : "Autosaved";
   return (
-    <div
-      className={classNames(
-        "stat-chip",
-        "save-chip",
-        `save-${status}`,
-        compact && "save-chip-compact",
-      )}
-      title={SAVE_COPY[status]}
-      aria-label={SAVE_COPY[status]}
-    >
-      <span className="save-dot" />
-      {!compact && <span className="stat-chip-val">{label}</span>}
-    </div>
+    <Tip content={SAVE_COPY[status]} stamp="SYNC" tone={status === "error" ? "coral" : status === "saved" ? "mint" : "lemon"} side="bottom">
+      <div
+        className={classNames(
+          "stat-chip",
+          "save-chip",
+          `save-${status}`,
+          compact && "save-chip-compact",
+        )}
+        aria-label={SAVE_COPY[status]}
+        tabIndex={0}
+      >
+        <span className="save-dot" />
+        {!compact && <span className="stat-chip-val">{label}</span>}
+      </div>
+    </Tip>
   );
 }
 
@@ -109,21 +112,22 @@ function ThemePicker({ themeKey, setThemeKey }) {
 
   return (
     <div className="theme-wrap" ref={wrapRef}>
-      <button
-        className="stat-chip theme-btn"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        title="Change theme"
-      >
-        <span className="theme-swatches">
-          {current.swatch.map((col, i) => (
-            <span key={i} className="theme-sw" style={{ background: col }} />
-          ))}
-        </span>
-        <span className="stat-chip-val">{current.name}</span>
-        <Icon.Chevron size={12} className={classNames("theme-chev", open && "theme-chev-open")} />
-      </button>
+      <Tip content="Swap the Field Ops colorway — signal, folio, afterburn, and more." stamp="LOOK" tone="violet" side="bottom">
+        <button
+          className="stat-chip theme-btn"
+          onClick={() => setOpen((v) => !v)}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+        >
+          <span className="theme-swatches">
+            {current.swatch.map((col, i) => (
+              <span key={i} className="theme-sw" style={{ background: col }} />
+            ))}
+          </span>
+          <span className="stat-chip-val">{current.name}</span>
+          <Icon.Chevron size={12} className={classNames("theme-chev", open && "theme-chev-open")} />
+        </button>
+      </Tip>
       {open && (
         <div className="theme-menu" role="listbox">
           {THEME_ORDER.map((k) => {
@@ -177,19 +181,20 @@ function FontPicker({ fontKey, setFontKey }) {
 
   return (
     <div className="theme-wrap font-wrap" ref={wrapRef}>
-      <button
-        className="stat-chip theme-btn font-btn"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        title="Change typeface"
-      >
-        <span className="font-sample" style={{ fontFamily: current.display }}>
-          {current.sample}
-        </span>
-        <span className="stat-chip-val">{current.name}</span>
-        <Icon.Chevron size={12} className={classNames("theme-chev", open && "theme-chev-open")} />
-      </button>
+      <Tip content="Pick a type pack — display, body, and mono move together." stamp="TYPE" tone="sky" side="bottom">
+        <button
+          className="stat-chip theme-btn font-btn"
+          onClick={() => setOpen((v) => !v)}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+        >
+          <span className="font-sample" style={{ fontFamily: current.display }}>
+            {current.sample}
+          </span>
+          <span className="stat-chip-val">{current.name}</span>
+          <Icon.Chevron size={12} className={classNames("theme-chev", open && "theme-chev-open")} />
+        </button>
+      </Tip>
       {open && (
         <div className="theme-menu font-menu" role="listbox">
           {FONT_ORDER.map((k) => {
@@ -275,36 +280,44 @@ export function TopBar({
     <header className={classNames("topbar", menuOpen && "topbar-menu-open")}>
       <div className="topbar-row">
         <div className="topbar-left">
-          <button className="brand brand-btn" onClick={onGoHome} title="Back to home" type="button">
-            <span className="brand-mark" aria-hidden="true" />
-            <span className="brand-stack">
-              <span className="brand-kicker">Field ops</span>
-              <span className="brand-text">REFRAIN<span className="brand-accent">LY</span></span>
-            </span>
-          </button>
+          <Tip content="Back to the landing strip — pick a campaign or spin up a new one." stamp="HOME" tone="ink" side="bottom">
+            <button className="brand brand-btn" onClick={onGoHome} type="button">
+              <span className="brand-mark" aria-hidden="true" />
+              <span className="brand-stack">
+                <span className="brand-kicker">Field ops</span>
+                <span className="brand-text">REFRAIN<span className="brand-accent">LY</span></span>
+              </span>
+            </button>
+          </Tip>
         </div>
 
         <div className="topbar-mobile-tray" aria-hidden={false}>
           <SaveIndicator status={saveStatus} compact />
-          <div
-            className="topbar-mobile-level"
-            title={`${stats.rank} · Level ${stats.level} · ${stats.xp.toLocaleString()} XP`}
+          <Tip
+            content={`${stats.rank} · Level ${stats.level} · ${stats.xp.toLocaleString()} XP earned on this campaign.`}
+            stamp="RANK"
+            tone="lemon"
+            side="bottom"
           >
-            <span className="level-badge">LV {stats.level}</span>
-            <div className="xp-bar-mini" aria-hidden="true">
-              <div className="xp-bar-mini-fill" style={{ width: pct + "%" }} />
+            <div className="topbar-mobile-level" tabIndex={0}>
+              <span className="level-badge">LV {stats.level}</span>
+              <div className="xp-bar-mini" aria-hidden="true">
+                <div className="xp-bar-mini-fill" style={{ width: pct + "%" }} />
+              </div>
             </div>
-          </div>
-          <button
-            type="button"
-            className="topbar-menu-btn"
-            aria-expanded={menuOpen}
-            aria-controls="topbar-panel"
-            onClick={() => setMenuOpen((v) => !v)}
-          >
-            {menuOpen ? <Icon.X size={18} /> : <Icon.Menu size={18} />}
-            <span className="sr-only">{menuOpen ? "Close menu" : "Open menu"}</span>
-          </button>
+          </Tip>
+          <Tip content={menuOpen ? "Close the ops drawer" : "Open New, AI, Plans, Data, and Account"} stamp="MENU" tone="ink" side="bottom">
+            <button
+              type="button"
+              className="topbar-menu-btn"
+              aria-expanded={menuOpen}
+              aria-controls="topbar-panel"
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              {menuOpen ? <Icon.X size={18} /> : <Icon.Menu size={18} />}
+              <span className="sr-only">{menuOpen ? "Close menu" : "Open menu"}</span>
+            </button>
+          </Tip>
         </div>
 
         <div
@@ -312,40 +325,59 @@ export function TopBar({
           className={classNames("topbar-right", menuOpen && "topbar-right-open")}
         >
           <nav className="topbar-cluster" aria-label="Workspace">
-            <button className="topbar-item" type="button" onClick={runAndClose(onNewPlan)} title="Create a custom plan">
-              <Icon.Target size={13} />
-              <span className="topbar-item-label">New</span>
-            </button>
-            <button className="topbar-item" type="button" onClick={runAndClose(onOpenSettings)} title="AI provider and API key">
-              <Icon.Cloud size={13} />
-              <span className="topbar-item-label">AI</span>
-            </button>
-            <button className="topbar-item" type="button" onClick={runAndClose(onOpenPricing)} title="Plans, pricing, and usage">
-              <Icon.Sparkle size={13} />
-              <span className="topbar-item-label">Plans</span>
-            </button>
-            <button className="topbar-item" type="button" onClick={runAndClose(onOpenData)} title="Export or import your data">
-              <Icon.Download size={13} />
-              <span className="topbar-item-label">Data</span>
-            </button>
-            <button
-              className={classNames("topbar-item", accountLabel && "topbar-item-active")}
-              type="button"
-              onClick={runAndClose(onOpenAccount)}
-              title={accountLabel ? `Signed in as ${accountLabel}` : "Sign in to sync across devices"}
+            <Tip content="Generate a custom day-by-day roadmap with your domains and constraints." stamp="NEW" tone="mint" side="bottom">
+              <button className="topbar-item" type="button" onClick={runAndClose(onNewPlan)}>
+                <Icon.Target size={13} />
+                <span className="topbar-item-label">New</span>
+              </button>
+            </Tip>
+            <Tip content="OpenRouter model + API key. Your key stays on this device." stamp="AI" tone="sky" side="bottom">
+              <button className="topbar-item" type="button" onClick={runAndClose(onOpenSettings)}>
+                <Icon.Cloud size={13} />
+                <span className="topbar-item-label">AI</span>
+              </button>
+            </Tip>
+            <Tip content="Compare Recruit / Operator / Command tiers and usage headroom." stamp="PLANS" tone="violet" side="bottom">
+              <button className="topbar-item" type="button" onClick={runAndClose(onOpenPricing)}>
+                <Icon.Sparkle size={13} />
+                <span className="topbar-item-label">Plans</span>
+              </button>
+            </Tip>
+            <Tip content="Export a full backup, share one plan, or import a dualtrack file." stamp="DATA" tone="lemon" side="bottom">
+              <button className="topbar-item" type="button" onClick={runAndClose(onOpenData)}>
+                <Icon.Download size={13} />
+                <span className="topbar-item-label">Data</span>
+              </button>
+            </Tip>
+            <Tip
+              content={
+                accountLabel
+                  ? `Signed in as ${accountLabel}. Cloud sync keeps progress across devices.`
+                  : "Sign in to sync progress, or continue as a guest on this device."
+              }
+              stamp="ID"
+              tone="coral"
+              side="bottom"
             >
-              <Icon.User size={13} />
-              <span className="topbar-item-label">{accountLabel ? "Account" : "Sign in"}</span>
-            </button>
-            <button
-              className="topbar-item"
-              type="button"
-              onClick={runAndClose(onOpenBadges)}
-              title={`${badgeCount} of ${badgeTotal} badges unlocked`}
-            >
-              <Icon.Medal size={13} />
-              <span>{badgeCount}/{badgeTotal}</span>
-            </button>
+              <button
+                className={classNames("topbar-item", accountLabel && "topbar-item-active")}
+                type="button"
+                onClick={runAndClose(onOpenAccount)}
+              >
+                <Icon.User size={13} />
+                <span className="topbar-item-label">{accountLabel ? "Account" : "Sign in"}</span>
+              </button>
+            </Tip>
+            <Tip content={`${badgeCount} of ${badgeTotal} Field Ops badges unlocked.`} stamp="MEDAL" tone="lemon" side="bottom">
+              <button
+                className="topbar-item"
+                type="button"
+                onClick={runAndClose(onOpenBadges)}
+              >
+                <Icon.Medal size={13} />
+                <span>{badgeCount}/{badgeTotal}</span>
+              </button>
+            </Tip>
           </nav>
 
           <div className="topbar-cluster topbar-cluster-look" aria-label="Appearance">
@@ -356,27 +388,35 @@ export function TopBar({
           <div className="topbar-cluster topbar-cluster-status" aria-label="Progress">
             <SaveIndicator status={saveStatus} compact />
             {noteCount > 0 && (
-              <div
-                className="topbar-item topbar-item-static"
-                title={`${noteCount} ${noteCount === 1 ? "day has" : "days have"} notes`}
+              <Tip
+                content={`${noteCount} ${noteCount === 1 ? "day has" : "days have"} notes pinned in the field log.`}
+                stamp="NOTES"
+                tone="sky"
+                side="bottom"
               >
-                <Icon.Note size={13} />
-                <span>{noteCount}</span>
-              </div>
+                <div className="topbar-item topbar-item-static" tabIndex={0}>
+                  <Icon.Note size={13} />
+                  <span>{noteCount}</span>
+                </div>
+              </Tip>
             )}
-            <div
-              className="topbar-item topbar-item-static topbar-progress"
-              title={`${stats.rank} · Level ${stats.level} · ${stats.xp.toLocaleString()} total XP`}
+            <Tip
+              content={`${stats.rank} · Level ${stats.level} · ${stats.xp.toLocaleString()} total XP. Bar fills toward the next rank.`}
+              stamp="XP"
+              tone="lemon"
+              side="bottom"
             >
-              <Icon.Trophy size={13} />
-              <span className="topbar-rank">{stats.rank}</span>
-              <span className="level-badge">LV {stats.level}</span>
-              <div className="xp-bar-mini" aria-hidden="true">
-                <div className="xp-bar-mini-fill" style={{ width: pct + "%" }} />
+              <div className="topbar-item topbar-item-static topbar-progress" tabIndex={0}>
+                <Icon.Trophy size={13} />
+                <span className="topbar-rank">{stats.rank}</span>
+                <span className="level-badge">LV {stats.level}</span>
+                <div className="xp-bar-mini" aria-hidden="true">
+                  <div className="xp-bar-mini-fill" style={{ width: pct + "%" }} />
+                </div>
+                <span className="topbar-xp">{stats.into}/{stats.need}</span>
+                <span className="topbar-xp-total">{stats.xp.toLocaleString()} XP</span>
               </div>
-              <span className="topbar-xp">{stats.into}/{stats.need}</span>
-              <span className="topbar-xp-total">{stats.xp.toLocaleString()} XP</span>
-            </div>
+            </Tip>
             {confirmReset ? (
               <div className="reset-confirm">
                 <span>Erase all?</span>
@@ -384,15 +424,16 @@ export function TopBar({
                 <button className="reset-no" type="button" onClick={() => setConfirmReset(false)}>Keep</button>
               </div>
             ) : (
-              <button
-                className="topbar-item topbar-item-icon reset-btn"
-                type="button"
-                onClick={() => setConfirmReset(true)}
-                title="Reset all progress and notes"
-              >
-                <Icon.Rotate size={13} />
-                <span className="topbar-reset-label">Reset</span>
-              </button>
+              <Tip content="Wipe progress, notes, and review queue for every plan on this device." stamp="RESET" tone="coral" side="bottom">
+                <button
+                  className="topbar-item topbar-item-icon reset-btn"
+                  type="button"
+                  onClick={() => setConfirmReset(true)}
+                >
+                  <Icon.Rotate size={13} />
+                  <span className="topbar-reset-label">Reset</span>
+                </button>
+              </Tip>
             )}
           </div>
         </div>
@@ -457,7 +498,6 @@ export function PlanSwitcher({
                   className={classNames("switcher-tab", isActive && "switcher-tab-active")}
                   style={{ "--accent": c.accent, "--glow": c.glow }}
                   onClick={() => setActive(planId)}
-                  title={c.subtitle || c.name}
                 >
                   <span className="switcher-dot" style={{ background: c.accent }} />
                   <span className="switcher-name">{c.name}</span>
@@ -466,7 +506,7 @@ export function PlanSwitcher({
                 <button
                   type="button"
                   className="switcher-delete"
-                  title={c.builtin ? "Hide built-in plan" : "Delete plan"}
+                  aria-label={c.builtin ? "Hide built-in plan" : "Delete plan"}
                   onClick={(e) => {
                     e.stopPropagation();
                     setConfirmDeletePlanId(planId);
@@ -483,7 +523,6 @@ export function PlanSwitcher({
         type="button"
         className="switcher-tab switcher-new"
         onClick={onNewPlan}
-        title="Build a custom roadmap"
       >
         <span className="switcher-plus">＋</span>
         <span className="switcher-name">New</span>
@@ -951,9 +990,11 @@ export function OnThisDayCard({ memory, onDismiss }) {
           </>
         )}
       </div>
-      <button type="button" className="today-widget-dismiss" onClick={onDismiss} aria-label="Dismiss">
-        <Icon.X size={12} />
-      </button>
+      <Tip content="Hide until tomorrow — another memory may surface next visit." stamp="DISMISS" tone="ink" side="left">
+        <button type="button" className="today-widget-dismiss" onClick={onDismiss} aria-label="Dismiss">
+          <Icon.X size={12} />
+        </button>
+      </Tip>
     </div>
   );
 }
@@ -969,30 +1010,42 @@ function BadgesPanel({ statuses, onClose }) {
       </p>
       <div className="badges-grid">
         {statuses.map((s) => (
-          <div
+          <Tip
             key={s.badge.id}
-            className={classNames(
-              "badge-card",
-              `badge-tier-${s.badge.tier}`,
-              s.unlocked && "badge-card-unlocked",
-            )}
-            title={s.badge.description}
+            content={
+              s.unlocked
+                ? `${s.badge.description} · Unlocked.`
+                : `${s.badge.description}${s.target > 1 ? ` · ${s.current}/${s.target}` : ""}`
+            }
+            stamp={String(s.badge.tier).toUpperCase()}
+            tone={s.unlocked ? "mint" : s.badge.tier === "gold" ? "lemon" : s.badge.tier === "silver" ? "sky" : "coral"}
+            side="top"
+            maxWidth={260}
           >
-            <div className="badge-card-icon"><Icon.Medal size={20} /></div>
-            <div className="badge-card-label">{s.badge.label}</div>
-            <div className="badge-card-desc">{s.badge.description}</div>
-            {!s.unlocked && s.target > 1 && (
-              <>
-                <div className="badge-card-progress">
-                  <div
-                    className="badge-card-progress-fill"
-                    style={{ width: `${Math.round((s.current / s.target) * 100)}%` }}
-                  />
-                </div>
-                <div className="badge-card-progress-label">{s.current}/{s.target}</div>
-              </>
-            )}
-          </div>
+            <div
+              className={classNames(
+                "badge-card",
+                `badge-tier-${s.badge.tier}`,
+                s.unlocked && "badge-card-unlocked",
+              )}
+              tabIndex={0}
+            >
+              <div className="badge-card-icon"><Icon.Medal size={20} /></div>
+              <div className="badge-card-label">{s.badge.label}</div>
+              <div className="badge-card-desc">{s.badge.description}</div>
+              {!s.unlocked && s.target > 1 && (
+                <>
+                  <div className="badge-card-progress">
+                    <div
+                      className="badge-card-progress-fill"
+                      style={{ width: `${Math.round((s.current / s.target) * 100)}%` }}
+                    />
+                  </div>
+                  <div className="badge-card-progress-label">{s.current}/{s.target}</div>
+                </>
+              )}
+            </div>
+          </Tip>
         ))}
       </div>
       <div className="panel-actions">
@@ -1172,25 +1225,26 @@ function PricingPanel({ onClose, onOpenAccount }) {
 /* ============================== VIEW TABS ============================== */
 export function ViewTabs({ view, setView, dueCount }) {
   const tabs = [
-    { key: "console", label: "Console", icon: Icon.Terminal },
-    { key: "grid", label: "Grid", icon: Icon.Grid },
-    { key: "review", label: "Review", icon: Icon.Rotate, badge: dueCount },
-    { key: "weekly", label: "Weekly", icon: Icon.Calendar },
-    { key: "learned", label: "Learned", icon: Icon.Note },
-    { key: "bookmarks", label: "Bookmarks", icon: Icon.Link },
-    { key: "log", label: "Analytics", icon: Icon.List },
+    { key: "console", label: "Console", icon: Icon.Terminal, stamp: "LIST", tone: "ink", tip: "Day-by-day mission list — check topics, jot notes, run tools." },
+    { key: "grid", label: "Grid", icon: Icon.Grid, stamp: "MAP", tone: "sky", tip: "Heatmap of every day. Spot gaps and jump straight to a cell." },
+    { key: "review", label: "Review", icon: Icon.Rotate, badge: dueCount, stamp: "SRS", tone: "coral", tip: dueCount > 0 ? `${dueCount} topic${dueCount === 1 ? "" : "s"} due for spaced recall.` : "Spaced-repetition queue — nothing due right now." },
+    { key: "weekly", label: "Weekly", icon: Icon.Calendar, stamp: "7D", tone: "lemon", tip: "Last seven days of clears, notes, and open questions." },
+    { key: "learned", label: "Learned", icon: Icon.Note, stamp: "LOG", tone: "mint", tip: "Archive of what you actually absorbed — searchable field notes." },
+    { key: "bookmarks", label: "Bookmarks", icon: Icon.Link, stamp: "REF", tone: "violet", tip: "Stash articles, docs, and videos beside the campaign." },
+    { key: "log", label: "Analytics", icon: Icon.List, stamp: "STATS", tone: "ink", tip: "Completion, streaks, and domain coverage for this plan." },
   ];
   return (
     <div className="view-tabs">
       {tabs.map((t) => (
-        <button
-          key={t.key}
-          className={classNames("view-tab", view === t.key && "view-tab-active")}
-          onClick={() => setView(t.key)}
-        >
-          <t.icon size={13} /> {t.label}
-          {t.badge > 0 && <span className="tab-badge">{t.badge}</span>}
-        </button>
+        <Tip key={t.key} content={t.tip} stamp={t.stamp} tone={t.tone} side="bottom">
+          <button
+            className={classNames("view-tab", view === t.key && "view-tab-active")}
+            onClick={() => setView(t.key)}
+          >
+            <t.icon size={13} /> {t.label}
+            {t.badge > 0 && <span className="tab-badge">{t.badge}</span>}
+          </button>
+        </Tip>
       ))}
     </div>
   );
@@ -1216,14 +1270,25 @@ export function PeriodNav({ scopes, scope, setScope, periods, periodIdx, setPeri
         </div>
         <div className="scope-btns" role="group" aria-label="Time range">
           {scopes.map((sc) => (
-            <button
+            <Tip
               key={sc.key}
-              type="button"
-              className={classNames("scope-btn", scope === sc.key && "scope-btn-active")}
-              onClick={() => setScope(sc.key)}
+              content={
+                sc.key === "all"
+                  ? "Show the full campaign timeline."
+                  : `Slice the plan into ${sc.label.toLowerCase()} buckets for focused ops.`
+              }
+              stamp="SLICE"
+              tone="sky"
+              side="bottom"
             >
-              {sc.label}
-            </button>
+              <button
+                type="button"
+                className={classNames("scope-btn", scope === sc.key && "scope-btn-active")}
+                onClick={() => setScope(sc.key)}
+              >
+                {sc.label}
+              </button>
+            </Tip>
           ))}
         </div>
         {activePeriod && (
@@ -1245,32 +1310,46 @@ export function PeriodNav({ scopes, scope, setScope, periods, periodIdx, setPeri
             const holdsCurrent = activeDayNum >= p.start && activeDayNum <= p.end;
             const complete = p.pct === 100;
             return (
-              <button
+              <Tip
                 key={p.label + p.start}
-                type="button"
-                data-period-active={isActive ? "true" : "false"}
-                className={classNames(
-                  "period-chip",
-                  isActive && "period-chip-active",
-                  complete && "period-chip-complete",
-                  holdsCurrent && "period-chip-here",
-                )}
-                onClick={() => setPeriodIdx(i)}
+                content={
+                  <>
+                    <strong>{p.label}</strong> · days {p.start}–{p.end}
+                    {p.sub ? ` · ${p.sub}` : ""}. {p.done}/{p.total} topics ({p.pct}%).
+                    {holdsCurrent ? " You are here." : ""}
+                    {complete ? " Cleared." : ""}
+                  </>
+                }
+                stamp={complete ? "DONE" : holdsCurrent ? "HERE" : "BLOCK"}
+                tone={complete ? "mint" : holdsCurrent ? "coral" : "lemon"}
+                side="bottom"
               >
-                <div className="period-chip-top">
-                  <span className="period-chip-label">{p.label}</span>
-                  {holdsCurrent && <span className="period-here">YOU</span>}
-                  {complete && !holdsCurrent && <span className="period-done-mark">✓</span>}
-                </div>
-                <div className="period-chip-sub">{p.sub}</div>
-                <div className="period-chip-track" aria-hidden="true">
-                  <div className="period-chip-fill" style={{ width: p.pct + "%" }} />
-                </div>
-                <div className="period-chip-meta">
-                  <span>D{p.start}–{p.end}</span>
-                  <span>{p.pct}%</span>
-                </div>
-              </button>
+                <button
+                  type="button"
+                  data-period-active={isActive ? "true" : "false"}
+                  className={classNames(
+                    "period-chip",
+                    isActive && "period-chip-active",
+                    complete && "period-chip-complete",
+                    holdsCurrent && "period-chip-here",
+                  )}
+                  onClick={() => setPeriodIdx(i)}
+                >
+                  <div className="period-chip-top">
+                    <span className="period-chip-label">{p.label}</span>
+                    {holdsCurrent && <span className="period-here">YOU</span>}
+                    {complete && !holdsCurrent && <span className="period-done-mark">✓</span>}
+                  </div>
+                  <div className="period-chip-sub">{p.sub}</div>
+                  <div className="period-chip-track" aria-hidden="true">
+                    <div className="period-chip-fill" style={{ width: p.pct + "%" }} />
+                  </div>
+                  <div className="period-chip-meta">
+                    <span>D{p.start}–{p.end}</span>
+                    <span>{p.pct}%</span>
+                  </div>
+                </button>
+              </Tip>
             );
           })}
         </div>
@@ -1309,25 +1388,35 @@ export function DomainLegend({ tally, active, setActive }) {
           const pct = t ? Math.round((t.done / t.total) * 100) : 0;
           const isActive = active === k;
           return (
-            <button
+            <Tip
               key={k}
-              type="button"
-              className={classNames("domain-meter", isActive && "domain-meter-active")}
-              style={{ "--dot": color }}
-              onClick={() => setActive(isActive ? null : k)}
-              title={`${meta.label}: ${t.done}/${t.total} complete`}
-              aria-pressed={isActive}
+              content={
+                isActive
+                  ? `Showing only ${meta.label}. Click again to clear the sector filter.`
+                  : `${meta.label}: ${t.done}/${t.total} topics complete (${pct}%). Filter the console to this sector.`
+              }
+              stamp="SECTOR"
+              tone={isActive ? "mint" : "ink"}
+              side="top"
             >
-              <span className="domain-meter-top">
-                <span className="domain-meter-dot" />
-                <span className="domain-meter-pct">{pct}%</span>
-              </span>
-              <span className="domain-meter-track" aria-hidden="true">
-                <span className="domain-meter-fill" style={{ width: `${pct}%` }} />
-              </span>
-              <span className="domain-meter-label">{meta.label}</span>
-              <span className="domain-meter-count">{t.done}/{t.total}</span>
-            </button>
+              <button
+                type="button"
+                className={classNames("domain-meter", isActive && "domain-meter-active")}
+                style={{ "--dot": color }}
+                onClick={() => setActive(isActive ? null : k)}
+                aria-pressed={isActive}
+              >
+                <span className="domain-meter-top">
+                  <span className="domain-meter-dot" />
+                  <span className="domain-meter-pct">{pct}%</span>
+                </span>
+                <span className="domain-meter-track" aria-hidden="true">
+                  <span className="domain-meter-fill" style={{ width: `${pct}%` }} />
+                </span>
+                <span className="domain-meter-label">{meta.label}</span>
+                <span className="domain-meter-count">{t.done}/{t.total}</span>
+              </button>
+            </Tip>
           );
         })}
       </div>
@@ -1392,15 +1481,21 @@ function DayDetailBody({
         dayNum={day.day}
       />
       <div className="day-tools">
-        <button type="button" className="tool-btn" onClick={() => onOpenTool("quiz", day)}>
-          <Icon.Target size={12} /> Quiz me
-        </button>
-        <button type="button" className="tool-btn" onClick={() => onOpenTool("notes", day)}>
-          <Icon.Book size={12} /> Generate notes
-        </button>
-        <button type="button" className="tool-btn" onClick={() => onOpenTool("linkedin", day)}>
-          <Icon.Send size={12} /> Draft post
-        </button>
+        <Tip content="Generate a short quiz from this day's topics and your notes." stamp="QUIZ" tone="coral" side="top">
+          <button type="button" className="tool-btn" onClick={() => onOpenTool("quiz", day)}>
+            <Icon.Target size={12} /> Quiz me
+          </button>
+        </Tip>
+        <Tip content="Draft study notes / references with AI, then pin them to this day." stamp="NOTES" tone="sky" side="top">
+          <button type="button" className="tool-btn" onClick={() => onOpenTool("notes", day)}>
+            <Icon.Book size={12} /> Generate notes
+          </button>
+        </Tip>
+        <Tip content="Turn today's win into a LinkedIn-ready post you can copy." stamp="POST" tone="violet" side="top">
+          <button type="button" className="tool-btn" onClick={() => onOpenTool("linkedin", day)}>
+            <Icon.Send size={12} /> Draft post
+          </button>
+        </Tip>
       </div>
       <ReferenceBlock
         data={refs[day.id]}
@@ -1459,21 +1554,21 @@ export function ConsoleView({ campaign, days, progress, onToggle, expandedDay, s
             const LayoutIcon = opt.Icon;
             const active = layout === opt.key;
             return (
-              <button
-                key={opt.key}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                title={opt.hint}
-                className={classNames("console-layout-btn", `console-layout-btn-${opt.key}`, active && "console-layout-btn-active")}
-                onClick={() => setLayout(opt.key)}
-              >
-                <span>
-                  <LayoutIcon size={13} />
-                  {opt.label}
-                </span>
-                <em>{opt.hint}</em>
-              </button>
+              <Tip key={opt.key} content={opt.hint} stamp="VIEW" tone={active ? "mint" : "ink"} side="bottom">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  className={classNames("console-layout-btn", `console-layout-btn-${opt.key}`, active && "console-layout-btn-active")}
+                  onClick={() => setLayout(opt.key)}
+                >
+                  <span>
+                    <LayoutIcon size={13} />
+                    {opt.label}
+                  </span>
+                  <em>{opt.hint}</em>
+                </button>
+              </Tip>
             );
           })}
         </div>
@@ -1946,17 +2041,33 @@ export function GridView({ campaign, days, progress, isDayComplete, topicsDoneCo
             const complete = isDayComplete(day);
             const level = done === 0 ? 0 : done === day.topics.length ? 2 : 1;
             return (
-              <button
+              <Tip
                 key={day.id}
-                type="button"
-                className={classNames("heat-cell", `heat-level-${level}`)}
-                onClick={() => onOpenDay(day)}
-                title={`Day ${day.day}: ${day.topics.join(" · ")}${notes[day.id] ? " — has notes" : ""}`}
+                content={
+                  <>
+                    <strong>Day {day.day}</strong> · {done}/{day.topics.length} topics
+                    {complete ? " · cleared" : ""}
+                    {notes[day.id] ? " · has notes" : ""}
+                    <br />
+                    {day.topics.join(" · ")}
+                  </>
+                }
+                stamp={complete ? "DONE" : done ? "WIP" : "DAY"}
+                tone={complete ? "mint" : done ? "lemon" : "ink"}
+                side="top"
+                maxWidth={280}
+                delay={180}
               >
-                <span className="heat-cell-num">{day.day}</span>
-                {complete && <span className="heat-cell-check"><Icon.Check size={9} /></span>}
-                {notes[day.id] && <span className="heat-cell-note" />}
-              </button>
+                <button
+                  type="button"
+                  className={classNames("heat-cell", `heat-level-${level}`)}
+                  onClick={() => onOpenDay(day)}
+                >
+                  <span className="heat-cell-num">{day.day}</span>
+                  {complete && <span className="heat-cell-check"><Icon.Check size={9} /></span>}
+                  {notes[day.id] && <span className="heat-cell-note" />}
+                </button>
+              </Tip>
             );
           })}
         </div>
@@ -2068,20 +2179,26 @@ export function ReviewView({ queue, srs, notes, scheduledCount, onGrade, onOpenD
         </div>
 
         <div className="grade-row">
-          <button type="button" className="grade-btn grade-forgot" onClick={() => grade("forgot")}>
-            <span className="grade-label">Forgot</span>
-            <span className="grade-sub">back in 3d</span>
-          </button>
-          <button type="button" className="grade-btn grade-shaky" onClick={() => grade("shaky")}>
-            <span className="grade-label">Shaky</span>
-            <span className="grade-sub">repeat {SRS_INTERVALS[entry.idx]}d</span>
-          </button>
-          <button type="button" className="grade-btn grade-solid" onClick={() => grade("solid")}>
-            <span className="grade-label">Solid</span>
-            <span className="grade-sub">
-              {entry.idx + 1 >= SRS_INTERVALS.length ? "retained" : `next ${SRS_INTERVALS[entry.idx + 1]}d`}
-            </span>
-          </button>
+          <Tip content="Blanked on it — reset the interval and see it again in 3 days." stamp="LAPSE" tone="coral" side="top">
+            <button type="button" className="grade-btn grade-forgot" onClick={() => grade("forgot")}>
+              <span className="grade-label">Forgot</span>
+              <span className="grade-sub">back in 3d</span>
+            </button>
+          </Tip>
+          <Tip content="Kinda got it — keep the same interval and drill again soon." stamp="HOLD" tone="lemon" side="top">
+            <button type="button" className="grade-btn grade-shaky" onClick={() => grade("shaky")}>
+              <span className="grade-label">Shaky</span>
+              <span className="grade-sub">repeat {SRS_INTERVALS[entry.idx]}d</span>
+            </button>
+          </Tip>
+          <Tip content="Locked in — advance the spaced interval toward long-term retention." stamp="LOCK" tone="mint" side="top">
+            <button type="button" className="grade-btn grade-solid" onClick={() => grade("solid")}>
+              <span className="grade-label">Solid</span>
+              <span className="grade-sub">
+                {entry.idx + 1 >= SRS_INTERVALS.length ? "retained" : `next ${SRS_INTERVALS[entry.idx + 1]}d`}
+              </span>
+            </button>
+          </Tip>
         </div>
 
         {queue.length > 1 && (

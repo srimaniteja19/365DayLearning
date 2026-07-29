@@ -6222,3 +6222,188 @@ select.settings-input { cursor: pointer; }
   .account-tabs { grid-template-columns: 1fr; }
 }
 
+
+/* ---------- Field Ops tooltips ---------- */
+.ops-tip {
+  --ops-tip-fill: #fff8e7;
+  --ops-tip-ink: #111827;
+  --ops-tip-accent: #f5d76e;
+  position: fixed;
+  z-index: 12000;
+  pointer-events: none;
+  padding: 10px 12px 11px;
+  max-width: 240px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--ops-tip-accent) 35%, transparent) 0%, transparent 42%),
+    var(--ops-tip-fill);
+  color: var(--ops-tip-ink);
+  border: 2.5px solid #111827;
+  border-radius: 0;
+  box-shadow:
+    4px 4px 0 #111827,
+    0 0 0 1px color-mix(in srgb, var(--ops-tip-accent) 40%, transparent);
+  font-family: var(--sans);
+  opacity: 0;
+  transform: translateY(4px) scale(0.97);
+  transition:
+    opacity 0.14s ease-out,
+    transform 0.18s cubic-bezier(0.2, 0.9, 0.25, 1.15);
+  will-change: opacity, transform;
+}
+.ops-tip-ready {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+.ops-tip-side-top.ops-tip-ready { transform: translateY(0) scale(1); }
+.ops-tip-side-top { transform: translateY(4px) scale(0.97); }
+.ops-tip-side-bottom { transform: translateY(-4px) scale(0.97); }
+.ops-tip-side-left { transform: translateX(4px) scale(0.97); }
+.ops-tip-side-right { transform: translateX(-4px) scale(0.97); }
+.ops-tip-side-left.ops-tip-ready,
+.ops-tip-side-right.ops-tip-ready { transform: translateX(0) scale(1); }
+
+.ops-tip-stamp {
+  display: inline-block;
+  margin-bottom: 5px;
+  padding: 2px 6px;
+  border: 1.5px solid #111827;
+  background: var(--ops-tip-accent);
+  color: #111827;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  box-shadow: 1.5px 1.5px 0 #111827;
+}
+.ops-tip-body {
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  text-wrap: pretty;
+}
+.ops-tip-body strong {
+  font-weight: 800;
+  color: #111827;
+}
+.ops-tip-arrow {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--ops-tip-fill);
+  border: 2.5px solid #111827;
+  transform: rotate(45deg);
+  box-shadow: none;
+}
+.ops-tip-side-bottom .ops-tip-arrow {
+  top: -7px;
+  left: 50%;
+  margin-left: -5px;
+  border-right: none;
+  border-bottom: none;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--ops-tip-accent) 35%, transparent) 0%, transparent 55%),
+    var(--ops-tip-fill);
+}
+.ops-tip-side-top .ops-tip-arrow {
+  bottom: -7px;
+  left: 50%;
+  margin-left: -5px;
+  border-left: none;
+  border-top: none;
+}
+.ops-tip-side-left .ops-tip-arrow {
+  right: -7px;
+  top: 50%;
+  margin-top: -5px;
+  border-left: none;
+  border-bottom: none;
+}
+.ops-tip-side-right .ops-tip-arrow {
+  left: -7px;
+  top: 50%;
+  margin-top: -5px;
+  border-right: none;
+  border-top: none;
+}
+
+.ops-tip-mint { --ops-tip-fill: #e8fff4; --ops-tip-accent: #6fe3b0; }
+.ops-tip-sky { --ops-tip-fill: #e8f4ff; --ops-tip-accent: #6eb6f5; }
+.ops-tip-lemon { --ops-tip-fill: #fff8d6; --ops-tip-accent: #f5d76e; }
+.ops-tip-coral { --ops-tip-fill: #ffe9e4; --ops-tip-accent: #ff8a73; }
+.ops-tip-violet { --ops-tip-fill: #f3e8ff; --ops-tip-accent: #c792ea; }
+.ops-tip-ink { --ops-tip-fill: #fff8e7; --ops-tip-accent: #f5d76e; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ops-tip,
+  .ops-tip-ready {
+    transition: none;
+    transform: none;
+  }
+}
+
+@media (hover: none) {
+  /* Touch: only show via keyboard focus, not sticky hover ghosts */
+  .ops-tip:not(:focus-within) {
+    /* still shown when Tip opens from focus */
+  }
+}
+
+.ops-tip-anchor {
+  display: inline-flex;
+  max-width: 100%;
+  vertical-align: middle;
+}
+.ops-tip-anchor > .topbar-item,
+.ops-tip-anchor > .view-tab,
+.ops-tip-anchor > .scope-btn,
+.ops-tip-anchor > .period-chip,
+.ops-tip-anchor > .domain-meter,
+.ops-tip-anchor > .console-layout-btn,
+.ops-tip-anchor > .tool-btn,
+.ops-tip-anchor > .grade-btn,
+.ops-tip-anchor > .stat-chip,
+.ops-tip-anchor > .brand-btn,
+.ops-tip-anchor > .topbar-menu-btn,
+.ops-tip-anchor > .switcher-add,
+.ops-tip-anchor > .switcher-del,
+.ops-tip-anchor > button {
+  width: 100%;
+}
+/* Stretch anchors that wrap blocky controls */
+.view-tabs .ops-tip-anchor,
+.scope-btns .ops-tip-anchor,
+.console-layout-btns .ops-tip-anchor,
+.grade-row .ops-tip-anchor,
+.day-tools .ops-tip-anchor,
+.domain-legend-grid .ops-tip-anchor,
+.period-strip .ops-tip-anchor {
+  display: flex;
+}
+.period-strip .ops-tip-anchor { flex: 0 0 auto; }
+.domain-legend-grid .ops-tip-anchor { min-width: 0; }
+.topbar-cluster .ops-tip-anchor { display: inline-flex; }
+
+.settings-tier-row .ops-tip-anchor,
+.settings-model-row .ops-tip-anchor,
+.seg-row .ops-tip-anchor,
+.badges-grid .ops-tip-anchor,
+.switcher-tab-wrap .ops-tip-anchor {
+  display: flex;
+  min-width: 0;
+}
+.badges-grid .ops-tip-anchor { width: 100%; }
+.switcher .ops-tip-anchor > .switcher-tab,
+.switcher .ops-tip-anchor > .switcher-new {
+  width: auto;
+}
+.switcher-tab-wrap {
+  display: inline-flex;
+  align-items: stretch;
+}
+.ops-search .ops-tip-anchor { display: inline-flex; align-items: center; }
+
+.heatmap .ops-tip-anchor { display: block; }
+.heatmap .ops-tip-anchor > .heat-cell { width: 100%; height: 100%; }

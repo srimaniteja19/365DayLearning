@@ -34,6 +34,7 @@ import {
 } from "@/theme/fonts";
 import { ThemeCtx } from "@/theme/ThemeContext";
 import { Icon } from "@/components/Icon";
+import { Tip } from "@/components/Tip";
 import { classNames } from "@/lib/classNames";
 import { XP_PER_TOPIC, XP_PER_DAY_BONUS, levelFromXp, rankForLevel } from "@/lib/xp";
 import { seedReview, nextReview, dueList } from "@/lib/srs";
@@ -943,7 +944,9 @@ export default function DualTrackConsole() {
             />
             <div className="controls-row">
               <label className="ops-search">
-                <span className="ops-search-label">Find</span>
+                <Tip content="Filter days by topic text or notes. Cleared when you leave." stamp="FIND" tone="sky" side="bottom">
+                  <span className="ops-search-label">Find</span>
+                </Tip>
                 <Icon.Search size={14} />
                 <input
                   className="ops-search-input"
@@ -952,14 +955,16 @@ export default function DualTrackConsole() {
                   onChange={(e) => setQuery(e.target.value)}
                 />
                 {query.trim() && (
-                  <button
-                    type="button"
-                    className="ops-search-clear"
-                    aria-label="Clear search"
-                    onClick={() => setQuery("")}
-                  >
-                    <Icon.X size={14} />
-                  </button>
+                  <Tip content="Clear the search filter" stamp="CLR" tone="coral" side="bottom">
+                    <button
+                      type="button"
+                      className="ops-search-clear"
+                      aria-label="Clear search"
+                      onClick={() => setQuery("")}
+                    >
+                      <Icon.X size={14} />
+                    </button>
+                  </Tip>
                 )}
               </label>
               <DomainLegend

@@ -22,6 +22,7 @@ import {
 } from "@/lib/providers/credentials";
 import { testConnection } from "@/lib/claude-client";
 import { classNames } from "@/lib/classNames";
+import { Tip } from "@/components/Tip";
 
 export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const [creds, setCreds] = useState(getCredentials);
@@ -93,24 +94,28 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
       <div className="settings-field">
         <label className="settings-label">Model</label>
         <div className="settings-tier-row" role="tablist" aria-label="Pricing tier">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tier === "paid"}
-            className={classNames("settings-tier-btn", tier === "paid" && "settings-tier-btn-active")}
-            onClick={() => setTier("paid")}
-          >
-            Paid{paidCount ? ` · ${Math.min(paidCount, 999)}` : ""}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tier === "free"}
-            className={classNames("settings-tier-btn", tier === "free" && "settings-tier-btn-active")}
-            onClick={() => setTier("free")}
-          >
-            Free{freeCount ? ` · ${freeCount}` : ""}
-          </button>
+          <Tip content="Paid catalog — budget, mid, and frontier models with sticker prices." stamp="PAID" tone="lemon" side="bottom">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tier === "paid"}
+              className={classNames("settings-tier-btn", tier === "paid" && "settings-tier-btn-active")}
+              onClick={() => setTier("paid")}
+            >
+              Paid{paidCount ? ` · ${Math.min(paidCount, 999)}` : ""}
+            </button>
+          </Tip>
+          <Tip content="Free OpenRouter models. Daily caps apply — failover may jump to cheap paid." stamp="FREE" tone="mint" side="bottom">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tier === "free"}
+              className={classNames("settings-tier-btn", tier === "free" && "settings-tier-btn-active")}
+              onClick={() => setTier("free")}
+            >
+              Free{freeCount ? ` · ${freeCount}` : ""}
+            </button>
+          </Tip>
         </div>
 
         <div className="settings-model-groups">
@@ -130,19 +135,26 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
                   const isDefault =
                     (m.tags || []).includes("Default") || m.id === "deepseek/deepseek-v4-flash";
                   return (
-                    <button
+                    <Tip
                       key={m.id}
-                      type="button"
-                      className={classNames(
-                        "settings-chip",
-                        creds.model === m.id && "settings-chip-active",
-                      )}
-                      onClick={() => update({ model: m.id })}
-                      title={[m.id, price, tags].filter(Boolean).join(" · ")}
+                      content={[m.id, price && `${price} per M tokens`, tags].filter(Boolean).join(" · ")}
+                      stamp={isDefault ? "DEF" : m.free ? "FREE" : "MODEL"}
+                      tone={creds.model === m.id ? "mint" : m.free ? "sky" : "lemon"}
+                      side="top"
+                      maxWidth={280}
                     >
-                      {shortModelName(m.id)}
-                      {isDefault && creds.model !== m.id ? " · default" : ""}
-                    </button>
+                      <button
+                        type="button"
+                        className={classNames(
+                          "settings-chip",
+                          creds.model === m.id && "settings-chip-active",
+                        )}
+                        onClick={() => update({ model: m.id })}
+                      >
+                        {shortModelName(m.id)}
+                        {isDefault && creds.model !== m.id ? " · default" : ""}
+                      </button>
+                    </Tip>
                   );
                 })}
               </div>
