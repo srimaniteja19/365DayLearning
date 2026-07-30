@@ -4066,21 +4066,25 @@
 }
 
 .landing-root {
-  --bg: var(--landing-paper) !important;
-  --bg-panel: var(--landing-panel) !important;
-  --text: var(--landing-ink) !important;
-  --text-dim: var(--landing-muted) !important;
-  --accent-main: var(--landing-blue-deep) !important;
-  --accent-sprint: var(--landing-pink) !important;
-  --accent: var(--landing-blue-deep) !important;
+  /* NOTE: .landing-root is the PARENT of .landing in the DOM (see DualTrackConsole.tsx),
+     so the --landing-* custom properties defined on .landing are NOT visible here —
+     CSS custom properties only cascade downward. Use literal hex values (matching
+     .landing's tokens) instead of var(--landing-*) references. */
+  --bg: #fdf6ec !important;
+  --bg-panel: #ffffff !important;
+  --text: #263d5b !important;
+  --text-dim: #4b5a72 !important;
+  --accent-main: #1b7fa8 !important;
+  --accent-sprint: #e8578b !important;
+  --accent: #1b7fa8 !important;
   --on-accent: #ffffff !important;
   --r-card: 18px !important;
   --r-ctl: 999px !important;
   --r-pill: 999px !important;
   background:
-    radial-gradient(900px 520px at 92% -8%, color-mix(in srgb, var(--landing-blue) 16%, transparent), transparent 58%),
-    radial-gradient(700px 420px at -6% 18%, color-mix(in srgb, var(--landing-pink) 12%, transparent), transparent 55%),
-    var(--landing-paper) !important;
+    radial-gradient(900px 520px at 92% -8%, rgba(73, 182, 229, 0.16), transparent 58%),
+    radial-gradient(700px 420px at -6% 18%, rgba(232, 87, 139, 0.12), transparent 55%),
+    #fdf6ec !important;
   position: relative;
   isolation: isolate;
 }

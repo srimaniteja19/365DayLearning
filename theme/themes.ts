@@ -76,36 +76,36 @@ export const DEFAULT_THEME_KEY: ThemeKey = "signal";
 
 /**
  * Fixed public homepage skin — same for every visitor, ignores account theme.
- * Cool steel paper + electric briefing blue + flare coral. Sharp neo-brutal edges.
+ * Warm paper + doodle sky blue + highlighter pink. Rounded hand-drawn edges.
  */
 export const LANDING_THEME: ThemeDef = {
-  name: "Briefing",
+  name: "Doodle",
   mode: "light",
   palette: "light",
   effects: true,
-  swatch: ["#D5DEE8", "#2554F2", "#FF4D6A"],
-  accents: { main: "#2554F2", sprint: "#FF4D6A" },
+  swatch: ["#FDF6EC", "#49B6E5", "#E8578B"],
+  accents: { main: "#1B7FA8", sprint: "#E8578B" },
   display: FONT_STACKS.grotesk,
-  radius: { card: "0px", ctl: "0px", pill: "0px", bar: "0px" },
-  grid: { color: "rgba(37,84,242,0.1)", size: "28px", scan: "0.18" },
+  radius: { card: "20px", ctl: "999px", pill: "999px", bar: "999px" },
+  grid: { color: "rgba(38,61,91,0.07)", size: "27px", scan: "0.1" },
   c: {
-    bg: "#D5DEE8",
-    panel: "#F4F7FB",
-    panel2: "#C0CBD8",
-    blur: "rgba(213,222,232,0.92)",
-    text: "#0B1220",
-    dim: "#3D4A5C",
-    faint: "#5C6B7E",
-    border: "rgba(11,18,32,0.2)",
-    borderSoft: "rgba(11,18,32,0.1)",
-    borderHover: "rgba(11,18,32,0.36)",
-    track: "rgba(11,18,32,0.12)",
+    bg: "#FDF6EC",
+    panel: "#FFFFFF",
+    panel2: "#F5ECDC",
+    blur: "rgba(253,246,236,0.92)",
+    text: "#263D5B",
+    dim: "#4B5A72",
+    faint: "#7E8FA6",
+    border: "rgba(38,61,91,0.2)",
+    borderSoft: "rgba(38,61,91,0.1)",
+    borderHover: "rgba(38,61,91,0.36)",
+    track: "rgba(38,61,91,0.12)",
     onAccent: "#FFFFFF",
     onAccentSoft: "rgba(255,255,255,0.9)",
-    ok: "#0F7A4A",
-    warn: "#C97800",
-    err: "#E11D48",
-    info: "#2554F2",
+    ok: "#15803D",
+    warn: "#B45309",
+    err: "#DC2626",
+    info: "#1B7FA8",
   },
 };
 
