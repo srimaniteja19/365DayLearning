@@ -6,6 +6,7 @@ import {
   insertDayAfter,
   moveDay,
   renumberPlanDays,
+  sanitizePlanDays,
   updatePeriodTheme,
   updateTopic,
   validateEditablePlan,
@@ -128,5 +129,37 @@ describe("planEdit mutations", () => {
       { day: 1, id: "plan-test:1" },
       { day: 2, id: "plan-test:2" },
     ]);
+  });
+
+  it("sanitizePlanDays repairs [object Object] topics", () => {
+    const dirty = samplePlan({
+      days: [
+        day(1, ["[object Object]", "Valid topic name"]),
+        day(2, ["[object Object]", "Another valid topic"]),
+      ],
+      totalDays: 2,
+      topicsPerDay: 2,
+    });
+    const cleaned = sanitizePlanDays(dirty);
+    expect(cleaned.days[0].topics[0]).toMatch(/^Needs review topic/);
+    expect(cleaned.days[0].topics[1]).toBe("Valid topic name");
+    expect(findDuplicateTopics(cleaned.days).has("[object object]")).toBe(false);
+    expect(validateEditablePlan(cleaned).some((i) => i.code === "duplicate")).toBe(false);
+  });
+
+  it("sanitizePlanDays strips HTML junk and Topic A placeholders", () => {
+    const dirty = samplePlan({
+      days: [
+        day(1, ["Decision-making models</</</</</", "Topic A"]),
+        day(2, ["topic b", "Solid retrieval practice"]),
+      ],
+      totalDays: 2,
+      topicsPerDay: 2,
+    });
+    const cleaned = sanitizePlanDays(dirty);
+    expect(cleaned.days[0].topics[0]).toBe("Decision-making models");
+    expect(cleaned.days[0].topics[1]).toMatch(/^Needs review topic/);
+    expect(cleaned.days[1].topics[0]).toMatch(/^Needs review topic/);
+    expect(cleaned.days[1].topics[1]).toBe("Solid retrieval practice");
   });
 });

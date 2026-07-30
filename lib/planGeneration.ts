@@ -25,10 +25,15 @@ const outlineSchema = z.object({
 });
 
 /** Topics may be empty — validatePeriodDays pads placeholders. */
+const topicStringSchema = z.preprocess(
+  (val) => scrubTopicText(val),
+  z.string(),
+);
+
 const generatedDaySchema = z.object({
   day: z.coerce.number().int().positive(),
-  topics: z.array(z.coerce.string()).default([]),
-  domains: z.array(z.coerce.string()).optional(),
+  topics: z.array(topicStringSchema).default([]),
+  domains: z.array(topicStringSchema).optional(),
 });
 
 export const periodDaysSchema = z.object({
@@ -187,8 +192,70 @@ function wordCount(topic: string): number {
   return topic.trim().split(/\s+/).filter(Boolean).length;
 }
 
-export function normalizeTopic(t: string): string {
-  return t.trim().toLowerCase().replace(/\s+/g, " ");
+/**
+ * Extract a string from model output that may be a bare string or
+ * `{ title|topic|name|… }` — never String(object) → "[object Object]".
+ */
+export function coerceTopicString(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value).trim();
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    for (const key of ["title", "topic", "name", "text", "label", "concept"]) {
+      const hit = obj[key];
+      if (typeof hit === "string" && hit.trim()) return hit.trim();
+    }
+  }
+  return "";
+}
+
+const PLACEHOLDER_TOPIC_RE =
+  /^(topic|example|placeholder|sample|dummy)\s*[a-z0-9_-]*$/i;
+
+/**
+ * Clean and validate a topic string. Returns "" when the text is unusable
+ * (HTML junk, example placeholders like "Topic A", mostly punctuation, etc.).
+ */
+export function scrubTopicText(value: unknown): string {
+  let s = coerceTopicString(value);
+  if (!s) return "";
+
+  // Collapse markup / broken tag runs the model sometimes emits (</</</…).
+  s = s.replace(/<\/?[a-zA-Z][^>]{0,40}>/g, " ");
+  s = s.replace(/[<>\/\\]{2,}/g, " ");
+  s = s.replace(/[<>]+/g, " ");
+  // Strip other control / zero-width junk
+  s = s.replace(/[\u0000-\u001F\u007F\u200B-\u200D\uFEFF]/g, "");
+  s = s.replace(/\s+/g, " ").trim();
+  if (!s) return "";
+
+  if (s.toLowerCase() === "[object object]") return "";
+  if (PLACEHOLDER_TOPIC_RE.test(s)) return "";
+  // "Topic A", "Topic 1", "topic b" — repair-prompt leaks
+  if (/^topics?\s+[a-z0-9]+$/i.test(s)) return "";
+
+  const letters = (s.match(/\p{L}/gu) || []).length;
+  if (letters < 4) return "";
+  if (letters / s.length < 0.45) return "";
+
+  // Detect pathological repetition (e.g. same 2–3 char chunk many times)
+  if (s.length >= 24) {
+    const chunk = s.slice(0, 3);
+    if (chunk.trim() && s.split(chunk).length > 8) return "";
+  }
+
+  if (s.length > 100) s = s.slice(0, 100).trim();
+
+  const words = s.split(/\s+/).filter(Boolean);
+  if (words.length > 12) s = words.slice(0, 12).join(" ");
+
+  return s.trim();
+}
+
+export function normalizeTopic(t: unknown): string {
+  return scrubTopicText(t).toLowerCase().replace(/\s+/g, " ");
 }
 
 export type PeriodValidationIssue = {
@@ -238,28 +305,34 @@ function padTopics(
   const nextTopics: string[] = [];
   let padded = false;
   for (let i = 0; i < topics.length && nextTopics.length < topicsPerDay; i++) {
-    let s = topics[i]?.trim() || "";
+    const s = scrubTopicText(topics[i]);
     if (!s) {
       nextTopics.push(placeholderTopic(dayNum, nextTopics.length));
       padded = true;
       continue;
     }
     const words = s.split(/\s+/).filter(Boolean);
+    let topic = s;
     if (words.length < 2) {
-      s = `${s} core concepts`;
+      topic = `${s} fundamentals`;
+      // Re-scrub in case append made it weird; keep unique enough for dedupe.
+      topic = scrubTopicText(topic) || placeholderTopic(dayNum, nextTopics.length);
       padded = true;
     } else if (words.length > 10) {
-      s = words.slice(0, 10).join(" ");
+      topic = words.slice(0, 10).join(" ");
       padded = true;
     }
-    nextTopics.push(s);
+    nextTopics.push(topic);
   }
   while (nextTopics.length < topicsPerDay) {
     nextTopics.push(placeholderTopic(dayNum, nextTopics.length));
     padded = true;
   }
   const trimmedTopics = nextTopics.slice(0, topicsPerDay);
-  const nextDomains = domains.map((d) => d.trim());
+  const nextDomains = domains.map((d) => {
+    const raw = typeof d === "string" ? d.trim() : scrubTopicText(d);
+    return raw;
+  });
   const trimmedDomains = trimmedTopics.map((t, i) => {
     const d = nextDomains[i];
     if (d && domainIds.includes(d)) return d;
@@ -502,10 +575,10 @@ export function formatParseError(err: unknown): string {
 
 function coerceStringList(value: unknown): string[] {
   if (Array.isArray(value)) {
-    return value.map((x) => String(x ?? "").trim()).filter(Boolean);
+    return value.map((x) => scrubTopicText(x)).filter(Boolean);
   }
-  if (typeof value === "string" && value.trim()) return [value.trim()];
-  return [];
+  const single = scrubTopicText(value);
+  return single ? [single] : [];
 }
 
 function coerceGeneratedDay(item: unknown, index: number): {
@@ -938,6 +1011,8 @@ Topic rules
 - Exactly ${draft.topicsPerDay} topics per day, each 2–10 words.
 - Each topic names one specific mechanism, technique, or concept — something you could write a quiz question about.
 - No filler: never Review, Recap, Catch-up, Rest day, Practice session, Introduction to X, Overview of X, Deep dive into X, or X basics.
+- Never use placeholder labels like Topic A, Topic B, Example topic, or Sample topic.
+- Never include HTML, XML, or markup characters (< > /) inside topic text.
 - No duplicates of already-covered topics (rephrasing counts).
 - Prerequisites before dependents within the period.
 - Do not use double-quote characters inside topic text. Prefer parentheses for acronyms, e.g. Remote Procedure Call (RPC).
@@ -967,7 +1042,8 @@ ${violations?.length ? `\nPrevious attempt rejected — fix every issue:\n${viol
     },
     parse: parseJsonWithRepair,
     repairPrompt: (error, bad) =>
-      `Fix this into valid JSON matching {"days":[{"day":1,"topics":["Topic A"],"domains":["ai-ml"]}]}.
+      `Fix this into valid JSON matching {"days":[{"day":15,"topics":["Working memory capacity limits","Cognitive load theory basics"],"domains":["cognitive-sci"]}]}.
+Use real, specific topic phrases — never placeholders like "Topic A" or "Topic B". Never include HTML or markup characters (< > /).
 domains is optional. Use double quotes only for JSON syntax — never inside topic strings. No trailing commas. No markdown.
 Parser error: ${error}
 Broken input:

@@ -135,4 +135,10 @@ export const Icon = {
       <path d="M14 11a5 5 0 0 0-7.54-.54L4.54 12.38a5 5 0 0 0 7.07 7.07L13.2 17.9" />
     </svg>
   ),
+  Play: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M10 8.5v7l6-3.5z" fill="currentColor" stroke="none" />
+    </svg>
+  ),
 };

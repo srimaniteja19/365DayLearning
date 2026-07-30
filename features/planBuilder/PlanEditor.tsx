@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { Plan } from "@/lib/types";
 import { classNames } from "@/lib/classNames";
 import { Icon } from "@/components/Icon";
@@ -12,6 +12,7 @@ import {
   normalizeTopic,
   primaryPeriodScope,
   regenerateDay,
+  sanitizePlanDays,
   updateDomain,
   updatePeriodTheme,
   updateTopic,
@@ -32,6 +33,14 @@ export function PlanEditor({ plan, onChange, onSave, onBack }: Props) {
   const [regenInstruction, setRegenInstruction] = useState("");
   const [regenBusy, setRegenBusy] = useState(false);
   const [regenError, setRegenError] = useState("");
+
+  // One-shot repair for corrupted topic strings (e.g. "[object Object]").
+  useEffect(() => {
+    const cleaned = sanitizePlanDays(plan);
+    if (cleaned !== plan) onChange(cleaned);
+    // Only on mount / when plan id changes — avoid loops.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan.id]);
 
   const issues = useMemo(() => validateEditablePlan(plan), [plan]);
   const dupMap = useMemo(() => findDuplicateTopics(plan.days), [plan.days]);
@@ -65,6 +74,20 @@ export function PlanEditor({ plan, onChange, onSave, onBack }: Props) {
     } finally {
       setRegenBusy(false);
     }
+  };
+
+  const handleSave = () => {
+    const cleaned = sanitizePlanDays({
+      ...plan,
+      status: "ready",
+      totalDays: plan.days.length,
+    });
+    const remaining = validateEditablePlan(cleaned);
+    if (remaining.length) {
+      if (cleaned !== plan) onChange(cleaned);
+      return;
+    }
+    onSave(cleaned);
   };
 
   return (
@@ -262,7 +285,7 @@ export function PlanEditor({ plan, onChange, onSave, onBack }: Props) {
           type="button"
           className="primary-btn"
           disabled={!canSave}
-          onClick={() => onSave({ ...plan, status: "ready", totalDays: plan.days.length })}
+          onClick={handleSave}
         >
           Save plan
         </button>

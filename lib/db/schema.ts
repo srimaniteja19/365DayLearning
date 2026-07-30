@@ -39,5 +39,21 @@ export const userState = pgTable("user_state", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Shared cache of suggested learning resources, keyed by normalized topic
+ * title (not per-user). Keeps OpenRouter web_search cost down when the same
+ * topics recur across plans/users.
+ *
+ * A row with null `url` is a negative cache entry (search ran, nothing usable).
+ */
+export const topicResourceCache = pgTable("topic_resource_cache", {
+  topicKey: text("topic_key").primaryKey(),
+  url: text("url"),
+  title: text("title"),
+  snippet: text("snippet"),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type UserRow = typeof users.$inferSelect;
 export type UserStateRow = typeof userState.$inferSelect;
+export type TopicResourceCacheRow = typeof topicResourceCache.$inferSelect;

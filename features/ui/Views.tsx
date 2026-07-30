@@ -635,7 +635,14 @@ export function PlanSwitcher({
 
 /* ============================== LANDING (re-exported from features/landing) ============================== */
 
-export function CampaignHero({ campaign, stats, progress, onToggle }) {
+export function CampaignHero({
+  campaign,
+  stats,
+  progress,
+  onToggle,
+  onGenerateTopicResources,
+  generatingTopicKey,
+}) {
   const activeDay = stats.activeDay;
   const dayProgress = activeDay && progress ? progress[activeDay.id] : null;
   const doneCount = activeDay
@@ -699,6 +706,16 @@ export function CampaignHero({ campaign, stats, progress, onToggle }) {
                     </span>
                     <span className="next-mission-idx">{i + 1}</span>
                     <span className="topic-text">{t}</span>
+                    <TopicResourceControls
+                      resourceSlot={activeDay.resources?.[i]}
+                      compact
+                      generating={generatingTopicKey === `${activeDay.id}:${i}`}
+                      onGenerate={
+                        onGenerateTopicResources
+                          ? () => onGenerateTopicResources(activeDay, i)
+                          : undefined
+                      }
+                    />
                   </label>
                 </li>
               );
@@ -1436,24 +1453,37 @@ function DayDetailBody({
   onCaptureToKit,
   refs,
   setRef,
+  onGenerateTopicResources,
+  generatingTopicKey,
 }) {
   return (
     <>
       {day.topics.map((t, i) => {
         const isDone = !!(progress[day.id] && progress[day.id][i]);
         return (
-          <label key={i} className={classNames("topic-line", isDone && "topic-line-done")}>
-            <input
-              type="checkbox"
-              checked={isDone}
-              onChange={() => onToggle(day, i, campaign)}
+          <div key={i} className={classNames("topic-line", isDone && "topic-line-done")}>
+            <label className="topic-line-main">
+              <input
+                type="checkbox"
+                checked={isDone}
+                onChange={() => onToggle(day, i, campaign)}
+              />
+              <span className="topic-checkbox">
+                {isDone && <Icon.Check size={11} />}
+              </span>
+              <span className="topic-text">{t}</span>
+              <DomainTag domain={day.domains[i]} />
+            </label>
+            <TopicResourceControls
+              resourceSlot={day.resources?.[i]}
+              generating={generatingTopicKey === `${day.id}:${i}`}
+              onGenerate={
+                onGenerateTopicResources
+                  ? () => onGenerateTopicResources(day, i)
+                  : undefined
+              }
             />
-            <span className="topic-checkbox">
-              {isDone && <Icon.Check size={11} />}
-            </span>
-            <span className="topic-text">{t}</span>
-            <DomainTag domain={day.domains[i]} />
-          </label>
+          </div>
         );
       })}
       <NoteEditor
@@ -1500,7 +1530,28 @@ function DayDetailBody({
   );
 }
 
-export function ConsoleView({ campaign, days, progress, onToggle, expandedDay, setExpandedDay, topicsDoneCount, isDayComplete, jumpTarget, notes, setNote, getRelated, onJumpDay, onOpenTool, onCaptureToKit, query, refs, setRef }) {
+export function ConsoleView({
+  campaign,
+  days,
+  progress,
+  onToggle,
+  expandedDay,
+  setExpandedDay,
+  topicsDoneCount,
+  isDayComplete,
+  jumpTarget,
+  notes,
+  setNote,
+  getRelated,
+  onJumpDay,
+  onOpenTool,
+  onCaptureToKit,
+  query,
+  refs,
+  setRef,
+  onGenerateTopicResources,
+  generatingTopicKey,
+}) {
   const listRef = useRef(null);
   const [layout, setLayout] = useState("bento");
 
@@ -1524,6 +1575,8 @@ export function ConsoleView({ campaign, days, progress, onToggle, expandedDay, s
     query,
     refs,
     setRef,
+    onGenerateTopicResources,
+    generatingTopicKey,
   };
 
   return (
@@ -1606,6 +1659,8 @@ function DayRow({
   query,
   refs,
   setRef,
+  onGenerateTopicResources,
+  generatingTopicKey,
 }) {
   const noteMatch =
     query &&
@@ -1676,6 +1731,8 @@ function DayRow({
             onCaptureToKit={onCaptureToKit}
             refs={refs}
             setRef={setRef}
+            onGenerateTopicResources={onGenerateTopicResources}
+            generatingTopicKey={generatingTopicKey}
           />
         </div>
       )}
@@ -1702,6 +1759,8 @@ function DayTile({
   query,
   refs,
   setRef,
+  onGenerateTopicResources,
+  generatingTopicKey,
 }) {
   const total = day.topics.length || 1;
   const pct = Math.round((done / total) * 100);
@@ -1797,6 +1856,8 @@ function DayTile({
             onCaptureToKit={onCaptureToKit}
             refs={refs}
             setRef={setRef}
+            onGenerateTopicResources={onGenerateTopicResources}
+            generatingTopicKey={generatingTopicKey}
           />
         </div>
       )}
@@ -1836,6 +1897,8 @@ function DayMission({
   query,
   refs,
   setRef,
+  onGenerateTopicResources,
+  generatingTopicKey,
   side,
 }) {
   const total = day.topics.length || 1;
@@ -1921,6 +1984,8 @@ function DayMission({
               onCaptureToKit={onCaptureToKit}
               refs={refs}
               setRef={setRef}
+              onGenerateTopicResources={onGenerateTopicResources}
+              generatingTopicKey={generatingTopicKey}
             />
           </div>
         )}
@@ -1976,6 +2041,90 @@ function RelatedDays({ related, onJump }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function TopicResourceLink({ resource, stamp = "RES", icon = "link" }) {
+  const href = resource?.url ? safeHref(resource.url) : null;
+  if (!href || !/^https?:\/\//i.test(href)) return null;
+  const label = resource.title || "Resource";
+  const tip = resource.snippet
+    ? `${label}\n\n${resource.snippet}`
+    : label;
+  return (
+    <Tip content={tip} stamp={stamp} tone="sky" side="top">
+      <a
+        className={classNames("topic-resource-link", icon === "video" && "topic-resource-link-video")}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.preventDefault()}
+        aria-label={`Open ${icon === "video" ? "video" : "article"}: ${label}`}
+      >
+        {icon === "video" ? <Icon.Play size={11} /> : <Icon.Link size={11} />}
+      </a>
+    </Tip>
+  );
+}
+
+function TopicResourceControls({
+  resourceSlot,
+  generating = false,
+  onGenerate,
+  compact = false,
+}) {
+  const pair = (() => {
+    if (!resourceSlot || typeof resourceSlot !== "object") return null;
+    if ("url" in resourceSlot && !("article" in resourceSlot) && !("video" in resourceSlot)) {
+      return { article: resourceSlot, video: null };
+    }
+    return resourceSlot;
+  })();
+  const hasArticle = !!pair?.article?.url;
+  const hasVideo = !!pair?.video?.url;
+
+  return (
+    <span className={classNames("topic-resource-controls", compact && "topic-resource-controls-compact")}>
+      {hasArticle && (
+        <TopicResourceLink resource={pair.article} stamp="DOC" icon="link" />
+      )}
+      {hasVideo && (
+        <TopicResourceLink resource={pair.video} stamp="VID" icon="video" />
+      )}
+      {onGenerate && (
+        <Tip
+          content={
+            hasArticle || hasVideo
+              ? "Find a fresh article + video for this topic"
+              : "Generate 1 article and 1 video for this topic"
+          }
+          stamp="GEN"
+          tone="mint"
+          side="top"
+        >
+          <button
+            type="button"
+            className="topic-resource-gen"
+            disabled={generating}
+            aria-label="Generate article and video resources"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onGenerate();
+            }}
+            onMouseDown={(e) => e.preventDefault()}
+          >
+            {generating ? (
+              <span className="topic-resource-gen-spin" aria-hidden="true" />
+            ) : (
+              <Icon.Sparkle size={11} />
+            )}
+            {!compact && <span>{generating ? "…" : "Generate"}</span>}
+          </button>
+        </Tip>
+      )}
+    </span>
   );
 }
 
@@ -2589,6 +2738,8 @@ function SummaryCard({ label, value, sub, accent, tone = "mint" }) {
 export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, progress, srs, log, learned, bookmarks, themeKey, onImport, fireToast, plans, activePlanId, onPlanCreated, badgeStatuses, onAccountAuthenticated, onOpenPricing, onOpenAccount }) {
   const dialogRef = useRef(null);
   const previousFocusRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   const titles = {
     quiz: "Recall check",
@@ -2606,6 +2757,10 @@ export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, pro
     (modal.kind === "account" && modal.gated ? "Sign in to continue" : titles[modal.kind]) +
     (modal.day ? ` · Day ${modal.day.day}` : "");
 
+  // Only re-bind focus trap when the modal *identity* changes — not when parent
+  // re-renders with a new onClose closure (e.g. plan resource enrichment).
+  const modalKey = `${modal.kind}:${modal.day?.id || ""}:${modal.gated ? "1" : "0"}:${modal.refreshToken || 0}`;
+
   useEffect(() => {
     previousFocusRef.current = document.activeElement;
     const dialog = dialogRef.current;
@@ -2621,14 +2776,16 @@ export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, pro
     const focusable = getFocusable();
     const initial =
       dialog.querySelector("[data-modal-initial-focus]") ||
-      focusable.find((el) => el.classList?.contains("modal-close")) ||
+      focusable.find((el) => !el.classList?.contains("modal-close")) ||
       focusable[0];
     initial?.focus?.();
 
     const onKey = (e) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        // PlanBuilder handles Escape itself while generating / dirty.
+        if (modal.kind === "builder") return;
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab") return;
@@ -2657,7 +2814,7 @@ export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, pro
         }
       }
     };
-  }, [modal, onClose]);
+  }, [modalKey, modal.kind]);
 
   return (
     <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>

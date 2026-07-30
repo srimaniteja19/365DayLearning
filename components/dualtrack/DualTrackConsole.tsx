@@ -54,6 +54,13 @@ import {
 import { computeBadges } from "@/lib/achievements";
 import { findOnThisDayMemory } from "@/lib/onThisDay";
 import { buildKitWeekDigest, countLearned, dateKey } from "@/lib/learned";
+import {
+  applyTopicResourcePair,
+  collectPendingTopicSlots,
+  enrichPlanResources,
+  generateTopicResourcePair,
+} from "@/lib/topicResources";
+import { sanitizePlanDays } from "@/lib/planEdit";
 
 import {
   BackgroundFX,
@@ -360,7 +367,11 @@ export default function DualTrackConsole() {
   }, []);
 
   const applyCloudSnapshot = useCallback((snap) => {
-    setPlans(snap.plans || {});
+    const nextPlans = {};
+    for (const [id, plan] of Object.entries(snap.plans || {})) {
+      nextPlans[id] = sanitizePlanDays(plan);
+    }
+    setPlans(nextPlans);
     setActivePlanId(snap.meta?.activePlanId || BUILTIN_365_ID);
     setProgress(snap.userdata?.progress || {});
     setNotes(snap.userdata?.notes || {});
@@ -371,6 +382,146 @@ export default function DualTrackConsole() {
     setBookmarks(sanitizeBookmarks(snap.userdata?.bookmarks));
     if (snap.meta?.themeKey) setThemeKey(resolveThemeKey(snap.meta.themeKey));
     if (snap.meta?.fontKey) setFontKey(resolveFontKey(snap.meta.fontKey));
+    return nextPlans;
+  }, []);
+
+  const enrichAbortRef = useRef(new Map());
+  const enrichingRef = useRef(new Set());
+  /** Plans we've already kicked off enrichment for this session (avoids conflict spirals). */
+  const enrichAttemptedRef = useRef(new Set());
+  const builderOpenRef = useRef(false);
+  builderOpenRef.current = modal?.kind === "builder";
+
+  const [generatingTopicKey, setGeneratingTopicKey] = useState(null);
+
+  const handleGenerateTopicResources = useCallback(
+    async (day, topicIndex) => {
+      const key = `${day.id}:${topicIndex}`;
+      if (generatingTopicKey) return;
+      const title = day.topics?.[topicIndex];
+      if (!title) return;
+      setGeneratingTopicKey(key);
+      try {
+        const pair = await generateTopicResourcePair({
+          title,
+          domain: day.domains?.[topicIndex],
+        });
+        setPlans((prev) => {
+          const plan = prev[activePlanId];
+          if (!plan) return prev;
+          const dayIndex = plan.days.findIndex((d) => d.id === day.id);
+          if (dayIndex < 0) return prev;
+          return {
+            ...prev,
+            [plan.id]: applyTopicResourcePair(plan, dayIndex, topicIndex, pair),
+          };
+        });
+        const found = !!(pair.article?.url || pair.video?.url);
+        fireToast(
+          found
+            ? "Resources ready · article + video"
+            : "No resources found for that topic",
+          found ? "day" : "warn",
+        );
+      } catch (err) {
+        console.warn("[topic-resources] generate failed", err);
+        fireToast("Could not generate resources", "warn");
+      } finally {
+        setGeneratingTopicKey(null);
+      }
+    },
+    [activePlanId, fireToast, generatingTopicKey],
+  );
+
+  const closeModal = useCallback(() => {
+    pendingAuthAction.current = null;
+    setModal(null);
+  }, []);
+
+  /** Progressive OpenRouter web_search fill for topic resource links (fail-soft). */
+  const startResourceEnrichment = useCallback((plan, { force = false } = {}) => {
+    if (!plan?.id || plan.hidden) return;
+    if (builderOpenRef.current && !force) return;
+    if (enrichingRef.current.has(plan.id)) return;
+    if (!force && enrichAttemptedRef.current.has(plan.id)) return;
+    if (!collectPendingTopicSlots(plan).length) {
+      enrichAttemptedRef.current.add(plan.id);
+      return;
+    }
+
+    enrichAttemptedRef.current.add(plan.id);
+    enrichingRef.current.add(plan.id);
+    const prevAc = enrichAbortRef.current.get(plan.id);
+    prevAc?.abort();
+    const ac = new AbortController();
+    enrichAbortRef.current.set(plan.id, ac);
+
+    enrichPlanResources({
+      plan,
+      signal: ac.signal,
+      onPlanUpdate: (next) => {
+        setPlans((prev) => {
+          const cur = prev[plan.id];
+          if (!cur) return prev;
+          const days = cur.days.map((day) => {
+            const enriched = next.days.find((d) => d.id === day.id);
+            if (!enriched?.resources) return day;
+            return { ...day, resources: enriched.resources };
+          });
+          return { ...prev, [plan.id]: { ...cur, days } };
+        });
+      },
+    })
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        console.warn("[topic-resources] enrich failed", plan.id, err);
+      })
+      .finally(() => {
+        enrichingRef.current.delete(plan.id);
+        if (enrichAbortRef.current.get(plan.id) === ac) {
+          enrichAbortRef.current.delete(plan.id);
+        }
+      });
+  }, []);
+
+  const enrichPlansMap = useCallback((plansMap, { force = false } = {}) => {
+    if (builderOpenRef.current && !force) return;
+    for (const plan of Object.values(plansMap || {})) {
+      startResourceEnrichment(plan, { force });
+    }
+  }, [startResourceEnrichment]);
+
+  const handlePlanCreated = useCallback(
+    (plan) => {
+      const cleaned = sanitizePlanDays(plan);
+      setPlans((prev) => ({ ...prev, [cleaned.id]: cleaned }));
+      setActivePlanId(cleaned.id);
+      setScope("all");
+      setView("console");
+      setPage("dashboard");
+      fireToast(`Plan ready · ${cleaned.totalDays} days`, "day");
+      // Defer enrichment until after the page transition settles.
+      window.setTimeout(() => startResourceEnrichment(cleaned, { force: true }), 1500);
+    },
+    [fireToast, startResourceEnrichment],
+  );
+
+  // Catch up resource enrichment after the builder closes (deferred while open).
+  useEffect(() => {
+    if (!cloudReady) return;
+    if (modal?.kind === "builder") return;
+    const t = window.setTimeout(() => enrichPlansMap(plans), 1200);
+    return () => window.clearTimeout(t);
+    // Intentionally omit `plans` / enrichPlansMap identity churn.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudReady, modal?.kind]);
+
+  useEffect(() => {
+    return () => {
+      for (const ac of enrichAbortRef.current.values()) ac.abort();
+      enrichAbortRef.current.clear();
+      enrichingRef.current.clear();
+    };
   }, []);
 
   // Unsigned users stay on the landing page — no guest dashboard/kit.
@@ -410,9 +561,11 @@ export default function DualTrackConsole() {
       const result = await pullCloudSnapshot();
       if (cancelled || gen !== hydrateGen.current) return;
       if (result.ok && result.snapshot) {
-        applyCloudSnapshot(result.snapshot);
+        const nextPlans = applyCloudSnapshot(result.snapshot);
         cloudBaseUpdatedAt.current = result.updatedAt;
         fireToast("Synced from your account");
+        // Defer enrichment so the first cloud save / UI settle isn't raced.
+        window.setTimeout(() => enrichPlansMap(nextPlans), 2500);
       } else if (result.ok) {
         cloudBaseUpdatedAt.current = result.updatedAt;
       } else if (!result.ok) {
@@ -427,7 +580,7 @@ export default function DualTrackConsole() {
     return () => {
       cancelled = true;
     };
-  }, [sessionStatus, cloudUserId, resetWorkspace, applyCloudSnapshot, fireToast]);
+  }, [sessionStatus, cloudUserId, resetWorkspace, applyCloudSnapshot, enrichPlansMap, fireToast]);
 
   const flushCloudSnapshot = useCallback(
     async (opts) => {
@@ -442,7 +595,10 @@ export default function DualTrackConsole() {
         return true;
       }
       if (result.conflict) {
-        if (result.snapshot) applyCloudSnapshot(result.snapshot);
+        if (result.snapshot) {
+          applyCloudSnapshot(result.snapshot);
+          // Do not re-kick enrichment here — that races with in-flight saves.
+        }
         cloudBaseUpdatedAt.current = result.updatedAt ?? cloudBaseUpdatedAt.current;
         fireToast(result.error || "Cloud data changed elsewhere — reloaded.", "warn");
         return true;
@@ -748,10 +904,15 @@ export default function DualTrackConsole() {
   );
 
   const addExamplePlan = useCallback((planId) => {
+    let added = null;
     setPlans((prev) => {
-      if (prev[planId]) return { ...prev, [planId]: { ...prev[planId], hidden: false } };
+      if (prev[planId]) {
+        added = { ...prev[planId], hidden: false };
+        return { ...prev, [planId]: added };
+      }
       const plan = createBuiltinById(planId);
       if (!plan) return prev;
+      added = plan;
       return { ...prev, [plan.id]: plan };
     });
     setActivePlanId(planId);
@@ -759,7 +920,11 @@ export default function DualTrackConsole() {
     setView("console");
     setPage("dashboard");
     fireToast("Plan added", "day");
-  }, [fireToast, setPage]);
+    // Defer enrichment so the home→dashboard transition isn't fighting sync writes.
+    if (added) {
+      window.setTimeout(() => startResourceEnrichment(added, { force: true }), 1500);
+    }
+  }, [fireToast, setPage, startResourceEnrichment]);
 
   const setTopicDone = useCallback((dayId, topicIdx, done) => {
     setProgress((prev) => {
@@ -950,6 +1115,7 @@ export default function DualTrackConsole() {
     if (!result || typeof result !== "object") throw new Error("Not a Refrainly backup file");
     if (result.kind === "plan") {
       setPlans(result.plans);
+      enrichPlansMap(result.plans);
       return;
     }
     if (result.kind === "full" && result.slice) {
@@ -964,10 +1130,11 @@ export default function DualTrackConsole() {
       setBookmarks(sanitizeBookmarks(s.bookmarks));
       if (s.themeKey) setThemeKey(resolveThemeKey(s.themeKey));
       if (s.activePlanId) setActivePlanId(s.activePlanId);
+      enrichPlansMap(s.plans);
       return;
     }
     throw new Error("Unrecognized import payload");
-  }, []);
+  }, [enrichPlansMap]);
 
   const periods = useMemo(() => {
     if (!campaign) return null;
@@ -1137,10 +1304,7 @@ export default function DualTrackConsole() {
         {modal && (
           <ModalHost
             modal={modal}
-            onClose={() => {
-              pendingAuthAction.current = null;
-              setModal(null);
-            }}
+            onClose={closeModal}
             notes={notes}
             refs={refs}
             setRef={setRef}
@@ -1158,14 +1322,7 @@ export default function DualTrackConsole() {
             onAccountAuthenticated={handleAccountAuthenticated}
             onOpenAccount={() => setModal({ kind: "account" })}
             onOpenPricing={() => setModal({ kind: "pricing" })}
-            onPlanCreated={(plan) => {
-              setPlans((prev) => ({ ...prev, [plan.id]: plan }));
-              setActivePlanId(plan.id);
-              setScope("all");
-              setView("console");
-              setPage("dashboard");
-              fireToast(`Plan ready · ${plan.totalDays} days`, "day");
-            }}
+            onPlanCreated={handlePlanCreated}
           />
         )}
         <ToastLayer toast={toast} />
@@ -1231,7 +1388,7 @@ export default function DualTrackConsole() {
           {modal && (
             <ModalHost
               modal={modal}
-              onClose={() => setModal(null)}
+              onClose={closeModal}
               notes={notes}
               refs={refs}
               setRef={setRef}
@@ -1249,14 +1406,7 @@ export default function DualTrackConsole() {
               badgeStatuses={badgeStatuses}
               onOpenAccount={() => setModal({ kind: "account" })}
               onOpenPricing={() => setModal({ kind: "pricing" })}
-              onPlanCreated={(plan) => {
-                setPlans((prev) => ({ ...prev, [plan.id]: plan }));
-                setActivePlanId(plan.id);
-                setScope("all");
-                setView("console");
-                setPage("dashboard");
-                fireToast(`Plan ready · ${plan.totalDays} days`, "day");
-              }}
+              onPlanCreated={handlePlanCreated}
             />
           )}
           <ToastLayer toast={toast} />
@@ -1295,6 +1445,8 @@ export default function DualTrackConsole() {
           stats={stats}
           progress={progress}
           onToggle={handleToggleTopic}
+          onGenerateTopicResources={handleGenerateTopicResources}
+          generatingTopicKey={generatingTopicKey}
         />
 
         {(onThisDayMemory && !onThisDayDismissed) ||
@@ -1405,6 +1557,8 @@ export default function DualTrackConsole() {
             onOpenTool={(kind, day) => setModal({ kind, day })}
             onCaptureToKit={captureDayToKit}
             query={query}
+            onGenerateTopicResources={handleGenerateTopicResources}
+            generatingTopicKey={generatingTopicKey}
           />
         )}
         {view === "grid" && (
@@ -1465,7 +1619,7 @@ export default function DualTrackConsole() {
         {modal && (
           <ModalHost
             modal={modal}
-            onClose={() => setModal(null)}
+            onClose={closeModal}
             notes={notes}
             refs={refs}
             setRef={setRef}
@@ -1483,14 +1637,7 @@ export default function DualTrackConsole() {
             badgeStatuses={badgeStatuses}
             onOpenAccount={() => setModal({ kind: "account" })}
             onOpenPricing={() => setModal({ kind: "pricing" })}
-            onPlanCreated={(plan) => {
-              setPlans((prev) => ({ ...prev, [plan.id]: plan }));
-              setActivePlanId(plan.id);
-              setScope("all");
-              setView("console");
-              setPage("dashboard");
-              fireToast(`Plan ready · ${plan.totalDays} days`, "day");
-            }}
+            onPlanCreated={handlePlanCreated}
           />
         )}
 

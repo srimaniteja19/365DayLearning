@@ -146,11 +146,28 @@ export function serializeExport(payload: PlanShareFile | FullBackupFile): string
 // Structural fields (ids, days, counts) are validated strictly; cosmetic
 // fields fall back to safe defaults so old or hand-edited files still load.
 
+const topicResourceSchema = z
+  .object({
+    url: z.string().min(1),
+    title: z.string().catch(""),
+    snippet: z.string().optional().catch(undefined),
+    kind: z.enum(["article", "video"]).optional().catch(undefined),
+  })
+  .nullable();
+
+const topicResourcePairSchema = z
+  .object({
+    article: topicResourceSchema.optional().catch(undefined),
+    video: topicResourceSchema.optional().catch(undefined),
+  })
+  .or(topicResourceSchema);
+
 const planDaySchema = z.object({
   day: z.number().int().positive(),
   id: z.string().optional(),
   topics: z.array(z.string()).catch([]),
   domains: z.array(z.string()).catch([]),
+  resources: z.array(topicResourcePairSchema.nullable()).optional().catch(undefined),
 });
 
 const planPeriodSchema = z.object({

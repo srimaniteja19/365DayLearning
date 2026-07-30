@@ -7,6 +7,7 @@ import {
   normalizeTopic,
   parseJsonWithRepair,
   periodDaysSchema,
+  scrubTopicText,
   shouldRetryPeriod,
   skeletonOutlinePeriods,
   snapOutlineToSkeleton,
@@ -14,6 +15,25 @@ import {
   validateOutlineTiles,
   validatePeriodDays,
 } from "@/lib/planGeneration";
+
+describe("scrubTopicText", () => {
+  it("strips markup junk while keeping the real phrase", () => {
+    expect(scrubTopicText("Decision-making models</</</</</")).toBe(
+      "Decision-making models",
+    );
+  });
+
+  it("rejects Topic A style placeholders", () => {
+    expect(scrubTopicText("Topic A")).toBe("");
+    expect(scrubTopicText("topic b")).toBe("");
+    expect(scrubTopicText("Example topic")).toBe("");
+  });
+
+  it("rejects [object Object] and pure punctuation", () => {
+    expect(scrubTopicText("[object Object]")).toBe("");
+    expect(scrubTopicText("</</</</")).toBe("");
+  });
+});
 
 describe("outline tiling", () => {
   it("accepts contiguous 1..N periods", () => {
@@ -142,7 +162,7 @@ describe("period day validation", () => {
     });
     expect(fixedDays).toHaveLength(7);
     expect(fixedDays.every((d) => d.topics.length === 2)).toBe(true);
-    expect(fixedDays.find((d) => d.day === 4)!.topics[0]).toMatch(/core concepts/i);
+    expect(fixedDays.find((d) => d.day === 4)!.topics[0]).toMatch(/fundamentals/i);
     expect(fixedDays.find((d) => d.day === 3)!.topics[0]).toMatch(/needs review/i);
     expect(issues.some((i) => i.code === "missing_day" || i.code === "topics_padded" || i.code === "topics_per_day")).toBe(true);
   });
@@ -237,18 +257,36 @@ describe("coercePlanAiPayload", () => {
     expect(coerced.days[0]).toEqual({ day: 4, topics: ["Write Ahead Log"] });
   });
 
-  it("fills blank outline labels and swaps inverted ranges", () => {
+  it("extracts title from topic objects instead of [object Object]", () => {
     const coerced = coercePlanAiPayload({
-      periods: [{ label: "  ", theme: "", start: 7, end: 1 }],
-    }) as {
-      periods: { label: string; theme: string; start: number; end: number }[];
-    };
-    expect(coerced.periods[0]).toMatchObject({
-      label: "Period 1",
-      theme: "Core topics",
-      start: 1,
-      end: 7,
-    });
+      days: [
+        {
+          day: 1,
+          topics: [
+            { title: "React Hooks Basics" },
+            { topic: "State Management Patterns" },
+            { name: "Effect Cleanup Rules" },
+          ],
+        },
+      ],
+    }) as { days: { day: number; topics: string[] }[] };
+    expect(coerced.days[0].topics).toEqual([
+      "React Hooks Basics",
+      "State Management Patterns",
+      "Effect Cleanup Rules",
+    ]);
+    expect(periodDaysSchema.parse(coerced).days[0].topics).toEqual([
+      "React Hooks Basics",
+      "State Management Patterns",
+      "Effect Cleanup Rules",
+    ]);
+  });
+
+  it("drops unusable object topics rather than stringifying them", () => {
+    const coerced = coercePlanAiPayload({
+      days: [{ day: 1, topics: [{ foo: "bar" }, "Valid Topic Name"] }],
+    }) as { days: { day: number; topics: string[] }[] };
+    expect(coerced.days[0].topics).toEqual(["Valid Topic Name"]);
   });
 });
 

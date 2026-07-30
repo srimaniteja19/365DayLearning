@@ -1,10 +1,34 @@
 export type Domain = string;
 
+export type TopicResourceKind = "article" | "video";
+
+/** Suggested learning resource for one topic. */
+export type TopicResource = {
+  url: string;
+  title: string;
+  snippet?: string;
+  kind?: TopicResourceKind;
+};
+
+/** Per-topic pair: one article + one video (index-aligned with `topics`). */
+export type TopicResourcePair = {
+  article?: TopicResource | null;
+  video?: TopicResource | null;
+};
+
 export type PlanDay = {
   day: number;
   id: string;
   topics: string[];
   domains: Domain[];
+  /**
+   * Optional suggested resources, index-aligned with `topics`.
+   * - missing / `undefined` slot = not searched yet
+   * - `null` = searched, nothing usable
+   * - pair object = article and/or video found
+   * Legacy single `{ url, title }` entries are still accepted and normalized.
+   */
+  resources?: Array<TopicResourcePair | TopicResource | null | undefined>;
 };
 
 export type PlanPeriod = {

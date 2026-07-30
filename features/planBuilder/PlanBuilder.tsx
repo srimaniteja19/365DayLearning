@@ -24,6 +24,7 @@ import {
   saveGenDraft,
   type GenProgress,
 } from "@/lib/planGeneration";
+import { sanitizePlanDays } from "@/lib/planEdit";
 import { suggestDomainsFromGoal } from "@/lib/domainSuggest";
 import { formatAiError } from "@/lib/providers/errors";
 import { PlanEditor } from "@/features/planBuilder/PlanEditor";
@@ -107,6 +108,7 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
+        e.stopPropagation();
         if (running) {
           setConfirmClose(true);
           return;
@@ -122,7 +124,7 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  });
+  }, [running, dirty, confirmClose, onClose, step, shapeErrors.length, contentErrors.length]);
 
   const startGenerate = async (resume = false) => {
     setGenError("");
@@ -150,7 +152,7 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
       });
       clearGenDraft();
       setRunning(false);
-      setEditablePlan(plan);
+      setEditablePlan(sanitizePlanDays(plan));
       setStep(4);
     } catch (err) {
       setRunning(false);
