@@ -10,6 +10,7 @@ import {
   hasLiveStripeSubscription,
   type SubscriptionTier,
 } from "@/lib/subscriptions";
+import { isSameOrigin } from "@/lib/httpGuard";
 import {
   appBaseUrl,
   checkoutIntegrationId,
@@ -17,18 +18,6 @@ import {
   hasStripe,
   priceIdForTier,
 } from "@/lib/stripe";
-
-function isSameOrigin(req: NextRequest): boolean {
-  const origin = req.headers.get("origin");
-  if (!origin) return false;
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
-  if (!host) return false;
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Creates a Stripe Checkout Session (subscription mode) for Operator / Architect

@@ -3,27 +3,19 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { getDb, hasDatabase } from "@/lib/db/client";
 import { userState } from "@/lib/db/schema";
+import { sanitizeAppSnapshot } from "@/lib/exportImport";
+import { isSameOrigin } from "@/lib/httpGuard";
 
 // A serialized AppSnapshot (plans + progress + notes + srs + learned journal
 // etc.) for a very active user is still well under this — this cap just
 // guards against pathological payloads.
 const MAX_SNAPSHOT_CHARS = 5_000_000;
 
-/**
- * Session cookies ride along on cross-site requests, so state-changing
- * requests need an explicit same-origin check to prevent CSRF (mirrors the
- * pattern used in app/api/ai and app/api/auth/signup).
- */
-function isSameOrigin(req: NextRequest): boolean {
-  const origin = req.headers.get("origin");
-  if (!origin) return false;
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
-  if (!host) return false;
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
+function toIso(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString();
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 export async function GET() {
@@ -47,7 +39,10 @@ export async function GET() {
     if (!row) {
       return NextResponse.json({ snapshot: null, updatedAt: null });
     }
-    return NextResponse.json({ snapshot: row.snapshot, updatedAt: row.updatedAt });
+    return NextResponse.json({
+      snapshot: row.snapshot,
+      updatedAt: toIso(row.updatedAt),
+    });
   } catch (err) {
     console.error("[api/state] GET failed", err);
     return NextResponse.json({ error: "Could not load cloud data." }, { status: 500 });
@@ -78,13 +73,41 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const snapshot = (body as { snapshot?: unknown } | null)?.snapshot;
-  if (!snapshot || typeof snapshot !== "object") {
-    return NextResponse.json({ error: "snapshot is required." }, { status: 400 });
+  const payload = body as { snapshot?: unknown; baseUpdatedAt?: unknown } | null;
+  const snapshot = sanitizeAppSnapshot(payload?.snapshot);
+  if (!snapshot) {
+    return NextResponse.json({ error: "snapshot is required and must be a valid AppSnapshot." }, { status: 400 });
   }
+
+  const baseUpdatedAt =
+    typeof payload?.baseUpdatedAt === "string" && payload.baseUpdatedAt.trim()
+      ? payload.baseUpdatedAt.trim()
+      : null;
 
   try {
     const db = getDb();
+    const [existing] = await db
+      .select()
+      .from(userState)
+      .where(eq(userState.userId, userId))
+      .limit(1);
+
+    if (existing && baseUpdatedAt != null) {
+      const serverAt = toIso(existing.updatedAt);
+      if (serverAt && serverAt !== baseUpdatedAt) {
+        const serverSnap = sanitizeAppSnapshot(existing.snapshot) || existing.snapshot;
+        return NextResponse.json(
+          {
+            error: "conflict",
+            message: "Cloud data changed on another device. Reloaded the latest copy.",
+            snapshot: serverSnap,
+            updatedAt: serverAt,
+          },
+          { status: 409 },
+        );
+      }
+    }
+
     const now = new Date();
     await db
       .insert(userState)

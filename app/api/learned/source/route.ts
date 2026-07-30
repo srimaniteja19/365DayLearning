@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { normalizeBookmarkUrl } from "@/lib/bookmarks";
+import { clientIp, isRateLimited, isSameOrigin } from "@/lib/httpGuard";
 import {
   extractSourcesForUrls,
   SOURCE_MAX_URLS,
@@ -11,49 +13,16 @@ export const maxDuration = 60;
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 12;
-const rateBuckets = new Map<string, number[]>();
-
-function clientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return req.headers.get("x-real-ip") || "unknown";
-}
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const cutoff = now - RATE_LIMIT_WINDOW_MS;
-  const hits = (rateBuckets.get(ip) || []).filter((t) => t > cutoff);
-  if (hits.length >= RATE_LIMIT_MAX) {
-    rateBuckets.set(ip, hits);
-    return true;
-  }
-  hits.push(now);
-  rateBuckets.set(ip, hits);
-  if (rateBuckets.size > 10_000) {
-    for (const [key, times] of rateBuckets) {
-      if (!times.some((t) => t > cutoff)) rateBuckets.delete(key);
-    }
-  }
-  return false;
-}
-
-function isSameOrigin(req: NextRequest): boolean {
-  const origin = req.headers.get("origin");
-  if (!origin) return false;
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
-  if (!host) return false;
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
 
 export async function POST(req: NextRequest) {
   if (!isSameOrigin(req)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (isRateLimited(clientIp(req))) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+  }
+  if (isRateLimited(`learned-source:${clientIp(req)}`, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS)) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 

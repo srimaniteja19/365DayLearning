@@ -17,6 +17,7 @@ import {
   resolveFontKey,
 } from "@/theme/fonts";
 import { callClaude } from "@/lib/claude-client";
+import { safeHref } from "@/lib/safeHref";
 import {
   SUBSCRIPTION_TIERS,
   TIER_ORDER,
@@ -60,35 +61,52 @@ export function BackgroundFX({ accent, effects }) {
 
 /* ============================== TOP BAR ============================== */
 const SAVE_COPY = {
-  loading: "Loading saved progress",
-  idle: "Progress saved automatically",
-  saving: "Saving",
-  saved: "Saved",
-  error: "Save failed - retrying on next change",
-  off: "Storage unavailable - this session only",
+  loading: "Loading saved progress from your account",
+  idle: "Progress saved to your account automatically",
+  saving: "Saving to your account",
+  saved: "Saved to your account",
+  error: "Cloud save failed — click to retry",
+  off: "Sign in to sync progress across devices",
 };
 
-function SaveIndicator({ status, compact = false }) {
+function SaveIndicator({ status, compact = false, onRetry }) {
   const label = status === "saving" ? "Saving…"
     : status === "saved" ? "Saved"
     : status === "error" ? "Not saved"
     : status === "loading" ? "Loading…"
     : status === "off" ? "Session only"
     : "Autosaved";
+  const tip = SAVE_COPY[status] || SAVE_COPY.idle;
+  const body = (
+    <>
+      <span className="save-dot" />
+      {!compact && <span className="stat-chip-val">{label}</span>}
+    </>
+  );
+  const className = classNames(
+    "stat-chip",
+    "save-chip",
+    `save-${status}`,
+    compact && "save-chip-compact",
+  );
+  if (status === "error" && typeof onRetry === "function") {
+    return (
+      <Tip content={tip} stamp="SYNC" tone="coral" side="bottom">
+        <button
+          type="button"
+          className={className}
+          aria-label={`${tip}. Retry sync.`}
+          onClick={onRetry}
+        >
+          {body}
+        </button>
+      </Tip>
+    );
+  }
   return (
-    <Tip content={SAVE_COPY[status]} stamp="SYNC" tone={status === "error" ? "coral" : status === "saved" ? "mint" : "lemon"} side="bottom">
-      <div
-        className={classNames(
-          "stat-chip",
-          "save-chip",
-          `save-${status}`,
-          compact && "save-chip-compact",
-        )}
-        aria-label={SAVE_COPY[status]}
-        tabIndex={0}
-      >
-        <span className="save-dot" />
-        {!compact && <span className="stat-chip-val">{label}</span>}
+    <Tip content={tip} stamp="SYNC" tone={status === "saved" ? "mint" : "lemon"} side="bottom">
+      <div className={className} aria-label={tip} tabIndex={0}>
+        {body}
       </div>
     </Tip>
   );
@@ -239,6 +257,7 @@ export function TopBar({
   fontKey,
   setFontKey,
   saveStatus,
+  onRetrySync,
   noteCount,
   confirmReset,
   setConfirmReset,
@@ -349,7 +368,7 @@ export function TopBar({
           </div>
 
           <div className="topbar-cluster topbar-cluster-status" aria-label="Progress">
-            <SaveIndicator status={saveStatus} compact />
+            <SaveIndicator status={saveStatus} compact onRetry={onRetrySync} />
             {noteCount > 0 && (
               <div
                 className="topbar-item topbar-item-static topbar-day-notes"
@@ -2568,11 +2587,8 @@ function SummaryCard({ label, value, sub, accent, tone = "mint" }) {
 
 /* ============================== MODALS ============================== */
 export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, progress, srs, log, learned, bookmarks, themeKey, onImport, fireToast, plans, activePlanId, onPlanCreated, badgeStatuses, onAccountAuthenticated, onOpenPricing, onOpenAccount }) {
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  const dialogRef = useRef(null);
+  const previousFocusRef = useRef(null);
 
   const titles = {
     quiz: "Recall check",
@@ -2586,9 +2602,67 @@ export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, pro
     pricing: "Plans & pricing",
   };
 
+  const titleText =
+    (modal.kind === "account" && modal.gated ? "Sign in to continue" : titles[modal.kind]) +
+    (modal.day ? ` · Day ${modal.day.day}` : "");
+
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement;
+    const dialog = dialogRef.current;
+    if (!dialog) return undefined;
+
+    const focusableSelector =
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const getFocusable = () =>
+      Array.from(dialog.querySelectorAll(focusableSelector)).filter(
+        (el) => el.offsetParent !== null || el === document.activeElement,
+      );
+
+    const focusable = getFocusable();
+    const initial =
+      dialog.querySelector("[data-modal-initial-focus]") ||
+      focusable.find((el) => el.classList?.contains("modal-close")) ||
+      focusable[0];
+    initial?.focus?.();
+
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const items = getFocusable();
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      const prev = previousFocusRef.current;
+      if (prev && typeof prev.focus === "function") {
+        try {
+          prev.focus();
+        } catch {
+          /* element may be gone */
+        }
+      }
+    };
+  }, [modal, onClose]);
+
   return (
     <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div
+        ref={dialogRef}
         className={classNames(
           "modal",
           (modal.kind === "builder" || modal.kind === "pricing") && "modal-wide",
@@ -2597,11 +2671,11 @@ export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, pro
         )}
         role="dialog"
         aria-modal="true"
+        aria-labelledby="modal-title"
       >
         <div className="modal-head">
-          <span className="modal-title">
-            {modal.kind === "account" && modal.gated ? "Sign in to continue" : titles[modal.kind]}
-            {modal.day ? ` · Day ${modal.day.day}` : ""}
+          <span className="modal-title" id="modal-title">
+            {titleText}
           </span>
           <button className="modal-close" onClick={onClose} aria-label="Close"><Icon.X size={15} /></button>
         </div>
@@ -2687,13 +2761,17 @@ function linkifyPlain(text, keyBase, startKey) {
   let i = startKey;
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) parts.push(text.slice(last, m.index));
-    const href = m[0];
-    parts.push(
-      <a key={keyBase + "-u" + i} href={href} className="md-a" target="_blank" rel="noopener noreferrer">
-        {href}
-      </a>,
-    );
-    last = m.index + href.length;
+    const href = safeHref(m[0]);
+    if (href) {
+      parts.push(
+        <a key={keyBase + "-u" + i} href={href} className="md-a" target="_blank" rel="noopener noreferrer">
+          {m[0]}
+        </a>,
+      );
+    } else {
+      parts.push(m[0]);
+    }
+    last = m.index + m[0].length;
     i += 1;
   }
   if (last < text.length) parts.push(text.slice(last));
@@ -2714,17 +2792,22 @@ function inlineFormat(text, keyBase) {
     if (tok.startsWith("[")) {
       const link = tok.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
       if (link) {
-        parts.push(
-          <a
-            key={keyBase + "-a" + i}
-            href={link[2]}
-            className="md-a"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {link[1]}
-          </a>,
-        );
+        const href = safeHref(link[2]);
+        if (href) {
+          parts.push(
+            <a
+              key={keyBase + "-a" + i}
+              href={href}
+              className="md-a"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {link[1]}
+            </a>,
+          );
+        } else {
+          parts.push(link[1]);
+        }
       } else {
         parts.push(tok);
       }
@@ -2733,11 +2816,16 @@ function inlineFormat(text, keyBase) {
     } else if (tok.startsWith("**")) {
       parts.push(<strong key={keyBase + "-b" + i}>{tok.slice(2, -2)}</strong>);
     } else if (tok.startsWith("http")) {
-      parts.push(
-        <a key={keyBase + "-u" + i} href={tok} className="md-a" target="_blank" rel="noopener noreferrer">
-          {tok}
-        </a>,
-      );
+      const href = safeHref(tok);
+      if (href) {
+        parts.push(
+          <a key={keyBase + "-u" + i} href={href} className="md-a" target="_blank" rel="noopener noreferrer">
+            {tok}
+          </a>,
+        );
+      } else {
+        parts.push(tok);
+      }
     } else {
       parts.push(tok);
     }

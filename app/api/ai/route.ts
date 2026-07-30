@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { hasDatabase } from "@/lib/db/client";
 import { requireManagedAiTier, reserveAiActionQuota } from "@/lib/db/subscriptionQuota";
+import { clientIp, isRateLimited, isSameOrigin } from "@/lib/httpGuard";
 import { OPENROUTER_DEFAULT_MODEL } from "@/lib/providers/openrouter";
 import { openAiCompatibleChat } from "@/lib/providers/openaiCompat";
 import type { ChatRequest } from "@/lib/providers/types";
@@ -14,47 +15,8 @@ const MAX_SYSTEM_CHARS = 8_000;
 const UPSTREAM_TIMEOUT_MS = 90_000;
 const OPENROUTER_BASE = "https://openrouter.ai/api";
 
-// Sliding-window rate limit, per IP. In-memory: resets on redeploy and is
-// per-instance, which is acceptable for this app's single-region scale.
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 15;
-const rateBuckets = new Map<string, number[]>();
-
-function clientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return req.headers.get("x-real-ip") || "unknown";
-}
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const cutoff = now - RATE_LIMIT_WINDOW_MS;
-  const hits = (rateBuckets.get(ip) || []).filter((t) => t > cutoff);
-  if (hits.length >= RATE_LIMIT_MAX_REQUESTS) {
-    rateBuckets.set(ip, hits);
-    return true;
-  }
-  hits.push(now);
-  rateBuckets.set(ip, hits);
-  if (rateBuckets.size > 10_000) {
-    for (const [key, times] of rateBuckets) {
-      if (!times.some((t) => t > cutoff)) rateBuckets.delete(key);
-    }
-  }
-  return false;
-}
-
-function isSameOrigin(req: NextRequest): boolean {
-  const origin = req.headers.get("origin");
-  if (!origin) return false;
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
-  if (!host) return false;
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
 
 type AiRequestBody = {
   prompt?: unknown;
@@ -101,8 +63,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const ip = clientIp(req);
-  if (isRateLimited(ip)) {
+  if (isRateLimited(`ai:${clientIp(req)}`, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS)) {
     return NextResponse.json(
       { error: "Too many requests. Try again in a minute." },
       { status: 429, headers: { "Retry-After": "60" } },

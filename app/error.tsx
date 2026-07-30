@@ -39,8 +39,9 @@ export default function Error({
     <div style={wrap}>
       <h2 style={{ margin: 0 }}>Something went wrong</h2>
       <p style={{ margin: 0, opacity: 0.75, maxWidth: 420 }}>
-        Your plans and notes are stored locally in this browser and are not
-        affected. Try again, or reload the page.
+        Your plans and notes live in your signed-in account (Neon). This error is only in the
+        current page — try again, or reload. If sync was mid-save, reopen the app and check the
+        save indicator.
       </p>
       {error.digest && (
         <code style={{ fontSize: 12, opacity: 0.5 }}>ref: {error.digest}</code>

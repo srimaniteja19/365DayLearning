@@ -4,46 +4,10 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { getDb, hasDatabase } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
+import { clientIp, isRateLimited, isSameOrigin } from "@/lib/httpGuard";
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 8;
-const rateBuckets = new Map<string, number[]>();
-
-function clientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return req.headers.get("x-real-ip") || "unknown";
-}
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const cutoff = now - RATE_LIMIT_WINDOW_MS;
-  const hits = (rateBuckets.get(ip) || []).filter((t) => t > cutoff);
-  if (hits.length >= RATE_LIMIT_MAX_REQUESTS) {
-    rateBuckets.set(ip, hits);
-    return true;
-  }
-  hits.push(now);
-  rateBuckets.set(ip, hits);
-  if (rateBuckets.size > 10_000) {
-    for (const [key, times] of rateBuckets) {
-      if (!times.some((t) => t > cutoff)) rateBuckets.delete(key);
-    }
-  }
-  return false;
-}
-
-function isSameOrigin(req: NextRequest): boolean {
-  const origin = req.headers.get("origin");
-  if (!origin) return false;
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
-  if (!host) return false;
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
 
 const signupSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(200),
@@ -63,8 +27,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Cross-origin requests are not allowed." }, { status: 403 });
   }
 
-  const ip = clientIp(req);
-  if (isRateLimited(ip)) {
+  if (isRateLimited(`signup:${clientIp(req)}`, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS)) {
     return NextResponse.json(
       { error: "Too many signup attempts. Try again in a minute." },
       { status: 429, headers: { "Retry-After": "60" } },

@@ -133,9 +133,12 @@ export default function DualTrackConsole() {
   const toastTimer = useRef(null);
   const saveTimer = useRef(null);
   const hydrateGen = useRef(0);
+  /** Last server `updatedAt` we pulled/pushed — used for conflict detection. */
+  const cloudBaseUpdatedAt = useRef(null);
   const { data: session, status: sessionStatus } = useSession();
   const cloudUserId = session?.user?.id || null;
   const pendingAuthAction = useRef(null);
+  const [syncRetryToken, setSyncRetryToken] = useState(0);
 
   useEffect(() => {
     if (!cloudUserId) {
@@ -394,6 +397,7 @@ export default function DualTrackConsole() {
 
     if (!cloudUserId) {
       resetWorkspace();
+      cloudBaseUpdatedAt.current = null;
       setSaveStatus("off");
       return;
     }
@@ -402,11 +406,15 @@ export default function DualTrackConsole() {
     (async () => {
       setSaveStatus("loading");
       resetWorkspace();
+      cloudBaseUpdatedAt.current = null;
       const result = await pullCloudSnapshot();
       if (cancelled || gen !== hydrateGen.current) return;
       if (result.ok && result.snapshot) {
         applyCloudSnapshot(result.snapshot);
+        cloudBaseUpdatedAt.current = result.updatedAt;
         fireToast("Synced from your account");
+      } else if (result.ok) {
+        cloudBaseUpdatedAt.current = result.updatedAt;
       } else if (!result.ok) {
         setSaveStatus("error");
         return;
@@ -421,19 +429,78 @@ export default function DualTrackConsole() {
     };
   }, [sessionStatus, cloudUserId, resetWorkspace, applyCloudSnapshot, fireToast]);
 
+  const flushCloudSnapshot = useCallback(
+    async (opts) => {
+      if (!cloudReady || !cloudUserId) return false;
+      const result = await pushCloudSnapshot(
+        buildSnapshot(),
+        cloudBaseUpdatedAt.current,
+        opts,
+      );
+      if (result.ok) {
+        cloudBaseUpdatedAt.current = result.updatedAt;
+        return true;
+      }
+      if (result.conflict) {
+        if (result.snapshot) applyCloudSnapshot(result.snapshot);
+        cloudBaseUpdatedAt.current = result.updatedAt ?? cloudBaseUpdatedAt.current;
+        fireToast(result.error || "Cloud data changed elsewhere — reloaded.", "warn");
+        return true;
+      }
+      return false;
+    },
+    [cloudReady, cloudUserId, buildSnapshot, applyCloudSnapshot, fireToast],
+  );
+
   useEffect(() => {
     if (!cloudReady || !cloudUserId) return;
     setSaveStatus("saving");
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      const ok = await pushCloudSnapshot(buildSnapshot());
+      const ok = await flushCloudSnapshot();
       setSaveStatus(ok ? "saved" : "error");
       if (ok) setTimeout(() => setSaveStatus((cur) => (cur === "saved" ? "idle" : cur)), 1600);
     }, 700);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [progress, notes, refs, srs, log, learned, bookmarks, themeKey, fontKey, plans, activePlanId, cloudUserId, cloudReady, buildSnapshot]);
+  }, [
+    progress,
+    notes,
+    refs,
+    srs,
+    log,
+    learned,
+    bookmarks,
+    themeKey,
+    fontKey,
+    plans,
+    activePlanId,
+    cloudUserId,
+    cloudReady,
+    flushCloudSnapshot,
+    syncRetryToken,
+  ]);
+
+  /** Best-effort flush when the tab closes (keepalive; large snapshots may not fit). */
+  useEffect(() => {
+    if (!cloudReady || !cloudUserId) return;
+    const onLeave = () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      void flushCloudSnapshot({ keepalive: true });
+    };
+    window.addEventListener("pagehide", onLeave);
+    window.addEventListener("beforeunload", onLeave);
+    return () => {
+      window.removeEventListener("pagehide", onLeave);
+      window.removeEventListener("beforeunload", onLeave);
+    };
+  }, [cloudReady, cloudUserId, flushCloudSnapshot]);
+
+  const retryCloudSync = useCallback(() => {
+    if (!cloudReady || !cloudUserId) return;
+    setSyncRetryToken((n) => n + 1);
+  }, [cloudReady, cloudUserId]);
 
   useEffect(() => {
     if (!campaign) return;
@@ -597,19 +664,24 @@ export default function DualTrackConsole() {
     setLearned({});
     setBookmarks([]);
     if (cloudUserId) {
-      pushCloudSnapshot({
-        meta: {
-          schemaVersion: SCHEMA_VERSION,
-          activePlanId,
-          themeKey,
-          fontKey,
-          hiddenPlanIds: Object.values(plans)
-            .filter((p) => p.hidden)
-            .map((p) => p.id),
-          updatedAt: Date.now(),
+      void pushCloudSnapshot(
+        {
+          meta: {
+            schemaVersion: SCHEMA_VERSION,
+            activePlanId,
+            themeKey,
+            fontKey,
+            hiddenPlanIds: Object.values(plans)
+              .filter((p) => p.hidden)
+              .map((p) => p.id),
+            updatedAt: Date.now(),
+          },
+          plans,
+          userdata: emptyUserSnapshot(),
         },
-        plans,
-        userdata: emptyUserSnapshot(),
+        cloudBaseUpdatedAt.current,
+      ).then((result) => {
+        if (result.ok) cloudBaseUpdatedAt.current = result.updatedAt;
       });
     }
     setConfirmReset(false);
@@ -1003,6 +1075,7 @@ export default function DualTrackConsole() {
     fontKey,
     setFontKey,
     saveStatus,
+    onRetrySync: retryCloudSync,
     noteCount: Object.keys(notes).length,
     confirmReset,
     setConfirmReset,

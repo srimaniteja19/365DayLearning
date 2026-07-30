@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { BADGES, calendarStreak, computeBadges } from "@/lib/achievements";
 import { dateKey } from "@/lib/learned";
+import type { Plan } from "@/lib/types";
 
 const DAY_MS = 86400000;
 
-function makePlan(overrides: Record<string, unknown> = {}) {
+function makePlan(overrides: Partial<Plan> = {}): Plan {
   return {
     id: "p1",
     name: "Plan",

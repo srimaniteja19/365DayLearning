@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type {
+  AppSnapshot,
   LearnedMap,
   BookmarksList,
   LogEntry,
@@ -17,13 +18,14 @@ import { migrateUserData } from "@/lib/migration";
 import { sanitizeLearned } from "@/lib/learned";
 import { mergeBookmarks, sanitizeBookmarks } from "@/lib/bookmarks";
 import { seedBuiltinPlans } from "@/data/builtinPlans";
-import { resolveThemeKey } from "@/theme/themes";
+import { DEFAULT_THEME_KEY, resolveThemeKey } from "@/theme/themes";
+import { DEFAULT_FONT_KEY, resolveFontKey } from "@/theme/fonts";
 import {
   assertNoCredentialsInExport,
   getCredentials,
   stripCredentialsFromObject,
 } from "@/lib/providers/credentials";
-import { SCHEMA_VERSION } from "@/lib/types";
+import { BUILTIN_365_ID, SCHEMA_VERSION } from "@/lib/types";
 
 export type PlanShareFile = {
   app: "dualtrack";
@@ -235,6 +237,58 @@ function sanitizePlans(raw: unknown): PlansState {
     if (plan) out[plan.id] = plan;
   }
   return out;
+}
+
+/**
+ * Normalize an account cloud snapshot for persistence. Drops corrupt entries
+ * instead of rejecting the whole document (same spirit as import sanitizers).
+ */
+export function sanitizeAppSnapshot(raw: unknown): AppSnapshot | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const data = raw as Record<string, unknown>;
+  const metaRaw =
+    data.meta && typeof data.meta === "object" && !Array.isArray(data.meta)
+      ? (data.meta as Record<string, unknown>)
+      : {};
+  const userdataRaw =
+    data.userdata && typeof data.userdata === "object" && !Array.isArray(data.userdata)
+      ? (data.userdata as Record<string, unknown>)
+      : null;
+  if (!userdataRaw) return null;
+
+  const userdata = migrateUserData({
+    progress: sanitizeRecord(userdataRaw.progress, progressEntrySchema) as ProgressMap,
+    notes: sanitizeRecord(userdataRaw.notes, noteEntrySchema) as NotesMap,
+    refs: sanitizeRecord(userdataRaw.refs, refEntrySchema) as RefsMap,
+    srs: sanitizeRecord(userdataRaw.srs, srsEntrySchema) as SrsMap,
+    log: sanitizeLog(userdataRaw.log),
+    learned: sanitizeLearned(userdataRaw.learned),
+    bookmarks: sanitizeBookmarks(userdataRaw.bookmarks),
+  });
+
+  const plans = sanitizePlans(data.plans);
+  const hiddenPlanIds = Array.isArray(metaRaw.hiddenPlanIds)
+    ? metaRaw.hiddenPlanIds.filter((id): id is string => typeof id === "string").slice(0, 200)
+    : [];
+
+  const activePlanId =
+    typeof metaRaw.activePlanId === "string" && metaRaw.activePlanId
+      ? metaRaw.activePlanId
+      : BUILTIN_365_ID;
+
+  return {
+    meta: {
+      schemaVersion:
+        typeof metaRaw.schemaVersion === "number" ? metaRaw.schemaVersion : SCHEMA_VERSION,
+      activePlanId,
+      themeKey: metaRaw.themeKey != null ? resolveThemeKey(metaRaw.themeKey) : DEFAULT_THEME_KEY,
+      fontKey: metaRaw.fontKey != null ? resolveFontKey(metaRaw.fontKey) : DEFAULT_FONT_KEY,
+      hiddenPlanIds,
+      updatedAt: typeof metaRaw.updatedAt === "number" ? metaRaw.updatedAt : Date.now(),
+    },
+    plans,
+    userdata,
+  };
 }
 
 /** Detect import kind from a parsed JSON blob. */

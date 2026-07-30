@@ -4,6 +4,16 @@ export type CloudPullResult =
   | { ok: true; snapshot: AppSnapshot | null; updatedAt: string | null }
   | { ok: false; error: string };
 
+export type CloudPushResult =
+  | { ok: true; updatedAt: string }
+  | {
+      ok: false;
+      error: string;
+      conflict?: boolean;
+      snapshot?: AppSnapshot | null;
+      updatedAt?: string | null;
+    };
+
 /** Session-only — last successful pull/push from this browser tab. */
 let lastSyncedAt: number | null = null;
 
@@ -23,17 +33,45 @@ export async function pullCloudSnapshot(): Promise<CloudPullResult> {
   }
 }
 
-export async function pushCloudSnapshot(snapshot: AppSnapshot): Promise<boolean> {
+export async function pushCloudSnapshot(
+  snapshot: AppSnapshot,
+  baseUpdatedAt: string | null = null,
+  opts?: { keepalive?: boolean },
+): Promise<CloudPushResult> {
   try {
     const res = await fetch("/api/state", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ snapshot }),
+      body: JSON.stringify({ snapshot, baseUpdatedAt }),
+      keepalive: opts?.keepalive === true,
     });
-    if (res.ok) recordSyncNow();
-    return res.ok;
+    const data = (await res.json().catch(() => null)) as {
+      ok?: boolean;
+      error?: string;
+      message?: string;
+      updatedAt?: string;
+      snapshot?: AppSnapshot | null;
+    } | null;
+
+    if (res.status === 409) {
+      return {
+        ok: false,
+        conflict: true,
+        error: data?.message || data?.error || "Cloud data changed on another device.",
+        snapshot: data?.snapshot ?? null,
+        updatedAt: data?.updatedAt ?? null,
+      };
+    }
+
+    if (!res.ok) {
+      return { ok: false, error: data?.error || `Request failed (${res.status})` };
+    }
+
+    const updatedAt = data?.updatedAt || new Date().toISOString();
+    recordSyncNow();
+    return { ok: true, updatedAt };
   } catch {
-    return false;
+    return { ok: false, error: "Network error while saving cloud data." };
   }
 }
 

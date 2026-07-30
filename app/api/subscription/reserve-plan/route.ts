@@ -2,22 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { hasDatabase } from "@/lib/db/client";
 import { reservePlanGenerationQuota } from "@/lib/db/subscriptionQuota";
-
-/**
- * Session cookies ride along on cross-site requests, so state-changing
- * requests need an explicit same-origin check (mirrors app/api/state).
- */
-function isSameOrigin(req: NextRequest): boolean {
-  const origin = req.headers.get("origin");
-  if (!origin) return false;
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
-  if (!host) return false;
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
+import { isSameOrigin } from "@/lib/httpGuard";
 
 /**
  * Reserves one AI-generated-plan unit against the caller's monthly quota.

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import {
   detectBookmarkKind,
   extractVimeoId,
@@ -6,7 +7,9 @@ import {
   hostnameOf,
   normalizeBookmarkUrl,
 } from "@/lib/bookmarks";
+import { clientIp, isRateLimited, isSameOrigin } from "@/lib/httpGuard";
 import type { BookmarkPreview } from "@/lib/types";
+import { isPrivateHostname } from "@/lib/urlSafety";
 
 export const runtime = "nodejs";
 
@@ -14,65 +17,6 @@ const MAX_HTML_BYTES = 512_000;
 const FETCH_TIMEOUT_MS = 8_000;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 30;
-const rateBuckets = new Map<string, number[]>();
-
-function clientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return req.headers.get("x-real-ip") || "unknown";
-}
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const cutoff = now - RATE_LIMIT_WINDOW_MS;
-  const hits = (rateBuckets.get(ip) || []).filter((t) => t > cutoff);
-  if (hits.length >= RATE_LIMIT_MAX) {
-    rateBuckets.set(ip, hits);
-    return true;
-  }
-  hits.push(now);
-  rateBuckets.set(ip, hits);
-  if (rateBuckets.size > 10_000) {
-    for (const [key, times] of rateBuckets) {
-      if (!times.some((t) => t > cutoff)) rateBuckets.delete(key);
-    }
-  }
-  return false;
-}
-
-function isSameOrigin(req: NextRequest): boolean {
-  const origin = req.headers.get("origin");
-  if (!origin) return false;
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
-  if (!host) return false;
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
-
-function isPrivateHostname(hostname: string): boolean {
-  const h = hostname.toLowerCase();
-  if (h === "localhost" || h === "0.0.0.0" || h.endsWith(".local") || h.endsWith(".internal")) {
-    return true;
-  }
-  // Literal IPv4
-  const m = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(h);
-  if (m) {
-    const a = Number(m[1]);
-    const b = Number(m[2]);
-    if (a === 10 || a === 127 || a === 0) return true;
-    if (a === 169 && b === 254) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-  }
-  // IPv6 / bracketed
-  if (h.includes(":")) {
-    if (h === "::1" || h.startsWith("fc") || h.startsWith("fd") || h.startsWith("fe80")) return true;
-  }
-  return false;
-}
 
 function decodeEntities(s: string): string {
   return s
@@ -233,7 +177,11 @@ export async function POST(req: NextRequest) {
   if (!isSameOrigin(req)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (isRateLimited(clientIp(req))) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+  }
+  if (isRateLimited(`bookmark-preview:${clientIp(req)}`, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS)) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
