@@ -10,6 +10,8 @@ import {
 
 type UsageRow = {
   subscriptionTier: string;
+  subscriptionStatus: string;
+  stripeCustomerId: string | null;
   planGenerationsUsed: number;
   aiActionsUsed: number;
   usagePeriodStart: Date;
@@ -20,6 +22,8 @@ async function loadUsageRow(userId: string): Promise<UsageRow | null> {
   const [row] = await db
     .select({
       subscriptionTier: users.subscriptionTier,
+      subscriptionStatus: users.subscriptionStatus,
+      stripeCustomerId: users.stripeCustomerId,
       planGenerationsUsed: users.planGenerationsUsed,
       aiActionsUsed: users.aiActionsUsed,
       usagePeriodStart: users.usagePeriodStart,
@@ -37,6 +41,8 @@ function toSubscriptionUsage(row: UsageRow): SubscriptionUsage {
   const limitsActive = tier.managedAi;
   return {
     tier: tier.id,
+    status: row.subscriptionStatus || "inactive",
+    hasBillingAccount: Boolean(row.stripeCustomerId),
     planGenerationsUsed: expired ? 0 : row.planGenerationsUsed,
     planGenerationsLimit: limitsActive ? tier.planGenerationsPerPeriod : null,
     aiActionsUsed: expired ? 0 : row.aiActionsUsed,

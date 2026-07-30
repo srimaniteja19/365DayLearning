@@ -41,8 +41,11 @@ async function syncSubscription(sub: Stripe.Subscription): Promise<void> {
   }
 
   const status = sub.status;
-  const active = status === "active" || status === "trialing";
-  const tier = active ? tierFromSubscription(sub) : "free";
+  // Keep paid entitlements while Stripe retries a failed charge so users can
+  // still open the Customer Portal and update their card.
+  const entitled =
+    status === "active" || status === "trialing" || status === "past_due";
+  const tier = entitled ? tierFromSubscription(sub) : "free";
   const existing = await getUserBilling(userId);
   const tierChanged = existing?.subscriptionTier !== tier;
 
@@ -50,8 +53,8 @@ async function syncSubscription(sub: Stripe.Subscription): Promise<void> {
     userId,
     tier,
     status,
-    stripeSubscriptionId: active ? sub.id : null,
-    resetUsage: active && tierChanged && tier !== "free",
+    stripeSubscriptionId: entitled ? sub.id : null,
+    resetUsage: entitled && status !== "past_due" && tierChanged && tier !== "free",
   });
 }
 

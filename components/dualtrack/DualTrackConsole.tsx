@@ -49,6 +49,7 @@ import { hydrateCredentialsFromStorage } from "@/lib/providers/credentials";
 import {
   fetchSubscriptionStatus,
   setCachedSubscriptionTier,
+  tierDef,
 } from "@/lib/subscriptions";
 import { computeBadges } from "@/lib/achievements";
 import { findOnThisDayMemory } from "@/lib/onThisDay";
@@ -265,6 +266,66 @@ export default function DualTrackConsole() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 2600);
   }, []);
+
+  /** Handle Stripe Checkout / Portal return (`?billing=success|cancelled|portal`). */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const billing = params.get("billing");
+    if (!billing) return;
+
+    // success/portal need a session to refetch tier — wait for auth hydrate.
+    if ((billing === "success" || billing === "portal") && !cloudUserId) return;
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("billing");
+    url.searchParams.delete("session_id");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+
+    if (billing === "cancelled") {
+      fireToast("Checkout cancelled — no charge made.", "warn");
+      setModal({ kind: "pricing", refreshToken: Date.now() });
+      return;
+    }
+
+    if (billing === "portal") {
+      fireToast("Billing updated.", "ok");
+      fetchSubscriptionStatus().then((res) => {
+        if (res.ok) setCachedSubscriptionTier(res.usage.tier);
+      });
+      setModal({ kind: "pricing", refreshToken: Date.now() });
+      return;
+    }
+
+    if (billing !== "success") return;
+
+    fireToast("Payment received — unlocking your plan…", "ok");
+    setModal({ kind: "pricing", refreshToken: Date.now() });
+
+    let cancelled = false;
+    (async () => {
+      for (let i = 0; i < 6; i++) {
+        if (cancelled) return;
+        const res = await fetchSubscriptionStatus();
+        if (cancelled) return;
+        if (res.ok && res.usage.tier !== "free") {
+          setCachedSubscriptionTier(res.usage.tier);
+          setModal({ kind: "pricing", refreshToken: Date.now() });
+          fireToast(`You're on ${tierDef(res.usage.tier).rankLabel}.`, "ok");
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+      if (!cancelled) {
+        fireToast("Payment received. Open Plans if your tier hasn’t updated yet.", "ok");
+        setModal({ kind: "pricing", refreshToken: Date.now() });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cloudUserId, fireToast]);
 
   useEffect(() => {
     hydrateCredentialsFromStorage();

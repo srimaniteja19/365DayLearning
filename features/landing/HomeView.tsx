@@ -38,15 +38,6 @@ const CAMPAIGN_STEPS = [
   },
 ];
 
-/** Planned annual = 10× monthly (≈2 months free). Display only — checkout not live. */
-function plannedAnnual(monthlyUsd) {
-  if (!monthlyUsd) return { yearly: 0, effectiveMonthly: 0, savePct: 0 };
-  const yearly = monthlyUsd * 10;
-  const effectiveMonthly = yearly / 12;
-  const savePct = Math.round((1 - effectiveMonthly / monthlyUsd) * 100);
-  return { yearly, effectiveMonthly, savePct };
-}
-
 function scrollToId(id) {
   if (typeof document === "undefined") return;
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -73,7 +64,6 @@ export function HomeView({
   bookmarkCount = 0,
 }) {
   const [started, setStarted] = useState(false);
-  const [billing, setBilling] = useState("annual");
   const pickerRef = useRef(null);
 
   useEffect(() => {
@@ -423,38 +413,15 @@ export function HomeView({
           Start free with an account. Upgrade anytime with Stripe.
         </h2>
         <p className="landing-section-lead">
-          Tier names match XP ranks (Recruit / Operator / Architect). Annual is the default view —
-          pair a subscription term with a long campaign when checkout goes live.{" "}
-          <strong>Checkout is not connected yet</strong> for paid tiers. An account is required to
-          run campaigns and Field Kit.
+          Tier names match XP ranks (Recruit / Operator / Architect). Paid plans check out monthly
+          via Stripe — manage invoices and cancel anytime in the billing portal. An account is
+          required to run campaigns and Field Kit.
         </p>
-
-        <div className="landing-billing" role="group" aria-label="Billing period">
-          <button
-            type="button"
-            className={classNames("landing-billing-btn", billing === "monthly" && "is-on")}
-            aria-pressed={billing === "monthly"}
-            onClick={() => setBilling("monthly")}
-          >
-            Monthly
-          </button>
-          <button
-            type="button"
-            className={classNames("landing-billing-btn", billing === "annual" && "is-on")}
-            aria-pressed={billing === "annual"}
-            onClick={() => setBilling("annual")}
-          >
-            Annual
-            <span className="landing-billing-save">better for 365-day arcs</span>
-          </button>
-        </div>
 
         <div className="landing-pricing-grid">
           {TIER_ORDER.map((id) => {
             const tier = SUBSCRIPTION_TIERS[id];
-            const annual = plannedAnnual(tier.priceMonthlyUsd);
             const isFree = tier.priceMonthlyUsd === 0;
-            const showAnnual = billing === "annual" && !isFree;
             return (
               <article
                 key={id}
@@ -475,14 +442,6 @@ export function HomeView({
                 <div className="landing-price-amount">
                   {isFree ? (
                     <>$0</>
-                  ) : showAnnual ? (
-                    <>
-                      <span className="landing-price-num">${annual.yearly}</span>
-                      <span className="landing-price-per">/yr</span>
-                      <span className="landing-price-eff">
-                        ≈ ${annual.effectiveMonthly.toFixed(2)}/mo · save {annual.savePct}%
-                      </span>
-                    </>
                   ) : (
                     <>
                       <span className="landing-price-num">${tier.priceMonthlyUsd}</span>
@@ -528,7 +487,7 @@ export function HomeView({
                     className="landing-surface-cta landing-price-cta"
                     onClick={onOpenPricing}
                   >
-                    {billing === "annual" ? "See monthly checkout" : `Get ${tier.rankLabel}`}
+                    {`Get ${tier.rankLabel}`}
                   </button>
                 )}
                 {isFree && (
@@ -543,7 +502,7 @@ export function HomeView({
           <button type="button" className="landing-text-btn" onClick={onOpenPricing}>
             Open Plans
           </button>
-          . Checkout is monthly for now — annual figures are illustrative (10× monthly).
+          . All paid plans are billed monthly.
         </p>
       </section>
 
@@ -692,7 +651,7 @@ export function HomeView({
           </a>
         </nav>
         <p className="landing-footer-legal">
-          Paid checkout is not live yet. See Privacy and Terms for how accounts and data work today.
+          Paid plans checkout via Stripe. See Privacy and Terms for accounts, data, and billing.
         </p>
       </footer>
     </div>

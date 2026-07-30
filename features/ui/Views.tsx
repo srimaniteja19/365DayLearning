@@ -866,7 +866,7 @@ function UsageBar({ label, used, limit }) {
   );
 }
 
-function PricingPanel({ onClose, onOpenAccount }) {
+function PricingPanel({ onClose, onOpenAccount, refreshToken = 0 }) {
   const { data: session } = useSession();
   const [usage, setUsage] = useState(null);
   const [loadingUsage, setLoadingUsage] = useState(false);
@@ -886,9 +886,11 @@ function PricingPanel({ onClose, onOpenAccount }) {
       if (res.ok) setUsage(res.usage);
     });
     return () => { cancelled = true; };
-  }, [session?.user]);
+  }, [session?.user, refreshToken]);
 
   const currentTier = usage?.tier || (session?.user ? "free" : null);
+  const liveSub = usage?.status === "active" || usage?.status === "trialing" || usage?.status === "past_due";
+  const pastDue = usage?.status === "past_due";
 
   const handleUpgrade = async (tierId) => {
     if (!session?.user) {
@@ -925,6 +927,13 @@ function PricingPanel({ onClose, onOpenAccount }) {
         </p>
       </div>
 
+      {pastDue && (
+        <div className="pricing-notice" role="status">
+          Payment failed — update your card to keep managed AI. Your plan stays active while
+          Stripe retries.
+        </div>
+      )}
+
       <div className="pricing-grid">
         {TIER_ORDER.map((id) => {
           const tier = SUBSCRIPTION_TIERS[id];
@@ -939,7 +948,7 @@ function PricingPanel({ onClose, onOpenAccount }) {
                 tier.comingSoon && "pricing-card-soon",
               )}
             >
-              {isCurrent && <div className="pricing-card-badge">Current</div>}
+              {isCurrent && <div className="pricing-card-badge">{pastDue ? "Past due" : "Current"}</div>}
               {tier.comingSoon && !isCurrent && (
                 <div className="pricing-card-badge pricing-card-badge-soon">Coming soon</div>
               )}
@@ -969,20 +978,26 @@ function PricingPanel({ onClose, onOpenAccount }) {
                 </div>
               ) : tier.comingSoon ? (
                 <div className="pricing-card-static">Coming soon</div>
+              ) : pastDue && isCurrent ? (
+                <button type="button" className="pricing-card-btn" onClick={handlePortal}>
+                  Update payment method
+                </button>
               ) : (
                 <button
                   type="button"
                   className="pricing-card-btn"
-                  disabled={isCurrent || pendingTier === id}
+                  disabled={(isCurrent && !pastDue) || pendingTier === id}
                   onClick={() => handleUpgrade(id)}
                 >
                   {isCurrent
                     ? "Active"
                     : pendingTier === id
                       ? "Working…"
-                      : session?.user
-                        ? `Upgrade to ${tier.rankLabel}`
-                        : `Sign in to get ${tier.rankLabel}`}
+                      : !session?.user
+                        ? `Sign in to get ${tier.rankLabel}`
+                        : liveSub
+                          ? `Change to ${tier.rankLabel}`
+                          : `Upgrade to ${tier.rankLabel}`}
                 </button>
               )}
             </div>
@@ -1015,7 +1030,7 @@ function PricingPanel({ onClose, onOpenAccount }) {
               Recruit · unlimited on your OpenRouter key
             </div>
           )}
-          {usage.tier !== "free" && (
+          {usage.hasBillingAccount && (
             <button type="button" className="pricing-card-btn" onClick={handlePortal}>
               Manage billing &amp; invoices
             </button>
@@ -2621,7 +2636,11 @@ export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, pro
           )}
           {modal.kind === "badges" && <BadgesPanel statuses={badgeStatuses} onClose={onClose} />}
           {modal.kind === "pricing" && (
-            <PricingPanel onClose={onClose} onOpenAccount={onOpenAccount} />
+            <PricingPanel
+              onClose={onClose}
+              onOpenAccount={onOpenAccount}
+              refreshToken={modal.refreshToken || 0}
+            />
           )}
           {modal.kind === "notes" && (
             <NotesGenPanel

@@ -5,7 +5,11 @@ import {
   getUserBilling,
   setStripeCustomerId,
 } from "@/lib/db/billing";
-import { SUBSCRIPTION_TIERS, type SubscriptionTier } from "@/lib/subscriptions";
+import {
+  SUBSCRIPTION_TIERS,
+  hasLiveStripeSubscription,
+  type SubscriptionTier,
+} from "@/lib/subscriptions";
 import {
   appBaseUrl,
   checkoutIntegrationId,
@@ -73,7 +77,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Account not found." }, { status: 404 });
   }
 
-  if (user.subscriptionTier === tier && user.subscriptionStatus === "active") {
+  if (
+    user.subscriptionTier === tier &&
+    (user.subscriptionStatus === "active" || user.subscriptionStatus === "trialing")
+  ) {
     return NextResponse.json({ error: "You're already on that plan." }, { status: 400 });
   }
 
@@ -91,6 +98,24 @@ export async function POST(req: NextRequest) {
   }
 
   const base = appBaseUrl(req.url);
+
+  // Already subscribed (or past_due) → Customer Portal for plan changes so we
+  // never open a second Checkout Session and create a duplicate subscription.
+  if (user.stripeSubscriptionId && hasLiveStripeSubscription(user.subscriptionStatus)) {
+    const portal = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: `${base}/?billing=portal`,
+      // Deep-link into plan switch (Operator ↔ Architect) instead of the portal home.
+      flow_data: {
+        type: "subscription_update",
+        subscription_update: {
+          subscription: user.stripeSubscriptionId,
+        },
+      },
+    });
+    return NextResponse.json({ url: portal.url, via: "portal" });
+  }
+
   const checkout = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: customerId,

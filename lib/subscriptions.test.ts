@@ -8,6 +8,7 @@ import {
   periodResetsAt,
   tierDef,
   fetchSubscriptionStatus,
+  hasLiveStripeSubscription,
   reservePlanGeneration,
   requestUpgrade,
 } from "@/lib/subscriptions";
@@ -75,6 +76,8 @@ describe("client fetch helpers", () => {
   it("fetchSubscriptionStatus returns usage on success", async () => {
     const usage = {
       tier: "operator",
+      status: "active",
+      hasBillingAccount: true,
       planGenerationsUsed: 1,
       planGenerationsLimit: 3,
       aiActionsUsed: 10,
@@ -84,6 +87,14 @@ describe("client fetch helpers", () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => usage })));
     const result = await fetchSubscriptionStatus();
     expect(result).toEqual({ ok: true, usage });
+  });
+
+  it("hasLiveStripeSubscription covers active, trialing, and past_due", () => {
+    expect(hasLiveStripeSubscription("active")).toBe(true);
+    expect(hasLiveStripeSubscription("trialing")).toBe(true);
+    expect(hasLiveStripeSubscription("past_due")).toBe(true);
+    expect(hasLiveStripeSubscription("canceled")).toBe(false);
+    expect(hasLiveStripeSubscription(null)).toBe(false);
   });
 
   it("reservePlanGeneration resolves silently on success", async () => {

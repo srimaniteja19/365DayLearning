@@ -54,9 +54,10 @@ export default function PrivacyPage() {
         <section className="legal-section">
           <h2>Payments</h2>
           <p>
-            Paid checkout is not live yet. We do not collect payment card details on the site
-            today. When billing ships, this policy will be updated to describe the processor and
-            what billing data we receive.
+            Paid plans (Operator / Architect) check out through Stripe. Card details are collected
+            and stored by Stripe — we do not see or store full card numbers on our servers. We
+            receive subscription status, customer and subscription IDs, and invoice metadata needed
+            to unlock managed AI quotas and show billing status in your account.
           </p>
         </section>
 

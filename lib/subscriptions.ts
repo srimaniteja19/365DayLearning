@@ -124,12 +124,21 @@ export function tierDef(tier: string | null | undefined): TierDefinition {
 
 export type SubscriptionUsage = {
   tier: SubscriptionTier;
+  /** Stripe subscription status (`active`, `past_due`, `canceled`, …). */
+  status: string;
+  /** True when a Stripe customer exists — portal stays available even if demoted. */
+  hasBillingAccount: boolean;
   planGenerationsUsed: number;
   planGenerationsLimit: number | null;
   aiActionsUsed: number;
   aiActionsLimit: number | null;
   periodResetAt: string;
 };
+
+/** Statuses that mean the account already has a live Stripe subscription. */
+export function hasLiveStripeSubscription(status: string | null | undefined): boolean {
+  return status === "active" || status === "trialing" || status === "past_due";
+}
 
 /** Fetch the signed-in user's current tier + usage from the server. */
 export async function fetchSubscriptionStatus(): Promise<

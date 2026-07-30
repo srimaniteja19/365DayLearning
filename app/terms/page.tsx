@@ -28,8 +28,9 @@ export default function TermsPage() {
           <p>
             Refrainly provides multi-plan learning campaigns, progress tracking, spaced
             repetition, Field Kit notes and bookmarks, and optional AI helpers that run with
-            your own provider key. Features may change as the product evolves. Paid plans are
-            described on the site as “coming soon” until checkout is enabled.
+            your own provider key. Features may change as the product evolves. Paid plans
+            (Operator / Architect) are billed monthly through Stripe Checkout; you can manage or
+            cancel in the Stripe billing portal.
           </p>
         </section>
 
