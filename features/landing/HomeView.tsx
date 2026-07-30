@@ -369,11 +369,11 @@ export function HomeView({
               <span className="landing-surface-stamp">Deck</span>
               <h3 className="landing-surface-title">Campaign Deck</h3>
               <p className="landing-surface-copy">
-                Your daily driver: active plan hero, Field Ops filters, and views — Console, Grid,
+                Your daily driver: active plan hero, campaign filters, and views — Console, Grid,
                 Review, Weekly, Analytics.
               </p>
               <ul className="landing-surface-list">
-                <li>Topic clears + day notes on each mission</li>
+                <li>Topic clears + day notes, day by day</li>
                 <li>Review queue (spaced repetition)</li>
                 <li>XP, streaks, On This Day</li>
               </ul>
