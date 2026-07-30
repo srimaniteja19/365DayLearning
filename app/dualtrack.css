@@ -4348,7 +4348,8 @@
   background: color-mix(in srgb, var(--landing-panel) 88%, #fff);
   border: 2.5px solid var(--landing-ink);
   box-shadow: 5px 5px 0 var(--landing-ink);
-  transform: rotate(-1.5deg);
+  transform-style: preserve-3d;
+  will-change: transform;
 }
 .landing-viz-top {
   display: flex;
@@ -4514,25 +4515,19 @@
 }
 .landing-viz-slip-a {
   background: var(--landing-flare);
-  transform: rotate(3deg);
   z-index: 3;
-  animation: landingSlipA 5s ease-in-out infinite alternate;
 }
 .landing-viz-slip-b {
   background: color-mix(in srgb, var(--landing-blue) 22%, #fff);
   margin-top: -6px;
   margin-left: 10px;
-  transform: rotate(-4deg);
   z-index: 2;
-  animation: landingSlipB 6s ease-in-out infinite alternate;
 }
 .landing-viz-slip-c {
   background: color-mix(in srgb, var(--landing-pink) 28%, #fff);
   margin-top: -4px;
   margin-left: 2px;
-  transform: rotate(1.5deg);
   z-index: 1;
-  animation: landingSlipC 4.5s ease-in-out infinite alternate;
 }
 .landing-viz-stamp {
   position: absolute;
@@ -5125,6 +5120,12 @@ a.landing-footer-link {
   background: var(--landing-panel);
   box-shadow: 3px 3px 0 color-mix(in srgb, var(--landing-ink) 16%, transparent);
 }
+.landing-loop-step-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
 .landing-loop-n {
   font-family: var(--mono, ui-monospace, monospace);
   font-size: 11px;
@@ -5161,6 +5162,10 @@ a.landing-footer-link {
   padding: 20px;
   border: 3px solid var(--landing-ink);
   box-shadow: 5px 5px 0 var(--landing-ink);
+}
+.landing-surface-inner {
+  display: block;
+  height: 100%;
 }
 .landing-surface-deck {
   background: color-mix(in srgb, var(--landing-blue) 16%, var(--landing-panel));
@@ -5301,13 +5306,16 @@ a.landing-footer-link {
 }
 .landing-price-card {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
   padding: 18px 16px 16px;
   border: 2.5px solid var(--landing-ink);
   background: var(--landing-panel);
   box-shadow: 3px 3px 0 color-mix(in srgb, var(--landing-ink) 16%, transparent);
+}
+.landing-price-card-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
 }
 .landing-price-card-free {
   border-width: 3px;
@@ -5507,19 +5515,6 @@ a.landing-footer-link {
   from { opacity: 0; transform: rotate(12deg) scale(1.4); }
   to { opacity: 0.85; transform: rotate(12deg) scale(1); }
 }
-@keyframes landingSlipA {
-  from { transform: rotate(3deg) translateY(0); }
-  to { transform: rotate(5deg) translateY(-4px); }
-}
-@keyframes landingSlipB {
-  from { transform: rotate(-4deg) translateX(0); }
-  to { transform: rotate(-6deg) translateX(3px); }
-}
-@keyframes landingSlipC {
-  from { transform: rotate(1.5deg) translateY(0); }
-  to { transform: rotate(3deg) translateY(3px); }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .landing-brand-mark,
   .landing-brand-hero,
@@ -5532,9 +5527,6 @@ a.landing-footer-link {
   .landing-viz-bar-fill,
   .landing-viz-day.is-active,
   .landing-viz-stamp,
-  .landing-viz-slip-a,
-  .landing-viz-slip-b,
-  .landing-viz-slip-c,
   .landing-stat,
   .landing-feature,
   .landing-picker,

@@ -2,8 +2,11 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
 import { classNames } from "@/lib/classNames";
 import { SUBSCRIPTION_TIERS, TIER_ORDER } from "@/lib/subscriptions";
+import { useHeroTilt } from "@/features/landing/use3d";
+import { TiltCard } from "@/features/landing/TiltCard";
 
 const CAMPAIGN_STEPS = [
   {
@@ -65,6 +68,7 @@ export function HomeView({
 }) {
   const [started, setStarted] = useState(false);
   const pickerRef = useRef(null);
+  const hero = useHeroTilt();
 
   useEffect(() => {
     if (started && pickerRef.current) {
@@ -128,8 +132,17 @@ export function HomeView({
       </header>
 
       {/* 1. Hero */}
-      <section className="landing-hero" aria-labelledby="landing-hero-title">
-        <div className="landing-hero-mesh" aria-hidden="true" />
+      <section
+        className="landing-hero"
+        aria-labelledby="landing-hero-title"
+        onMouseMove={hero.onMouseMove}
+        onMouseLeave={hero.onMouseLeave}
+      >
+        <motion.div
+          className="landing-hero-mesh"
+          aria-hidden="true"
+          style={{ x: hero.meshX, y: hero.meshY }}
+        />
         <div className="landing-hero-copy">
           <span className="landing-hero-kicker">Briefing · Field ops</span>
           <p className="landing-brand-hero">REFRAINLY</p>
@@ -183,15 +196,23 @@ export function HomeView({
         </div>
 
         <div className="landing-hero-viz" aria-hidden="true">
-          <div className="landing-viz-board">
-            <div className="landing-viz-top">
+          <motion.div
+            className="landing-viz-board"
+            style={{
+              rotate: -1.5,
+              rotateX: hero.rotateX,
+              rotateY: hero.rotateY,
+              transformPerspective: 1000,
+            }}
+          >
+            <div className="landing-viz-top" style={{ transform: "translateZ(26px)" }}>
               <span className="landing-viz-op">OPERATION MINDFIELD</span>
               <span className="landing-viz-live">
                 <span className="landing-viz-live-dot" />
                 LIVE
               </span>
             </div>
-            <div className="landing-viz-progress">
+            <div className="landing-viz-progress" style={{ transform: "translateZ(16px)" }}>
               <div className="landing-viz-progress-meta">
                 <span>Day 12 / 30</span>
                 <span>40%</span>
@@ -200,7 +221,7 @@ export function HomeView({
                 <span className="landing-viz-bar-fill" />
               </div>
             </div>
-            <ul className="landing-viz-days">
+            <ul className="landing-viz-days" style={{ transform: "translateZ(6px)" }}>
               <li className="landing-viz-day is-done">
                 <span className="landing-viz-day-n">10</span>
                 <span className="landing-viz-day-t">Deliberate practice</span>
@@ -221,18 +242,48 @@ export function HomeView({
                 <span className="landing-viz-day-t">Metacognition</span>
               </li>
             </ul>
-          </div>
+          </motion.div>
           <div className="landing-viz-kit">
             <span className="landing-viz-kit-label">Field Kit</span>
-            <div className="landing-viz-slip landing-viz-slip-a">
+            <motion.div
+              className="landing-viz-slip landing-viz-slip-a"
+              style={{ transformPerspective: 700 }}
+              initial={{ rotate: 3 }}
+              animate={
+                hero.reduceMotion
+                  ? undefined
+                  : { rotate: [3, 6, 3], y: [0, -6, 0], z: [0, 24, 0] }
+              }
+              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+            >
               Loss aversion ≠ risk aversion
-            </div>
-            <div className="landing-viz-slip landing-viz-slip-b">
+            </motion.div>
+            <motion.div
+              className="landing-viz-slip landing-viz-slip-b"
+              style={{ transformPerspective: 700 }}
+              initial={{ rotate: -4 }}
+              animate={
+                hero.reduceMotion
+                  ? undefined
+                  : { rotate: [-4, -6, -4], x: [0, 4, 0], z: [0, 16, 0] }
+              }
+              transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+            >
               Link · Kahneman ch. 26
-            </div>
-            <div className="landing-viz-slip landing-viz-slip-c">
+            </motion.div>
+            <motion.div
+              className="landing-viz-slip landing-viz-slip-c"
+              style={{ transformPerspective: 700 }}
+              initial={{ rotate: 1.5 }}
+              animate={
+                hero.reduceMotion
+                  ? undefined
+                  : { rotate: [1.5, 3.5, 1.5], y: [0, 4, 0], z: [0, 10, 0] }
+              }
+              transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
+            >
               Rabbit hole → keep
-            </div>
+            </motion.div>
           </div>
           <span className="landing-viz-stamp">DAY 12</span>
         </div>
@@ -292,14 +343,24 @@ export function HomeView({
         </h2>
         <p className="landing-section-lead">Six steps. Skim the headlines — that&apos;s the loop.</p>
         <ol className="landing-loop-grid">
-          {CAMPAIGN_STEPS.map((step) => (
-            <li key={step.n} className="landing-loop-step">
-              <span className="landing-loop-n" aria-hidden="true">
-                {step.n}
-              </span>
-              <h3 className="landing-loop-title">{step.title}</h3>
-              <p className="landing-loop-copy">{step.copy}</p>
-            </li>
+          {CAMPAIGN_STEPS.map((step, i) => (
+            <motion.li
+              key={step.n}
+              className="landing-loop-step"
+              style={{ transformPerspective: 900 }}
+              initial={{ opacity: 0, rotateX: -35, y: 24 }}
+              whileInView={{ opacity: 1, rotateX: 0, y: 0 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ duration: 0.5, delay: i * 0.06, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <TiltCard className="landing-loop-step-inner" maxTilt={6}>
+                <span className="landing-loop-n" aria-hidden="true">
+                  {step.n}
+                </span>
+                <h3 className="landing-loop-title">{step.title}</h3>
+                <p className="landing-loop-copy">{step.copy}</p>
+              </TiltCard>
+            </motion.li>
           ))}
         </ol>
       </section>
@@ -321,46 +382,50 @@ export function HomeView({
         </p>
         <div className="landing-surfaces-grid">
           <article className="landing-surface landing-surface-deck">
-            <span className="landing-surface-stamp">Deck</span>
-            <h3 className="landing-surface-title">Campaign Deck</h3>
-            <p className="landing-surface-copy">
-              Your daily driver: active plan hero, Field Ops filters, and views — Console, Grid,
-              Review, Weekly, Analytics.
-            </p>
-            <ul className="landing-surface-list">
-              <li>Topic clears + day notes on each mission</li>
-              <li>Review queue (spaced repetition)</li>
-              <li>XP, streaks, On This Day</li>
-            </ul>
-            {hasCampaign && (
-              <button type="button" className="landing-surface-cta" onClick={onGoDashboard}>
-                Open dashboard
-              </button>
-            )}
+            <TiltCard className="landing-surface-inner" maxTilt={5}>
+              <span className="landing-surface-stamp">Deck</span>
+              <h3 className="landing-surface-title">Campaign Deck</h3>
+              <p className="landing-surface-copy">
+                Your daily driver: active plan hero, Field Ops filters, and views — Console, Grid,
+                Review, Weekly, Analytics.
+              </p>
+              <ul className="landing-surface-list">
+                <li>Topic clears + day notes on each mission</li>
+                <li>Review queue (spaced repetition)</li>
+                <li>XP, streaks, On This Day</li>
+              </ul>
+              {hasCampaign && (
+                <button type="button" className="landing-surface-cta" onClick={onGoDashboard}>
+                  Open dashboard
+                </button>
+              )}
+            </TiltCard>
           </article>
           <article className="landing-surface landing-surface-kit">
-            <span className="landing-surface-stamp">Kit</span>
-            <h3 className="landing-surface-title">Field Kit</h3>
-            <p className="landing-surface-copy">
-              Independent of any campaign. Always one click away — even before you start a plan.
-            </p>
-            <ul className="landing-surface-list">
-              <li>
-                <strong>Notes</strong> — date-keyed slips, Chrono filters, tags (talk / paper / tool
-                / tip / course / other)
-              </li>
-              <li>
-                <strong>Bookmarks</strong> — YouTube, Vimeo, articles, repos, docs
-              </li>
-              <li>
-                <strong>Lens</strong> — search across Notes and Bookmarks
-              </li>
-            </ul>
-            {onOpenKit && (
-              <button type="button" className="landing-surface-cta" onClick={openFieldKit}>
-                Open Field Kit
-              </button>
-            )}
+            <TiltCard className="landing-surface-inner" maxTilt={5}>
+              <span className="landing-surface-stamp">Kit</span>
+              <h3 className="landing-surface-title">Field Kit</h3>
+              <p className="landing-surface-copy">
+                Independent of any campaign. Always one click away — even before you start a plan.
+              </p>
+              <ul className="landing-surface-list">
+                <li>
+                  <strong>Notes</strong> — date-keyed slips, Chrono filters, tags (talk / paper /
+                  tool / tip / course / other)
+                </li>
+                <li>
+                  <strong>Bookmarks</strong> — YouTube, Vimeo, articles, repos, docs
+                </li>
+                <li>
+                  <strong>Lens</strong> — search across Notes and Bookmarks
+                </li>
+              </ul>
+              {onOpenKit && (
+                <button type="button" className="landing-surface-cta" onClick={openFieldKit}>
+                  Open Field Kit
+                </button>
+              )}
+            </TiltCard>
           </article>
         </div>
       </section>
@@ -432,67 +497,68 @@ export function HomeView({
                   tier.comingSoon && "landing-price-card-soon",
                 )}
               >
-                {tier.comingSoon && (
+                {tier.comingSoon ? (
                   <span className="landing-price-badge">Coming soon</span>
-                )}
-                {!tier.comingSoon && (
+                ) : (
                   <span className="landing-price-badge landing-price-badge-live">Live</span>
                 )}
-                <h3 className="landing-price-rank">{tier.rankLabel}</h3>
-                <div className="landing-price-amount">
+                <TiltCard className="landing-price-card-inner" maxTilt={6}>
+                  <h3 className="landing-price-rank">{tier.rankLabel}</h3>
+                  <div className="landing-price-amount">
+                    {isFree ? (
+                      <>$0</>
+                    ) : (
+                      <>
+                        <span className="landing-price-num">${tier.priceMonthlyUsd}</span>
+                        <span className="landing-price-per">/mo</span>
+                      </>
+                    )}
+                  </div>
+                  <p className="landing-price-tagline">{tier.tagline}</p>
+                  <ul className="landing-price-features">
+                    {isFree ? (
+                      <>
+                        <li>Free account — full campaign loop</li>
+                        <li>Console, XP, Review queue, Field Kit</li>
+                        <li>Bring-your-own-key AI (unlimited on your credits)</li>
+                        <li>Cloud sync · export / import</li>
+                        <li>Multi-plan switcher, themes, badges</li>
+                      </>
+                    ) : id === "operator" ? (
+                      <>
+                        <li>Everything in Recruit</li>
+                        <li>Managed AI — 3 plan gens + 150 actions / month</li>
+                        <li>No key required for those quotas</li>
+                        <li>Bring-your-own-key remains available</li>
+                        <li>Stripe checkout · invoices · billing portal</li>
+                      </>
+                    ) : (
+                      <>
+                        <li>Everything in Operator</li>
+                        <li>Managed AI — 5 plan gens + 400 actions / month</li>
+                        <li>Highest managed allowance</li>
+                        <li>Bring-your-own-key remains available</li>
+                        <li>Stripe checkout · invoices · billing portal</li>
+                      </>
+                    )}
+                  </ul>
                   {isFree ? (
-                    <>$0</>
+                    <button type="button" className="landing-cta landing-price-cta" onClick={startAccount}>
+                      Create free account
+                    </button>
                   ) : (
-                    <>
-                      <span className="landing-price-num">${tier.priceMonthlyUsd}</span>
-                      <span className="landing-price-per">/mo</span>
-                    </>
+                    <button
+                      type="button"
+                      className="landing-surface-cta landing-price-cta"
+                      onClick={onOpenPricing}
+                    >
+                      {`Get ${tier.rankLabel}`}
+                    </button>
                   )}
-                </div>
-                <p className="landing-price-tagline">{tier.tagline}</p>
-                <ul className="landing-price-features">
-                  {isFree ? (
-                    <>
-                      <li>Free account — full campaign loop</li>
-                      <li>Console, XP, Review queue, Field Kit</li>
-                      <li>Bring-your-own-key AI (unlimited on your credits)</li>
-                      <li>Cloud sync · export / import</li>
-                      <li>Multi-plan switcher, themes, badges</li>
-                    </>
-                  ) : id === "operator" ? (
-                    <>
-                      <li>Everything in Recruit</li>
-                      <li>Managed AI — 3 plan gens + 150 actions / month</li>
-                      <li>No key required for those quotas</li>
-                      <li>Bring-your-own-key remains available</li>
-                      <li>Stripe checkout · invoices · billing portal</li>
-                    </>
-                  ) : (
-                    <>
-                      <li>Everything in Operator</li>
-                      <li>Managed AI — 5 plan gens + 400 actions / month</li>
-                      <li>Highest managed allowance</li>
-                      <li>Bring-your-own-key remains available</li>
-                      <li>Stripe checkout · invoices · billing portal</li>
-                    </>
+                  {isFree && (
+                    <p className="landing-price-fine">Free forever on Recruit · no card for signup</p>
                   )}
-                </ul>
-                {isFree ? (
-                  <button type="button" className="landing-cta landing-price-cta" onClick={startAccount}>
-                    Create free account
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="landing-surface-cta landing-price-cta"
-                    onClick={onOpenPricing}
-                  >
-                    {`Get ${tier.rankLabel}`}
-                  </button>
-                )}
-                {isFree && (
-                  <p className="landing-price-fine">Free forever on Recruit · no card for signup</p>
-                )}
+                </TiltCard>
               </article>
             );
           })}
