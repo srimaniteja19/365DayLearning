@@ -5407,6 +5407,7 @@ a.landing-footer-link {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+  margin-bottom: 28px;
 }
 .landing-price-card {
   position: relative;
