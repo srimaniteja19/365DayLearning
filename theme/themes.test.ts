@@ -28,8 +28,8 @@ const REQUIRED_THEME_VARS = [
 ] as const;
 
 describe("theme tokens", () => {
-  it("ships ten themes in THEME_ORDER", () => {
-    expect(THEME_ORDER).toHaveLength(10);
+  it("ships eleven themes in THEME_ORDER", () => {
+    expect(THEME_ORDER).toHaveLength(11);
     for (const key of THEME_ORDER) {
       expect(THEMES[key]).toBeTruthy();
     }

@@ -85,6 +85,7 @@ export type Plan = {
 export type DayEntry = PlanDay;
 
 export type ThemeKey =
+  | "doodle"
   | "signal"
   | "folio"
   | "afterburn"

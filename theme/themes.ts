@@ -72,7 +72,7 @@ const FONT_STACKS = {
 };
 
 /** Default dashboard theme (user-selectable). Homepage uses LANDING_THEME instead. */
-export const DEFAULT_THEME_KEY: ThemeKey = "signal";
+export const DEFAULT_THEME_KEY: ThemeKey = "doodle";
 
 /**
  * Fixed public homepage skin — same for every visitor, ignores account theme.
@@ -114,6 +114,36 @@ export const LANDING_THEME: ThemeDef = {
  * Mix of light/dark, sharp/soft radii, and singular accent stories.
  */
 export const THEMES: Record<ThemeKey, ThemeDef> = {
+  doodle: {
+    name: "Doodle",
+    mode: "dark",
+    palette: "dark",
+    effects: true,
+    swatch: ["#14100D", "#E3C4AE", "#D97757"],
+    accents: { main: "#E3C4AE", sprint: "#D97757" },
+    display: FONT_STACKS.grotesk,
+    radius: { card: "16px", ctl: "10px", pill: "999px", bar: "999px" },
+    grid: { color: "rgba(245,237,228,0.06)", size: "24px", scan: "0.08" },
+    c: {
+      bg: "#14100D",
+      panel: "#1B1613",
+      panel2: "#2B2118",
+      blur: "rgba(20,16,13,0.9)",
+      text: "#F5EDE4",
+      dim: "#A89A8C",
+      faint: "#7D7166",
+      border: "rgba(245,237,228,0.85)",
+      borderSoft: "rgba(245,237,228,0.18)",
+      borderHover: "rgba(245,237,228,0.4)",
+      track: "rgba(245,237,228,0.12)",
+      onAccent: "#2B2118",
+      onAccentSoft: "rgba(43,33,24,0.85)",
+      ok: "#7FB88A",
+      warn: "#D9A44F",
+      err: "#C97B6B",
+      info: "#7B9BB0",
+    },
+  },
   signal: {
     name: "Signal", mode: "light", palette: "light", effects: false,
     swatch: ["#EEF2F6", "#1D4ED8", "#E11D48"],
@@ -267,6 +297,7 @@ export const THEMES: Record<ThemeKey, ThemeDef> = {
 };
 
 export const THEME_ORDER: ThemeKey[] = [
+  "doodle",
   "signal",
   "folio",
   "afterburn",
