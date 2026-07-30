@@ -11,6 +11,7 @@ import { openRouterWebSearch } from "@/lib/openrouterWebSearch";
 import {
   cacheKeyForKind,
   citationToResource,
+  isVideoCitationUrl,
   normalizeTopicResourceKey,
   pairFromCitations,
   searchPromptForKind,
@@ -191,7 +192,7 @@ export async function POST(req: NextRequest) {
         prompt,
         maxTokens: 200,
         signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-        maxResults: kindMode === "pair" ? 5 : 3,
+        maxResults: kindMode === "article" ? 3 : 5,
         allowedDomains,
         referer: process.env.AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "https://refrainly.dev",
       });
@@ -214,7 +215,23 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ pair, kind: "pair" });
       }
 
-      const resource = citationToResource(result.citation, kindMode);
+      let resource: TopicResource | null = null;
+      if (kindMode === "video") {
+        const hit =
+          result.citations.find((c) => c.url && isVideoCitationUrl(c.url)) ||
+          (result.citation?.url && isVideoCitationUrl(result.citation.url)
+            ? result.citation
+            : null);
+        resource = citationToResource(hit, "video");
+      } else {
+        const hit =
+          result.citations.find((c) => c.url && !isVideoCitationUrl(c.url)) ||
+          (result.citation?.url && !isVideoCitationUrl(result.citation.url)
+            ? result.citation
+            : null);
+        resource = citationToResource(hit, "article");
+      }
+
       const baseKey = normalizeTopicResourceKey(title);
       const topicKey = baseKey ? cacheKeyForKind(baseKey, kindMode) : "";
       if (hasDatabase() && topicKey) {

@@ -8,11 +8,11 @@ import {
   citationToResource,
   domainLabelForSearch,
   isPlaceholderTopic,
+  isVideoCitationUrl,
   normalizeTopicResourceKey,
   pairFromCitations,
   pairHasAnyResource,
   searchPromptForKind,
-  searchPromptForPair,
   TOPIC_RESOURCE_SEARCH_MODEL,
 } from "@/lib/topicResourceShared";
 import type {
@@ -142,74 +142,31 @@ async function searchOne(
       maxTokens: 200,
       signal,
       baseUrl: creds.baseUrl || openrouterProvider.defaultBaseUrl,
-      maxResults: 3,
+      maxResults: 5,
+      // Video search must be domain-filtered — mixed web results almost never
+      // include YouTube in url_citation annotations.
       allowedDomains: kind === "video" ? VIDEO_DOMAINS : undefined,
     });
-    return citationToResource(result.citation, kind);
+
+    if (kind === "video") {
+      const hit =
+        result.citations.find((c) => c.url && isVideoCitationUrl(c.url)) ||
+        (result.citation?.url && isVideoCitationUrl(result.citation.url)
+          ? result.citation
+          : null);
+      return citationToResource(hit, "video");
+    }
+
+    const hit =
+      result.citations.find((c) => c.url && !isVideoCitationUrl(c.url)) ||
+      (result.citation?.url && !isVideoCitationUrl(result.citation.url)
+        ? result.citation
+        : null);
+    return citationToResource(hit, "article");
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") throw err;
     console.warn("[topic-resources] search error", kind, title, err);
     return null;
-  }
-}
-
-/** One OpenRouter web_search → article + video (parse mixed citations). */
-async function searchPair(
-  title: string,
-  category: string,
-  signal?: AbortSignal,
-): Promise<TopicResourcePair> {
-  try {
-    if (willUseManagedAi()) {
-      const res = await fetch("/api/topic-resources", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal,
-        body: JSON.stringify({
-          action: "search",
-          title,
-          category,
-          kind: "pair",
-        }),
-      });
-      if (!res.ok) {
-        console.warn("[topic-resources] managed pair search failed", res.status);
-        return { article: null, video: null };
-      }
-      const data = (await res.json()) as {
-        pair?: TopicResourcePair;
-        resource?: TopicResource | null;
-      };
-      if (data.pair) {
-        return {
-          article: data.pair.article ?? null,
-          video: data.pair.video ?? null,
-        };
-      }
-      // Older response shape — treat as article-only.
-      return { article: data.resource ?? null, video: null };
-    }
-
-    const creds = getCredentials();
-    if (!creds.apiKey?.trim()) {
-      console.warn("[topic-resources] no OpenRouter key; skipping pair search");
-      return { article: null, video: null };
-    }
-
-    const result = await openRouterWebSearch({
-      apiKey: creds.apiKey,
-      model: TOPIC_RESOURCE_SEARCH_MODEL,
-      prompt: searchPromptForPair(title, category),
-      maxTokens: 200,
-      signal,
-      baseUrl: creds.baseUrl || openrouterProvider.defaultBaseUrl,
-      maxResults: 5,
-    });
-    return pairFromCitations(result.citations);
-  } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") throw err;
-    console.warn("[topic-resources] pair search error", title, err);
-    return { article: null, video: null };
   }
 }
 
@@ -280,7 +237,8 @@ export function applyTopicResource(
 
 /**
  * On-demand: find 1 article + 1 video for a single topic.
- * Uses cache when available; one web_search when both miss (fail-soft).
+ * Uses positive cache hits; otherwise runs dedicated article + video searches
+ * in parallel (video is domain-filtered to YouTube/Vimeo).
  */
 export async function generateTopicResourcePair(opts: {
   title: string;
@@ -293,27 +251,23 @@ export async function generateTopicResourcePair(opts: {
   const videoKey = cacheKeyForKind(topicKey, "video");
 
   const cache = await lookupCache([articleKey, videoKey], opts.signal);
-  let article = cache.get(articleKey)?.hit
-    ? cache.get(articleKey)!.resource
-    : undefined;
-  let video = cache.get(videoKey)?.hit ? cache.get(videoKey)!.resource : undefined;
+  // Only reuse real URLs. Negative cache (null) from a prior mixed/pair search
+  // must not block a dedicated video retry on Generate.
+  let article =
+    cache.get(articleKey)?.hit && cache.get(articleKey)!.resource?.url
+      ? cache.get(articleKey)!.resource
+      : undefined;
+  let video =
+    cache.get(videoKey)?.hit && cache.get(videoKey)!.resource?.url
+      ? cache.get(videoKey)!.resource
+      : undefined;
 
   const toStore: Array<{ topicKey: string; resource: TopicResource | null }> = [];
   const canSearch = willUseManagedAi() || !!getCredentials().apiKey?.trim();
-  const needArticle = article === undefined;
-  const needVideo = video === undefined;
+  const needArticle = !article?.url;
+  const needVideo = !video?.url;
 
-  if (canSearch && needArticle && needVideo) {
-    // Single OpenRouter round-trip for both links.
-    const pair = await searchPair(opts.title, category, opts.signal);
-    article = pair.article ?? null;
-    video = pair.video ?? null;
-    toStore.push(
-      { topicKey: articleKey, resource: article },
-      { topicKey: videoKey, resource: video },
-    );
-  } else if (canSearch && (needArticle || needVideo)) {
-    // Only one side missing — keep a focused single search.
+  if (canSearch && (needArticle || needVideo)) {
     const searches: Array<Promise<void>> = [];
     if (needArticle) {
       searches.push(

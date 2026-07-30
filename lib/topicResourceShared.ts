@@ -96,7 +96,7 @@ export function searchPromptForKind(
   kind: TopicResourceKind,
 ): string {
   if (kind === "video") {
-    return `Find one high-quality educational YouTube video for: "${title}" (${category}). Prefer a clear tutorial from a reputable channel.`;
+    return `Search YouTube for one high-quality educational video tutorial about: "${title}" (${category}). Return a youtube.com or youtu.be watch link.`;
   }
   return `Find one authoritative article or official docs page for: "${title}" (${category}). Prefer official docs over blogspam.`;
 }
