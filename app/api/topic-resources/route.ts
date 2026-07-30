@@ -12,10 +12,12 @@ import {
   cacheKeyForKind,
   citationToResource,
   normalizeTopicResourceKey,
+  pairFromCitations,
   searchPromptForKind,
+  searchPromptForPair,
   TOPIC_RESOURCE_SEARCH_MODEL,
 } from "@/lib/topicResourceShared";
-import type { TopicResource, TopicResourceKind } from "@/lib/types";
+import type { TopicResource, TopicResourceKind, TopicResourcePair } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -157,8 +159,8 @@ export async function POST(req: NextRequest) {
         ? categoryRaw.trim().slice(0, 120)
         : "General";
     const kindRaw = searchBody.kind;
-    const kind: TopicResourceKind =
-      kindRaw === "video" ? "video" : "article";
+    const kindMode: TopicResourceKind | "pair" =
+      kindRaw === "video" ? "video" : kindRaw === "pair" ? "pair" : "article";
 
     if (hasDatabase()) {
       const tierOk = await requireManagedAiTier(session.user.id);
@@ -166,15 +168,19 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: tierOk.message }, { status: tierOk.status });
       }
       // One AI action per search miss (cache hits never reach here).
+      // Pair mode is still one upstream call → one quota unit.
       const reserved = await reserveAiActionQuota(session.user.id);
       if (!reserved.ok) {
         return NextResponse.json({ error: reserved.message }, { status: reserved.status });
       }
     }
 
-    const prompt = searchPromptForKind(title, category, kind);
+    const prompt =
+      kindMode === "pair"
+        ? searchPromptForPair(title, category)
+        : searchPromptForKind(title, category, kindMode);
     const allowedDomains =
-      kind === "video"
+      kindMode === "video"
         ? ["youtube.com", "www.youtube.com", "youtu.be", "vimeo.com", "www.vimeo.com"]
         : undefined;
 
@@ -183,23 +189,48 @@ export async function POST(req: NextRequest) {
         apiKey,
         model: process.env.OPENROUTER_MODEL?.trim() || TOPIC_RESOURCE_SEARCH_MODEL,
         prompt,
-        maxTokens: 600,
+        maxTokens: 200,
         signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-        maxResults: 3,
+        maxResults: kindMode === "pair" ? 5 : 3,
         allowedDomains,
         referer: process.env.AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "https://refrainly.dev",
       });
-      const resource = citationToResource(result.citation, kind);
+
+      if (kindMode === "pair") {
+        const pair: TopicResourcePair = pairFromCitations(result.citations);
+        const baseKey = normalizeTopicResourceKey(title);
+        if (hasDatabase() && baseKey) {
+          await storeTopicResources([
+            {
+              topicKey: cacheKeyForKind(baseKey, "article"),
+              resource: pair.article ?? null,
+            },
+            {
+              topicKey: cacheKeyForKind(baseKey, "video"),
+              resource: pair.video ?? null,
+            },
+          ]);
+        }
+        return NextResponse.json({ pair, kind: "pair" });
+      }
+
+      const resource = citationToResource(result.citation, kindMode);
       const baseKey = normalizeTopicResourceKey(title);
-      const topicKey = baseKey ? cacheKeyForKind(baseKey, kind) : "";
+      const topicKey = baseKey ? cacheKeyForKind(baseKey, kindMode) : "";
       if (hasDatabase() && topicKey) {
         await storeTopicResources([{ topicKey, resource }]);
       }
-      return NextResponse.json({ resource, topicKey, kind });
+      return NextResponse.json({ resource, topicKey, kind: kindMode });
     } catch (err) {
-      console.error("[api/topic-resources] search failed", kind, title, err);
+      console.error("[api/topic-resources] search failed", kindMode, title, err);
       // Fail soft — caller treats null as "no resource".
-      return NextResponse.json({ resource: null, kind });
+      if (kindMode === "pair") {
+        return NextResponse.json({
+          pair: { article: null, video: null },
+          kind: "pair",
+        });
+      }
+      return NextResponse.json({ resource: null, kind: kindMode });
     }
   }
 

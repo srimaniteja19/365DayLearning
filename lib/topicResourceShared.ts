@@ -96,7 +96,49 @@ export function searchPromptForKind(
   kind: TopicResourceKind,
 ): string {
   if (kind === "video") {
-    return `Find one high-quality educational video (preferably YouTube or a well-known course lecture) for the topic: "${title}" in the context of ${category}. Prefer clear tutorials or lectures from reputable channels over spam. Return only the single best video.`;
+    return `Find one high-quality educational YouTube video for: "${title}" (${category}). Prefer a clear tutorial from a reputable channel.`;
   }
-  return `Find one high-quality, authoritative learning article or official docs page for the topic: "${title}" in the context of ${category}. Prefer official documentation or widely-cited articles over blogspam. Return only the single best article.`;
+  return `Find one authoritative article or official docs page for: "${title}" (${category}). Prefer official docs over blogspam.`;
+}
+
+/** One web_search for both resources — half the latency of two separate calls. */
+export function searchPromptForPair(title: string, category: string): string {
+  return `Find exactly 2 learning resources for "${title}" (${category}):
+1) One authoritative article or official documentation page
+2) One educational YouTube video
+Prefer quality sources. Do not invent URLs — use web search results only.`;
+}
+
+export function isVideoCitationUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+    return (
+      host === "youtube.com" ||
+      host === "m.youtube.com" ||
+      host === "music.youtube.com" ||
+      host === "youtu.be" ||
+      host === "vimeo.com" ||
+      host.endsWith(".youtube.com")
+    );
+  } catch {
+    return /youtu\.?be|vimeo\.com/i.test(url);
+  }
+}
+
+/** Pick first article + first video from a mixed citation list. */
+export function pairFromCitations(
+  citations: UrlCitation[],
+): TopicResourcePair {
+  let article: TopicResource | null = null;
+  let video: TopicResource | null = null;
+  for (const c of citations) {
+    if (!c?.url) continue;
+    if (isVideoCitationUrl(c.url)) {
+      if (!video) video = citationToResource(c, "video");
+    } else if (!article) {
+      article = citationToResource(c, "article");
+    }
+    if (article && video) break;
+  }
+  return { article, video };
 }

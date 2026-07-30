@@ -8,7 +8,9 @@ import {
 import {
   asResourcePair,
   citationToResource,
+  isVideoCitationUrl,
   normalizeTopicResourceKey,
+  pairFromCitations,
 } from "@/lib/topicResourceShared";
 import type { Plan } from "@/lib/types";
 
@@ -65,6 +67,23 @@ describe("citationToResource", () => {
     expect(citationToResource({ url: "https://example.com/a", title: "A" })?.url).toBe(
       "https://example.com/a",
     );
+  });
+});
+
+describe("pairFromCitations", () => {
+  it("splits mixed citations into article + video", () => {
+    const pair = pairFromCitations([
+      { url: "https://www.typescriptlang.org/docs/handbook/generics.html", title: "Generics" },
+      { url: "https://www.youtube.com/watch?v=abc123", title: "TS Generics" },
+      { url: "https://example.com/extra", title: "Extra" },
+    ]);
+    expect(pair.article?.url).toContain("typescriptlang.org");
+    expect(pair.video?.url).toContain("youtube.com");
+  });
+
+  it("detects youtu.be as video", () => {
+    expect(isVideoCitationUrl("https://youtu.be/abc")).toBe(true);
+    expect(isVideoCitationUrl("https://react.dev/hooks")).toBe(false);
   });
 });
 

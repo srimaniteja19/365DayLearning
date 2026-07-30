@@ -130,8 +130,8 @@ export async function openRouterWebSearch(
     },
     body: JSON.stringify({
       model: opts.model,
-      max_tokens: opts.maxTokens ?? 600,
-      temperature: opts.temperature ?? 0.2,
+      max_tokens: opts.maxTokens ?? 200,
+      temperature: opts.temperature ?? 0.1,
       messages,
       tools: [
         {
@@ -139,7 +139,8 @@ export async function openRouterWebSearch(
           parameters,
         },
       ],
-      max_tool_calls: 2,
+      // One search is enough — we only need url_citation annotations, not a long essay.
+      max_tool_calls: 1,
     }),
   });
 
