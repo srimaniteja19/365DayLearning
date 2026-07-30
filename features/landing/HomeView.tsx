@@ -2,11 +2,16 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { classNames } from "@/lib/classNames";
 import { SUBSCRIPTION_TIERS, TIER_ORDER } from "@/lib/subscriptions";
-import { useHeroTilt } from "@/features/landing/use3d";
-import { TiltCard } from "@/features/landing/TiltCard";
+import {
+  DoodleUnderline,
+  DoodleArrow,
+  DoodleStar,
+  DoodleBullet,
+  DoodleCircledNumber,
+} from "@/features/landing/doodle-assets";
 
 const CAMPAIGN_STEPS = [
   {
@@ -16,12 +21,12 @@ const CAMPAIGN_STEPS = [
   },
   {
     n: "02",
-    title: "Execute",
+    title: "Show up",
     copy: "Daily Console — list, bento, or spine. Check topics. Write day notes.",
   },
   {
     n: "03",
-    title: "Assist",
+    title: "Get a hand",
     copy: "Optional: Quiz me, generate notes, draft a LinkedIn post — with your own AI key.",
   },
   {
@@ -31,7 +36,7 @@ const CAMPAIGN_STEPS = [
   },
   {
     n: "05",
-    title: "Capture overflow",
+    title: "Catch the overflow",
     copy: "Rabbit holes go to Field Kit — not lost, not cluttering the campaign.",
   },
   {
@@ -68,7 +73,7 @@ export function HomeView({
 }) {
   const [started, setStarted] = useState(false);
   const pickerRef = useRef(null);
-  const hero = useHeroTilt();
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     if (started && pickerRef.current) {
@@ -132,24 +137,15 @@ export function HomeView({
       </header>
 
       {/* 1. Hero */}
-      <section
-        className="landing-hero"
-        aria-labelledby="landing-hero-title"
-        onMouseMove={hero.onMouseMove}
-        onMouseLeave={hero.onMouseLeave}
-      >
-        <motion.div
-          className="landing-hero-mesh"
-          aria-hidden="true"
-          style={{ x: hero.meshX, y: hero.meshY }}
-        />
+      <section className="landing-hero" aria-labelledby="landing-hero-title">
+        <div className="landing-hero-mesh" aria-hidden="true" />
         <div className="landing-hero-copy">
-          <span className="landing-hero-kicker">Briefing · Field ops</span>
+          <span className="landing-hero-kicker">Daily learning journal</span>
           <p className="landing-brand-hero">REFRAINLY</p>
           {hasCampaign ? (
             <>
               <h1 id="landing-hero-title" className="landing-hero-title">
-                Ready for today&apos;s mission?
+                Ready to pick up where you left off?
               </h1>
               <p className="landing-hero-lead">
                 Continue <strong>{summary.name}</strong> — {summary.daysComplete} of{" "}
@@ -167,11 +163,11 @@ export function HomeView({
           ) : (
             <>
               <h1 id="landing-hero-title" className="landing-hero-title">
-                Field Ops for daily learning campaigns
+                Turn any subject into a daily learning habit
               </h1>
               <p className="landing-hero-lead">
-                A <strong>campaign runner</strong> for any subject — day-by-day plans, real memory,
-                and a Field Kit for everything off-plan.
+                A <strong>daily campaign</strong> for any subject — day-by-day plans, real memory,
+                and a Field Kit for every rabbit hole.
               </p>
               <div className="landing-hero-subjects" aria-hidden="true">
                 {["Psychology", "Economics", "History", "Languages", "Music", "Tech"].map((s) => (
@@ -196,23 +192,15 @@ export function HomeView({
         </div>
 
         <div className="landing-hero-viz" aria-hidden="true">
-          <motion.div
-            className="landing-viz-board"
-            style={{
-              rotate: -1.5,
-              rotateX: hero.rotateX,
-              rotateY: hero.rotateY,
-              transformPerspective: 1000,
-            }}
-          >
-            <div className="landing-viz-top" style={{ transform: "translateZ(26px)" }}>
-              <span className="landing-viz-op">OPERATION MINDFIELD</span>
+          <div className="landing-viz-board">
+            <div className="landing-viz-top">
+              <span className="landing-viz-op">MY LEARNING LOG</span>
               <span className="landing-viz-live">
                 <span className="landing-viz-live-dot" />
                 LIVE
               </span>
             </div>
-            <div className="landing-viz-progress" style={{ transform: "translateZ(16px)" }}>
+            <div className="landing-viz-progress">
               <div className="landing-viz-progress-meta">
                 <span>Day 12 / 30</span>
                 <span>40%</span>
@@ -221,7 +209,7 @@ export function HomeView({
                 <span className="landing-viz-bar-fill" />
               </div>
             </div>
-            <ul className="landing-viz-days" style={{ transform: "translateZ(6px)" }}>
+            <ul className="landing-viz-days">
               <li className="landing-viz-day is-done">
                 <span className="landing-viz-day-n">10</span>
                 <span className="landing-viz-day-t">Deliberate practice</span>
@@ -242,44 +230,29 @@ export function HomeView({
                 <span className="landing-viz-day-t">Metacognition</span>
               </li>
             </ul>
-          </motion.div>
+          </div>
           <div className="landing-viz-kit">
             <span className="landing-viz-kit-label">Field Kit</span>
             <motion.div
               className="landing-viz-slip landing-viz-slip-a"
-              style={{ transformPerspective: 700 }}
               initial={{ rotate: 3 }}
-              animate={
-                hero.reduceMotion
-                  ? undefined
-                  : { rotate: [3, 6, 3], y: [0, -6, 0], z: [0, 24, 0] }
-              }
+              animate={reduceMotion ? undefined : { rotate: [3, 6, 3], y: [0, -6, 0] }}
               transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
             >
               Loss aversion ≠ risk aversion
             </motion.div>
             <motion.div
               className="landing-viz-slip landing-viz-slip-b"
-              style={{ transformPerspective: 700 }}
               initial={{ rotate: -4 }}
-              animate={
-                hero.reduceMotion
-                  ? undefined
-                  : { rotate: [-4, -6, -4], x: [0, 4, 0], z: [0, 16, 0] }
-              }
+              animate={reduceMotion ? undefined : { rotate: [-4, -6, -4], x: [0, 4, 0] }}
               transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
             >
               Link · Kahneman ch. 26
             </motion.div>
             <motion.div
               className="landing-viz-slip landing-viz-slip-c"
-              style={{ transformPerspective: 700 }}
               initial={{ rotate: 1.5 }}
-              animate={
-                hero.reduceMotion
-                  ? undefined
-                  : { rotate: [1.5, 3.5, 1.5], y: [0, 4, 0], z: [0, 10, 0] }
-              }
+              animate={reduceMotion ? undefined : { rotate: [1.5, 3.5, 1.5], y: [0, 4, 0] }}
               transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
             >
               Rabbit hole → keep
@@ -314,20 +287,31 @@ export function HomeView({
 
       {/* 2. Problem */}
       <section className="landing-section landing-problem" aria-labelledby="landing-problem-title">
-        <span className="landing-stamp">Problem</span>
+        <span className="landing-stamp">The problem</span>
         <h2 id="landing-problem-title" className="landing-section-title">
-          Most tools dump content or lock you in
+          Most tools dump content on you — or lock you into one path
         </h2>
+        <DoodleUnderline className="landing-section-underline" />
         <ul className="landing-problem-list">
-          <li>Content dumps with no finishable structure — or one rigid course you can&apos;t reshape.</li>
           <li>
-            Checkboxes without memory: nothing resurfaces, so yesterday&apos;s topics evaporate.
+            <DoodleBullet />
+            <span>Content dumps with no finishable structure — or one rigid course you can&apos;t reshape.</span>
           </li>
           <li>
-            No clean split between day notes and rabbit holes — tangents either vanish or clutter
-            the plan.
+            <DoodleBullet />
+            <span>Checkboxes without memory: nothing resurfaces, so yesterday&apos;s topics evaporate.</span>
           </li>
-          <li>AI gated behind a vendor quota before you&apos;ve proven the loop works.</li>
+          <li>
+            <DoodleBullet />
+            <span>
+              No clean split between day notes and rabbit holes — tangents either vanish or clutter
+              the plan.
+            </span>
+          </li>
+          <li>
+            <DoodleBullet />
+            <span>AI gated behind a vendor quota before you&apos;ve proven the loop works.</span>
+          </li>
         </ul>
       </section>
 
@@ -337,29 +321,27 @@ export function HomeView({
         className="landing-section landing-loop"
         aria-labelledby="landing-loop-title"
       >
-        <span className="landing-stamp">Mechanism</span>
+        <span className="landing-stamp">The loop</span>
         <h2 id="landing-loop-title" className="landing-section-title">
           How a campaign runs
         </h2>
+        <DoodleUnderline className="landing-section-underline" />
         <p className="landing-section-lead">Six steps. Skim the headlines — that&apos;s the loop.</p>
         <ol className="landing-loop-grid">
           {CAMPAIGN_STEPS.map((step, i) => (
             <motion.li
               key={step.n}
-              className="landing-loop-step"
-              style={{ transformPerspective: 900 }}
-              initial={{ opacity: 0, rotateX: -35, y: 24 }}
-              whileInView={{ opacity: 1, rotateX: 0, y: 0 }}
+              className="landing-loop-step landing-doodle-card"
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-80px" }}
               transition={{ duration: 0.5, delay: i * 0.06, ease: [0.16, 1, 0.3, 1] }}
             >
-              <TiltCard className="landing-loop-step-inner" maxTilt={6}>
-                <span className="landing-loop-n" aria-hidden="true">
-                  {step.n}
-                </span>
+              <div className="landing-loop-step-inner">
+                <DoodleCircledNumber n={step.n} />
                 <h3 className="landing-loop-title">{step.title}</h3>
                 <p className="landing-loop-copy">{step.copy}</p>
-              </TiltCard>
+              </div>
             </motion.li>
           ))}
         </ol>
@@ -371,18 +353,19 @@ export function HomeView({
         className="landing-section landing-surfaces"
         aria-labelledby="landing-surfaces-title"
       >
-        <span className="landing-stamp">Surfaces</span>
+        <span className="landing-stamp">Two notebooks</span>
         <h2 id="landing-surfaces-title" className="landing-section-title">
-          Two surfaces. One ops deck.
+          Two notebooks. One home base.
         </h2>
+        <DoodleUnderline className="landing-section-underline" />
         <p className="landing-section-lead landing-surfaces-callout">
           <strong>Day notes</strong> live inside a campaign day.{" "}
           <strong>Field Kit notes</strong> are for everything else — talks, tools, tips, and rabbit
           holes that don&apos;t belong to any single day. Same words, different jobs.
         </p>
         <div className="landing-surfaces-grid">
-          <article className="landing-surface landing-surface-deck">
-            <TiltCard className="landing-surface-inner" maxTilt={5}>
+          <article className="landing-surface landing-surface-deck landing-doodle-card">
+            <div className="landing-surface-inner">
               <span className="landing-surface-stamp">Deck</span>
               <h3 className="landing-surface-title">Campaign Deck</h3>
               <p className="landing-surface-copy">
@@ -399,10 +382,10 @@ export function HomeView({
                   Open dashboard
                 </button>
               )}
-            </TiltCard>
+            </div>
           </article>
-          <article className="landing-surface landing-surface-kit">
-            <TiltCard className="landing-surface-inner" maxTilt={5}>
+          <article className="landing-surface landing-surface-kit landing-doodle-card">
+            <div className="landing-surface-inner">
               <span className="landing-surface-stamp">Kit</span>
               <h3 className="landing-surface-title">Field Kit</h3>
               <p className="landing-surface-copy">
@@ -425,7 +408,7 @@ export function HomeView({
                   Open Field Kit
                 </button>
               )}
-            </TiltCard>
+            </div>
           </article>
         </div>
       </section>
@@ -436,10 +419,11 @@ export function HomeView({
         className="landing-section landing-ai"
         aria-labelledby="landing-ai-title"
       >
-        <span className="landing-stamp">AI</span>
+        <span className="landing-stamp">AI, your way</span>
         <h2 id="landing-ai-title" className="landing-section-title">
           Bring your own key. Keep the loop free.
         </h2>
+        <DoodleUnderline className="landing-section-underline" />
         <div className="landing-ai-grid">
           <div className="landing-ai-card landing-ai-card-main">
             <h3 className="landing-ai-card-title">Recruit · bring your own key (live)</h3>
@@ -477,6 +461,7 @@ export function HomeView({
         <h2 id="landing-pricing-title" className="landing-section-title">
           Start free with an account. Upgrade anytime with Stripe.
         </h2>
+        <DoodleUnderline className="landing-section-underline" />
         <p className="landing-section-lead">
           Tier names match XP ranks (Recruit / Operator / Architect). Paid plans check out monthly
           via Stripe — manage invoices and cancel anytime in the billing portal. An account is
@@ -495,14 +480,16 @@ export function HomeView({
                   `landing-price-card-${id}`,
                   isFree && "landing-price-card-free",
                   tier.comingSoon && "landing-price-card-soon",
+                  "landing-doodle-card",
                 )}
               >
+                {isFree && <DoodleStar className="landing-price-star" />}
                 {tier.comingSoon ? (
                   <span className="landing-price-badge">Coming soon</span>
                 ) : (
                   <span className="landing-price-badge landing-price-badge-live">Live</span>
                 )}
-                <TiltCard className="landing-price-card-inner" maxTilt={6}>
+                <div className="landing-price-card-inner">
                   <h3 className="landing-price-rank">{tier.rankLabel}</h3>
                   <div className="landing-price-amount">
                     {isFree ? (
@@ -558,7 +545,7 @@ export function HomeView({
                   {isFree && (
                     <p className="landing-price-fine">Free forever on Recruit · no card for signup</p>
                   )}
-                </TiltCard>
+                </div>
               </article>
             );
           })}
@@ -578,26 +565,27 @@ export function HomeView({
         className="landing-section landing-trust"
         aria-labelledby="landing-trust-title"
       >
-        <span className="landing-stamp">Trust</span>
+        <span className="landing-stamp">The fine print</span>
         <h2 id="landing-trust-title" className="landing-section-title">
           Your data, spelled out
         </h2>
+        <DoodleUnderline className="landing-section-underline" />
         <div className="landing-trust-grid">
-          <article className="landing-trust-card">
+          <article className="landing-trust-card landing-doodle-card">
             <h3>Account required</h3>
             <p>
               Sign up to run campaigns and Field Kit. Your plans, progress, notes, review state,
               learned slips, and bookmarks belong to your account.
             </p>
           </article>
-          <article className="landing-trust-card">
+          <article className="landing-trust-card landing-doodle-card">
             <h3>Cloud sync</h3>
             <p>
               Signed-in sessions sync the full snapshot across devices — so a long campaign can
               follow you from laptop to phone without starting over.
             </p>
           </article>
-          <article className="landing-trust-card">
+          <article className="landing-trust-card landing-doodle-card">
             <h3>Export · import</h3>
             <p>
               Export markdown notes, a full backup, or a plan-only share file. Import supports{" "}
@@ -610,27 +598,43 @@ export function HomeView({
 
       {/* 8. Audience */}
       <section className="landing-section landing-audience" aria-labelledby="landing-audience-title">
-        <span className="landing-stamp">Fit</span>
+        <span className="landing-stamp">Who it&apos;s for</span>
         <h2 id="landing-audience-title" className="landing-section-title">
           Who it&apos;s for
         </h2>
+        <DoodleUnderline className="landing-section-underline" />
         <div className="landing-audience-grid">
           <div className="landing-audience-for">
             <h3 className="landing-audience-label">For</h3>
             <ul>
               <li>
-                Anyone running a serious self-study arc — psychology, economics, history,
-                languages, arts, sciences, trades, tech, or something you invent yourself
+                <DoodleBullet />
+                <span>
+                  Anyone running a serious self-study arc — psychology, economics, history,
+                  languages, arts, sciences, trades, tech, or something you invent yourself
+                </span>
               </li>
-              <li>People who want structure + recall + a place for messy off-plan learning</li>
+              <li>
+                <DoodleBullet />
+                <span>People who want structure + recall + a place for messy off-plan learning</span>
+              </li>
             </ul>
           </div>
           <div className="landing-audience-not">
             <h3 className="landing-audience-label">Not for</h3>
             <ul>
-              <li>Not a Coursera-style course platform — you build (or generate) the curriculum</li>
-              <li>Not a Notion template</li>
-              <li>Not a generic habit tracker</li>
+              <li>
+                <DoodleBullet className="landing-li-bullet-not" />
+                <span>Not a Coursera-style course platform — you build (or generate) the curriculum</span>
+              </li>
+              <li>
+                <DoodleBullet className="landing-li-bullet-not" />
+                <span>Not a Notion template</span>
+              </li>
+              <li>
+                <DoodleBullet className="landing-li-bullet-not" />
+                <span>Not a generic habit tracker</span>
+              </li>
             </ul>
           </div>
         </div>
@@ -676,12 +680,13 @@ export function HomeView({
       {/* 10. Final CTA */}
       {!hasCampaign && (
         <section className="landing-band" aria-labelledby="landing-final-title">
+          <DoodleArrow className="landing-band-arrow" direction="down" />
           <div className="landing-band-copy">
             <h2 id="landing-final-title" className="landing-band-title">
               Run the campaign. Keep the rabbit holes.
             </h2>
             <p className="landing-band-lead">
-              Create a free account — then pick a plan and open Field Ops.
+              Create a free account — then pick a plan and start day one.
             </p>
           </div>
           <button type="button" className="landing-cta landing-cta-band" onClick={startAccount}>
@@ -695,7 +700,7 @@ export function HomeView({
         <div className="landing-footer-brand">
           <span>REFRAINLY</span>
           <span className="landing-footer-dot" aria-hidden="true" />
-          <span>Field Ops · progress saves automatically</span>
+          <span>Progress saves automatically</span>
         </div>
         <nav className="landing-footer-nav" aria-label="Footer">
           <button type="button" className="landing-footer-link" onClick={() => scrollToId("pricing")}>
