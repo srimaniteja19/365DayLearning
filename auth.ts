@@ -1,8 +1,10 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { getDb, hasDatabase } from "@/lib/db/client";
+import { findOrCreateOAuthUser } from "@/lib/db/users";
 import { users } from "@/lib/db/schema";
 import { isRateLimited } from "@/lib/httpGuard";
 
@@ -17,11 +19,25 @@ function loginRateKey(request: Request | undefined, email: string): string {
   return `login:${ip}:${email || "*"}`;
 }
 
+const googleConfigured = Boolean(
+  process.env.AUTH_GOOGLE_ID?.trim() && process.env.AUTH_GOOGLE_SECRET?.trim(),
+);
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
   pages: { signIn: "/" },
   trustHost: true,
   providers: [
+    ...(googleConfigured
+      ? [
+          Google({
+            clientId: process.env.AUTH_GOOGLE_ID!,
+            clientSecret: process.env.AUTH_GOOGLE_SECRET!,
+            // Same email as a password account → one Refrainly user (Neon + Stripe).
+            allowDangerousEmailAccountLinking: true,
+          }),
+        ]
+      : []),
     Credentials({
       credentials: {
         email: { label: "Email" },
@@ -39,7 +55,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const db = getDb();
         const [row] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-        if (!row) return null;
+        if (!row?.passwordHash) return null;
 
         const ok = await bcrypt.compare(password, row.passwordHash);
         if (!ok) return null;
@@ -49,6 +65,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
+    signIn: async ({ user, account }) => {
+      if (account?.provider !== "google") return true;
+      if (!hasDatabase()) return false;
+      const email = typeof user.email === "string" ? user.email : "";
+      const row = await findOrCreateOAuthUser({
+        email,
+        name: typeof user.name === "string" ? user.name : null,
+      });
+      if (!row) return false;
+      user.id = row.id;
+      user.email = row.email;
+      user.name = row.name || user.name;
+      return true;
+    },
     jwt: async ({ token, user }) => {
       if (user?.id) token.id = user.id;
       return token;

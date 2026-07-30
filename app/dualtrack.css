@@ -8494,6 +8494,20 @@ select.settings-input { cursor: pointer; }
 .account-btn-plans:hover {
   background: color-mix(in srgb, var(--account-blue) 88%, black);
 }
+.account-btn-google {
+  width: 100%;
+  margin-bottom: 4px;
+  background: var(--account-panel);
+  color: var(--account-ink);
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+}
+.account-btn-google:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--account-blue) 10%, var(--account-panel));
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 color-mix(in srgb, var(--account-ink) 24%, transparent);
+}
 .account-or {
   display: flex;
   align-items: center;

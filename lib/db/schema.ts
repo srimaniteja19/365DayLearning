@@ -13,7 +13,8 @@ import { pgTable, text, timestamp, jsonb, uuid, integer } from "drizzle-orm/pg-c
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
+  /** Null for Google-only accounts; set for email/password sign-up. */
+  passwordHash: text("password_hash"),
   name: text("name"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   subscriptionTier: text("subscription_tier").notNull().default("free"),

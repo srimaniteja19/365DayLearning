@@ -31,13 +31,17 @@ per account so it follows you across devices.
    npx auth secret
    ```
    This writes `AUTH_SECRET` to `.env.local` (add it to your Vercel env vars too).
-3. **Create the tables** (Drizzle ORM manages the schema in `lib/db/schema.ts`):
+3. **(Optional) Google sign-in** — create an OAuth Web client in Google Cloud Console. Add
+   redirect URI `{AUTH_URL}/api/auth/callback/google` (e.g. `http://localhost:3000/...` and
+   `https://refrainly.dev/...`). Set `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and production
+   `AUTH_URL` in `.env.local` / Vercel. Same email as a password account links to that user.
+4. **Create the tables** (Drizzle ORM manages the schema in `lib/db/schema.ts`):
    ```bash
    npm run db:push
    ```
-4. Run the app — create an account or sign in from the landing page or top bar. On sign-in the
-   app pulls your cloud snapshot (or starts empty and seeds Neon on first save), then pushes on
-   every change. Any leftover pre-Neon browser caches are cleared after a successful pull.
+5. Run the app — create an account, use Google, or sign in from the landing page or top bar. On
+   sign-in the app pulls your cloud snapshot (or starts empty and seeds Neon on first save), then
+   pushes on every change. Any leftover pre-Neon browser caches are cleared after a successful pull.
 
 Without `DATABASE_URL`/`AUTH_SECRET` set, sign-in/sign-up calls fail gracefully (503) — auth must
 be configured for the app to be usable beyond the landing page.
