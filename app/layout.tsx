@@ -10,6 +10,7 @@ import {
   Kalnia,
   Host_Grotesk,
   Red_Hat_Mono,
+  Delius_Swash_Caps,
 } from "next/font/google";
 import "./globals.css";
 import "./dualtrack.css";
@@ -85,6 +86,13 @@ const redmono = Red_Hat_Mono({
   display: "swap",
 });
 
+const delius = Delius_Swash_Caps({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-delius",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "Refrainly | Field Ops Learning Campaigns",
   description:
@@ -133,6 +141,7 @@ const fontVars = [
   kalnia.variable,
   host.variable,
   redmono.variable,
+  delius.variable,
 ].join(" ");
 
 export default function RootLayout({

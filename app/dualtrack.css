@@ -4012,50 +4012,75 @@
 
 /* ---------- landing page (fixed Briefing skin — not user theme) ---------- */
 .landing {
-  --landing-blue: #2554f2;
-  --landing-pink: #ff4d6a;
-  --landing-ink: #0b1220;
-  --landing-paper: #d5dee8;
-  --landing-panel: #f4f7fb;
-  --landing-muted: #3d4a5c;
-  --landing-on: #ffffff;
-  --landing-mint: #5cff9a;
-  --landing-flare: #ffe566;
-  --landing-steel: #9aabbd;
+  --landing-ink: #263d5b;        /* doodle secondary — headings, body text, primary CTA bg (11:1 white text) */
+  --landing-blue: #49b6e5;       /* doodle primary — fills/badges (pair with --landing-ink text, not white: 2.3:1 fails AA) */
+  --landing-blue-deep: #1b7fa8;  /* AA-safe blue (4.5:1 on white) — links, borders, focus rings, small blue text */
+  --landing-pink: #e8578b;       /* doodle highlighter accent — underlines/squiggles/stars (decorative, aria-hidden only) */
+  --landing-paper: #fdf6ec;      /* warm paper page background */
+  --landing-panel: #ffffff;      /* card surface */
+  --landing-muted: #4b5a72;      /* secondary/body text on white (7:1) */
+  --landing-on: #ffffff;         /* text-on-dark */
+  --landing-mint: #15803d;       /* success — Live badges, white text (5:1) */
+  --landing-flare: #b45309;      /* warning — Coming soon / NOW badges, white text (5:1) */
+  --landing-steel: #c9d4e0;      /* neutral borders/dividers (decorative, non-text) */
+  --landing-radius: 20px;
+  --landing-radius-sm: 12px;
   --landing-gap: 52px;
   position: relative;
   z-index: 2;
   max-width: 1180px;
   margin: 0 auto;
   padding: 0 28px 80px;
-  font-family: var(--font-archivo), var(--font-space), sans-serif;
+  font-family: var(--font-archivo), sans-serif;
   color: var(--landing-ink);
 }
 
+/* Doodle display font — headings, labels, and buttons only; body/paragraph text stays Archivo for AA readability. */
+.landing-brand-text,
+.landing-hero-kicker,
+.landing-brand-hero,
+.landing-hero-title,
+.landing-section-title,
+.landing-loop-title,
+.landing-surface-title,
+.landing-price-rank,
+.landing-picker-title,
+.landing-band-title,
+.landing-stamp,
+.landing-surface-stamp,
+.landing-cta,
+.landing-cta-ghost,
+.landing-surface-cta,
+.landing-price-cta,
+.landing-picker-custom,
+.landing-cta-band,
+.landing-plan-btn,
+.landing-nav-link,
+.landing-nav-cta,
+.landing-footer-link,
+.landing-plan-name,
+.landing-viz-op,
+.landing-price-badge,
+.landing-audience-label {
+  font-family: var(--font-delius), cursive;
+}
+
 .landing-root {
-  --bg: #d5dee8 !important;
-  --bg-panel: #f4f7fb !important;
-  --text: #0b1220 !important;
-  --text-dim: #3d4a5c !important;
-  --accent-main: #2554f2 !important;
-  --accent-sprint: #ff4d6a !important;
-  --accent: #2554f2 !important;
+  --bg: var(--landing-paper) !important;
+  --bg-panel: var(--landing-panel) !important;
+  --text: var(--landing-ink) !important;
+  --text-dim: var(--landing-muted) !important;
+  --accent-main: var(--landing-blue-deep) !important;
+  --accent-sprint: var(--landing-pink) !important;
+  --accent: var(--landing-blue-deep) !important;
   --on-accent: #ffffff !important;
-  --r-card: 0px !important;
-  --r-ctl: 0px !important;
-  --r-pill: 0px !important;
+  --r-card: 18px !important;
+  --r-ctl: 999px !important;
+  --r-pill: 999px !important;
   background:
-    radial-gradient(900px 520px at 92% -8%, rgba(37, 84, 242, 0.22), transparent 58%),
-    radial-gradient(700px 420px at -6% 18%, rgba(255, 77, 106, 0.14), transparent 55%),
-    radial-gradient(600px 380px at 48% 100%, rgba(92, 255, 154, 0.12), transparent 50%),
-    repeating-linear-gradient(
-      -14deg,
-      transparent,
-      transparent 17px,
-      rgba(11, 18, 32, 0.035) 17px,
-      rgba(11, 18, 32, 0.035) 18px
-    ),
-    linear-gradient(180deg, #cfd9e4 0%, #d5dee8 38%, #c8d3df 100%) !important;
+    radial-gradient(900px 520px at 92% -8%, color-mix(in srgb, var(--landing-blue) 16%, transparent), transparent 58%),
+    radial-gradient(700px 420px at -6% 18%, color-mix(in srgb, var(--landing-pink) 12%, transparent), transparent 55%),
+    var(--landing-paper) !important;
   position: relative;
   isolation: isolate;
 }
@@ -4065,29 +4090,79 @@
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.45;
-  background-image:
-    linear-gradient(rgba(11, 18, 32, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(11, 18, 32, 0.03) 1px, transparent 1px);
-  background-size: 28px 28px;
-  mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, #000 20%, transparent 75%);
+  opacity: 0.55;
+  background-image: repeating-linear-gradient(
+    180deg,
+    transparent,
+    transparent 27px,
+    rgba(38, 61, 91, 0.07) 27px,
+    rgba(38, 61, 91, 0.07) 28px
+  );
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, #000 20%, transparent 78%);
 }
-.landing-root::after {
-  content: "BRIEFING";
-  position: fixed;
-  right: -2vw;
-  bottom: 6vh;
-  z-index: 0;
-  pointer-events: none;
-  font-family: var(--font-archivo), sans-serif;
-  font-weight: 800;
-  font-size: clamp(64px, 18vw, 200px);
-  letter-spacing: -0.06em;
-  line-height: 0.8;
-  color: transparent;
-  -webkit-text-stroke: 1.5px rgba(11, 18, 32, 0.07);
-  transform: rotate(-8deg);
-  user-select: none;
+
+/* Shared hover-lift for "sticky note" cards. Pure CSS — no JS, no pointer tracking. */
+.landing-doodle-card {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.landing-doodle-card:hover {
+  transform: rotate(0deg) translateY(-4px);
+  box-shadow: 0 16px 26px -10px color-mix(in srgb, var(--landing-ink) 32%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-doodle-card,
+  .landing-doodle-card:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+.doodle-underline {
+  display: block;
+  width: 100px;
+  height: 10px;
+  color: var(--landing-pink);
+  overflow: visible;
+}
+.landing-section-underline {
+  margin: -6px 0 14px;
+}
+.doodle-arrow {
+  display: inline-block;
+  color: var(--landing-blue-deep);
+  flex-shrink: 0;
+}
+.doodle-star {
+  display: inline-block;
+  color: var(--landing-flare);
+}
+.doodle-bullet {
+  display: inline-block;
+  color: var(--landing-blue-deep);
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.landing-li-bullet-not {
+  color: var(--landing-muted);
+}
+.doodle-circled-number {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: var(--landing-blue-deep);
+}
+.doodle-circled-number svg {
+  position: absolute;
+  inset: 0;
+}
+.doodle-circled-number-val {
+  position: relative;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--landing-ink);
 }
 
 .landing-nav {
