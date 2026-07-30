@@ -94,9 +94,9 @@ const delius = Delius_Swash_Caps({
 });
 
 export const metadata: Metadata = {
-  title: "Refrainly | Field Ops Learning Campaigns",
+  title: "Refrainly | Daily learning campaigns for any subject",
   description:
-    "Refrainly is a Field Ops learning console for multi-plan daily campaigns in any subject — psychology, economics, history, languages, tech, and more. Day-by-day plans, spaced repetition, Field Kit, and bring-your-own-key AI. Create a free account to start.",
+    "Refrainly is a daily learning campaign runner for any subject — psychology, economics, history, languages, tech, and more. Day-by-day plans, spaced repetition, Field Kit, and bring-your-own-key AI. Create a free account to start.",
   applicationName: "Refrainly",
   keywords: [
     "learning campaigns",

@@ -4059,7 +4059,6 @@
 .landing-nav-cta,
 .landing-footer-link,
 .landing-plan-name,
-.landing-viz-op,
 .landing-price-badge,
 .landing-audience-label {
   font-family: var(--font-delius), cursive;
@@ -4847,7 +4846,6 @@
   top: -14px;
   right: 120px;
   color: var(--landing-blue-deep);
-  transform: rotate(35deg);
 }
 .landing-band-title {
   margin: 0 0 6px;
@@ -5434,6 +5432,11 @@ a.landing-footer-link {
   background: color-mix(in srgb, var(--landing-mint) 20%, var(--landing-panel));
 }
 .landing-price-card-soon { opacity: 0.92; }
+.landing-price-star {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+}
 .landing-price-badge {
   position: absolute;
   top: 10px;
