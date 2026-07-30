@@ -44,14 +44,15 @@ export const OPENROUTER_CURATED_MODELS: readonly CuratedModelMeta[] = [
   // Mid-tier
   { id: "nvidia/nemotron-3-ultra-550b-a55b", costBand: "mid", inputPerM: 0.5, outputPerM: 2.5, tags: ["Mid-tier", "NVIDIA", "1M ctx"], sortOrder: 18 },
   { id: "z-ai/glm-5.2", costBand: "mid", inputPerM: 0.45, outputPerM: 3.31, tags: ["Mid-tier", "Z.ai", "Open-weight IQ"], sortOrder: 19 },
-  { id: "x-ai/grok-4.5", costBand: "mid", inputPerM: 2, outputPerM: 6, tags: ["Mid-tier", "xAI", "Cheapest frontier"], sortOrder: 20 },
-  { id: "google/gemini-3.6-flash", costBand: "mid", inputPerM: 1.5, outputPerM: 7.5, tags: ["Mid-tier", "Google", "Coding"], sortOrder: 21 },
-  { id: "google/gemini-3.5-flash", costBand: "mid", inputPerM: 1.5, outputPerM: 9, tags: ["Mid-tier", "Google"], sortOrder: 22 },
-  { id: "google/gemini-3.1-pro-preview", costBand: "mid", inputPerM: 2, outputPerM: 12, tags: ["Mid-tier", "Google", "Long-ctx pricing"], sortOrder: 23 },
+  { id: "thinkingmachines/inkling", costBand: "mid", inputPerM: 1, outputPerM: 4.05, tags: ["Mid-tier", "Thinking Machines", "Multimodal", "MoE", "Reasoning"], sortOrder: 20 },
+  { id: "x-ai/grok-4.5", costBand: "mid", inputPerM: 2, outputPerM: 6, tags: ["Mid-tier", "xAI", "Cheapest frontier"], sortOrder: 21 },
+  { id: "google/gemini-3.6-flash", costBand: "mid", inputPerM: 1.5, outputPerM: 7.5, tags: ["Mid-tier", "Google", "Coding"], sortOrder: 22 },
+  { id: "google/gemini-3.5-flash", costBand: "mid", inputPerM: 1.5, outputPerM: 9, tags: ["Mid-tier", "Google"], sortOrder: 23 },
+  { id: "google/gemini-3.1-pro-preview", costBand: "mid", inputPerM: 2, outputPerM: 12, tags: ["Mid-tier", "Google", "Long-ctx pricing"], sortOrder: 24 },
   // Frontier
-  { id: "moonshotai/kimi-k3", costBand: "frontier", inputPerM: 3, outputPerM: 15, tags: ["Frontier", "Moonshot", "Cache-friendly"], sortOrder: 24 },
-  { id: "anthropic/claude-opus-4.8", costBand: "frontier", inputPerM: 5, outputPerM: 25, tags: ["Frontier", "Anthropic", "Top intelligence"], sortOrder: 25 },
-  { id: "openai/gpt-5.6-sol", costBand: "frontier", inputPerM: 5, outputPerM: 30, tags: ["Frontier", "OpenAI", "Costliest"], sortOrder: 26 },
+  { id: "moonshotai/kimi-k3", costBand: "frontier", inputPerM: 3, outputPerM: 15, tags: ["Frontier", "Moonshot", "Cache-friendly"], sortOrder: 25 },
+  { id: "anthropic/claude-opus-4.8", costBand: "frontier", inputPerM: 5, outputPerM: 25, tags: ["Frontier", "Anthropic", "Top intelligence"], sortOrder: 26 },
+  { id: "openai/gpt-5.6-sol", costBand: "frontier", inputPerM: 5, outputPerM: 30, tags: ["Frontier", "OpenAI", "Costliest"], sortOrder: 27 },
 ];
 
 const META_BY_ID = Object.fromEntries(
