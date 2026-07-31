@@ -283,11 +283,15 @@ export function TopBar({
   const opsRef = useRef(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
-  const closeOps = useCallback(() => {
-    setOpsOpen(false);
+  const resetConfirm = useCallback(() => {
     setConfirmReset(false);
     setDeleteConfirmText("");
   }, [setConfirmReset]);
+
+  const closeOps = useCallback(() => {
+    setOpsOpen(false);
+    resetConfirm();
+  }, [resetConfirm]);
 
   useEffect(() => {
     if (!opsOpen) return;
@@ -306,9 +310,7 @@ export function TopBar({
   }, [opsOpen, closeOps]);
 
   const go = (fn) => () => {
-    setOpsOpen(false);
-    setConfirmReset(false);
-    setDeleteConfirmText("");
+    closeOps();
     fn?.();
   };
 
@@ -418,7 +420,7 @@ export function TopBar({
                 type="button"
                 className="topbar-ops-scrim"
                 aria-label="Close ops menu"
-                onClick={() => setOpsOpen(false)}
+                onClick={closeOps}
               />
             )}
             <button
@@ -426,7 +428,7 @@ export function TopBar({
               className={classNames("topbar-ops-trigger", opsOpen && "is-on")}
               aria-expanded={opsOpen}
               aria-controls="topbar-ops-panel"
-              onClick={() => setOpsOpen((v) => !v)}
+              onClick={() => (opsOpen ? closeOps() : setOpsOpen(true))}
             >
               {opsOpen ? <Icon.X size={16} /> : <Icon.Menu size={16} />}
               <span className="topbar-ops-trigger-label">Ops</span>
@@ -523,7 +525,7 @@ export function TopBar({
                   <div className="topbar-ops-label">Danger</div>
                   {confirmReset ? (
                     <div className="topbar-ops-confirm">
-                      <p className="topbar-ops-confirm-warning">
+                      <p id="topbar-ops-delete-warning" className="topbar-ops-confirm-warning">
                         This permanently deletes your progress, notes, references, and study
                         history — synced across every device on this account. This can&apos;t be
                         undone.
@@ -535,6 +537,7 @@ export function TopBar({
                         type="text"
                         className="topbar-ops-confirm-input"
                         aria-labelledby="topbar-ops-delete-hint"
+                        aria-describedby="topbar-ops-delete-warning"
                         value={deleteConfirmText}
                         onChange={(e) => setDeleteConfirmText(e.target.value)}
                         placeholder="DELETE"
@@ -553,10 +556,7 @@ export function TopBar({
                         <button
                           type="button"
                           className="topbar-ops-confirm-no"
-                          onClick={() => {
-                            setConfirmReset(false);
-                            setDeleteConfirmText("");
-                          }}
+                          onClick={resetConfirm}
                         >
                           Cancel
                         </button>
