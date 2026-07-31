@@ -281,14 +281,21 @@ export function TopBar({
   const pct = stats.need ? Math.min(100, Math.round((stats.into / stats.need) * 100)) : 0;
   const [opsOpen, setOpsOpen] = useState(false);
   const opsRef = useRef(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+
+  const closeOps = useCallback(() => {
+    setOpsOpen(false);
+    setConfirmReset(false);
+    setDeleteConfirmText("");
+  }, [setConfirmReset]);
 
   useEffect(() => {
     if (!opsOpen) return;
     const onKey = (e) => {
-      if (e.key === "Escape") setOpsOpen(false);
+      if (e.key === "Escape") closeOps();
     };
     const onPointer = (e) => {
-      if (opsRef.current && !opsRef.current.contains(e.target)) setOpsOpen(false);
+      if (opsRef.current && !opsRef.current.contains(e.target)) closeOps();
     };
     document.addEventListener("keydown", onKey);
     document.addEventListener("pointerdown", onPointer);
@@ -296,11 +303,12 @@ export function TopBar({
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("pointerdown", onPointer);
     };
-  }, [opsOpen]);
+  }, [opsOpen, closeOps]);
 
   const go = (fn) => () => {
     setOpsOpen(false);
     setConfirmReset(false);
+    setDeleteConfirmText("");
     fn?.();
   };
 
@@ -515,13 +523,44 @@ export function TopBar({
                   <div className="topbar-ops-label">Danger</div>
                   {confirmReset ? (
                     <div className="topbar-ops-confirm">
-                      <span>Erase all local data?</span>
-                      <button type="button" className="topbar-ops-confirm-yes" onClick={go(onReset)}>
-                        Erase
-                      </button>
-                      <button type="button" className="topbar-ops-confirm-no" onClick={() => setConfirmReset(false)}>
-                        Keep
-                      </button>
+                      <p className="topbar-ops-confirm-warning">
+                        This permanently deletes your progress, notes, references, and study
+                        history — synced across every device on this account. This can&apos;t be
+                        undone.
+                      </p>
+                      <span id="topbar-ops-delete-hint" className="topbar-ops-confirm-hint">
+                        Type DELETE to confirm
+                      </span>
+                      <input
+                        type="text"
+                        className="topbar-ops-confirm-input"
+                        aria-labelledby="topbar-ops-delete-hint"
+                        value={deleteConfirmText}
+                        onChange={(e) => setDeleteConfirmText(e.target.value)}
+                        placeholder="DELETE"
+                        autoFocus
+                        autoComplete="off"
+                      />
+                      <div className="topbar-ops-confirm-actions">
+                        <button
+                          type="button"
+                          className="topbar-ops-confirm-yes"
+                          disabled={deleteConfirmText.trim().toUpperCase() !== "DELETE"}
+                          onClick={go(onReset)}
+                        >
+                          Delete
+                        </button>
+                        <button
+                          type="button"
+                          className="topbar-ops-confirm-no"
+                          onClick={() => {
+                            setConfirmReset(false);
+                            setDeleteConfirmText("");
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <button
@@ -531,7 +570,7 @@ export function TopBar({
                       onClick={() => setConfirmReset(true)}
                     >
                       <Icon.Rotate size={14} />
-                      <span>Reset device data</span>
+                      <span>Delete all my data</span>
                     </button>
                   )}
                 </div>
