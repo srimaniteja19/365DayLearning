@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Cross-origin requests are not allowed." }, { status: 403 });
   }
 
-  if (isRateLimited(`signup:${clientIp(req)}`, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS)) {
+  if (await isRateLimited(`signup:${clientIp(req)}`, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS)) {
     return NextResponse.json(
       { error: "Too many signup attempts. Try again in a minute." },
       { status: 429, headers: { "Retry-After": "60" } },

@@ -16,7 +16,11 @@ function loginRateKey(request: Request | undefined, email: string): string {
   const ip = forwarded
     ? forwarded.split(",")[0].trim()
     : request?.headers?.get("x-real-ip") || "unknown";
-  return `login:${ip}:${email || "*"}`;
+  // Cap the attacker-controlled email portion so it can't be used to mint
+  // unbounded distinct Redis keys against the operator's Upstash store.
+  // 254 is the practical email length limit per RFC 5321.
+  const boundedEmail = email.slice(0, 254);
+  return `login:${ip}:${boundedEmail || "*"}`;
 }
 
 const googleConfigured = Boolean(
@@ -49,7 +53,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const password = typeof raw?.password === "string" ? raw.password : "";
         if (!email || !password) return null;
 
-        if (isRateLimited(loginRateKey(request, email), LOGIN_RATE_MAX, LOGIN_RATE_WINDOW_MS)) {
+        if (await isRateLimited(loginRateKey(request, email), LOGIN_RATE_MAX, LOGIN_RATE_WINDOW_MS)) {
           return null;
         }
 
