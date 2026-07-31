@@ -208,6 +208,14 @@ export type PersistedState = {
 /** Current multi-plan schema. */
 export const SCHEMA_VERSION = 3;
 
+/**
+ * Hard cap on a serialized AppSnapshot PUT body (app/api/state/route.ts) —
+ * shared with the client so the size-warning threshold in
+ * DualTrackConsole.tsx's flushCloudSnapshot can never drift from the
+ * server's actual limit.
+ */
+export const MAX_SNAPSHOT_CHARS = 5_000_000;
+
 export const BUILTIN_365_ID = "builtin-365";
 export const BUILTIN_45_ID = "builtin-45";
 export const BUILTIN_30_MIND_ID = "builtin-30-mind";

@@ -12,12 +12,7 @@ import {
 import { sanitizeAppSnapshot } from "@/lib/exportImport";
 import { isSameOrigin } from "@/lib/httpGuard";
 import { logError } from "@/lib/logError";
-import { SCHEMA_VERSION, type AppSnapshot } from "@/lib/types";
-
-// A serialized AppSnapshot (plans + progress + notes + srs + learned journal
-// etc.) for a very active user is still well under this — this cap just
-// guards against pathological payloads.
-const MAX_SNAPSHOT_CHARS = 5_000_000;
+import { MAX_SNAPSHOT_CHARS, SCHEMA_VERSION, type AppSnapshot } from "@/lib/types";
 
 function toIso(value: Date | string | null | undefined): string | null {
   if (!value) return null;

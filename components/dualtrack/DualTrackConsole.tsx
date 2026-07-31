@@ -46,6 +46,7 @@ import { exportAll, serializeExport } from "@/lib/exportImport";
 import { downloadText } from "@/lib/fileIo";
 import {
   BUILTIN_365_ID,
+  MAX_SNAPSHOT_CHARS,
   SCHEMA_VERSION,
 } from "@/lib/types";
 import { hydrateCredentialsFromStorage } from "@/lib/providers/credentials";
@@ -145,6 +146,7 @@ export default function DualTrackConsole() {
   const hydrateGen = useRef(0);
   /** Last server `updatedAt` we pulled/pushed — used for conflict detection. */
   const cloudBaseUpdatedAt = useRef(null);
+  const warnedSnapshotSizeRef = useRef(false);
   /** Page restored from sessionStorage on mount, if any — read by the cloud hydrate effect below. */
   const restoredPageRef = useRef(null);
   const { data: session, status: sessionStatus } = useSession();
@@ -613,6 +615,7 @@ export default function DualTrackConsole() {
     if (!cloudUserId) {
       resetWorkspace();
       cloudBaseUpdatedAt.current = null;
+      warnedSnapshotSizeRef.current = false;
       setSaveStatus("off");
       return;
     }
@@ -622,6 +625,7 @@ export default function DualTrackConsole() {
       setSaveStatus("loading");
       resetWorkspace();
       cloudBaseUpdatedAt.current = null;
+      warnedSnapshotSizeRef.current = false;
       const result = await pullCloudSnapshot();
       if (cancelled || gen !== hydrateGen.current) return;
       if (result.ok && result.snapshot) {
@@ -665,6 +669,14 @@ export default function DualTrackConsole() {
         ...localSnapshot,
         userdata: { ...localSnapshot.userdata, log: [], learned: {}, bookmarks: [] },
       };
+      const payloadSize = JSON.stringify(syncPayload).length;
+      if (payloadSize >= MAX_SNAPSHOT_CHARS * 0.6 && !warnedSnapshotSizeRef.current) {
+        warnedSnapshotSizeRef.current = true;
+        fireToast(
+          "Your account data is getting large — export a backup or trim old notes soon.",
+          "warn",
+        );
+      }
       const result = await pushCloudSnapshot(
         syncPayload,
         cloudBaseUpdatedAt.current,
