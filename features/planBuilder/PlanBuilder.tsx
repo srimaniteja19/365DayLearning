@@ -133,7 +133,7 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
     abortRef.current = ac;
     const current = draftRef.current;
     try {
-      const plan = await generatePlan({
+      const { plan, telemetry, totalPeriods, failedPeriods, placeholderDays } = await generatePlan({
         draft: current,
         signal: ac.signal,
         resume:
@@ -154,6 +154,18 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
       setRunning(false);
       setEditablePlan(sanitizePlanDays(plan));
       setStep(4);
+      fetch("/api/telemetry/generation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          totalDays: plan.totalDays,
+          placeholderDays,
+          totalPeriods,
+          failedPeriods,
+          repairCalls: telemetry.repairCalls,
+          modelOutcomes: telemetry.modelOutcomes,
+        }),
+      }).catch(() => {});
     } catch (err) {
       setRunning(false);
       if (err instanceof DOMException && err.name === "AbortError") {
