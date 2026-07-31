@@ -655,8 +655,18 @@ export default function DualTrackConsole() {
     async (opts) => {
       if (!cloudReady || !cloudUserId) return false;
       const localSnapshot = buildSnapshot();
+      // log/learned/bookmarks are synced via their own per-record
+      // endpoints now (see handleToggleTopic/addLearned/addBookmark
+      // etc. below) — emptied here (not omitted) so AppSnapshot's type
+      // stays unchanged everywhere, including localSnapshot itself,
+      // which the conflict-recovery-stash export below still uses in
+      // full.
+      const syncPayload = {
+        ...localSnapshot,
+        userdata: { ...localSnapshot.userdata, log: [], learned: {}, bookmarks: [] },
+      };
       const result = await pushCloudSnapshot(
-        localSnapshot,
+        syncPayload,
         cloudBaseUpdatedAt.current,
         opts,
       );
@@ -789,7 +799,14 @@ export default function DualTrackConsole() {
       const list = prev[date] || [];
       return { ...prev, [date]: [item, ...list] };
     });
-  }, []);
+    if (cloudUserId) {
+      fetch("/api/learned", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dateKey: date, item }),
+      }).catch(() => {});
+    }
+  }, [cloudUserId]);
 
   const updateLearned = useCallback((fromDate, item, toDate) => {
     const dest = toDate && /^\d{4}-\d{2}-\d{2}$/.test(toDate) ? toDate : fromDate;
@@ -809,7 +826,14 @@ export default function DualTrackConsole() {
       next[dest] = [item, ...destList];
       return next;
     });
-  }, []);
+    if (cloudUserId) {
+      fetch("/api/learned", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dateKey: dest, item }),
+      }).catch(() => {});
+    }
+  }, [cloudUserId]);
 
   const removeLearned = useCallback((date, id) => {
     setLearned((prev) => {
@@ -819,19 +843,39 @@ export default function DualTrackConsole() {
       else delete next[date];
       return next;
     });
-  }, []);
+    if (cloudUserId) {
+      fetch(`/api/learned?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
+    }
+  }, [cloudUserId]);
 
   const addBookmark = useCallback((item) => {
     setBookmarks((prev) => [item, ...(prev || [])]);
-  }, []);
+    if (cloudUserId) {
+      fetch("/api/bookmarks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item }),
+      }).catch(() => {});
+    }
+  }, [cloudUserId]);
 
   const updateBookmark = useCallback((item) => {
     setBookmarks((prev) => (prev || []).map((x) => (x.id === item.id ? item : x)));
-  }, []);
+    if (cloudUserId) {
+      fetch("/api/bookmarks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item }),
+      }).catch(() => {});
+    }
+  }, [cloudUserId]);
 
   const removeBookmark = useCallback((id) => {
     setBookmarks((prev) => (prev || []).filter((x) => x.id !== id));
-  }, []);
+    if (cloudUserId) {
+      fetch(`/api/bookmarks?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
+    }
+  }, [cloudUserId]);
 
   const pinBookmarkFromUrl = useCallback(
     async (url, meta = {}) => {
@@ -913,6 +957,9 @@ export default function DualTrackConsole() {
     setLearned({});
     setBookmarks([]);
     if (cloudUserId) {
+      void fetch("/api/log?all=true", { method: "DELETE" }).catch(() => {});
+      void fetch("/api/learned?all=true", { method: "DELETE" }).catch(() => {});
+      void fetch("/api/bookmarks?all=true", { method: "DELETE" }).catch(() => {});
       void pushCloudSnapshot(
         {
           meta: {
@@ -969,13 +1016,16 @@ export default function DualTrackConsole() {
     setLog(purged.log);
     setLearned(purged.learned || {});
     setBookmarks(purged.bookmarks || []);
+    if (cloudUserId) {
+      fetch(`/api/log?planId=${encodeURIComponent(planId)}`, { method: "DELETE" }).catch(() => {});
+    }
     if (activePlanId === planId) {
       const remaining = Object.values(plans).filter((p) => p.id !== planId && !p.hidden);
       setActivePlanId(remaining[0]?.id || BUILTIN_365_ID);
     }
     setConfirmDeletePlanId(null);
     fireToast("Plan deleted", "xp");
-  }, [plans, activePlanId, progress, notes, refs, srs, log, learned, bookmarks, fireToast]);
+  }, [plans, activePlanId, progress, notes, refs, srs, log, learned, bookmarks, fireToast, cloudUserId]);
 
   // Curated example curricula — opt-in starters (tech + non-tech), not auto-assigned.
   const examplePlans = useMemo(
@@ -1169,6 +1219,19 @@ export default function DualTrackConsole() {
         ? [...prev, { d: day.id, i: idx, at: now }]
         : prev.filter((e) => !(e.d === day.id && e.i === idx)),
     );
+    if (cloudUserId) {
+      if (willBeDone) {
+        fetch("/api/log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ day: day.id, topicIndex: idx }),
+        }).catch(() => {});
+      } else {
+        fetch(`/api/log?day=${encodeURIComponent(day.id)}&topicIndex=${idx}`, {
+          method: "DELETE",
+        }).catch(() => {});
+      }
+    }
 
     const otherIdxAll = day.topics.map((_, i) => i).filter((i) => i !== idx);
     const othersDone = otherIdxAll.every((i) => !!(progress[day.id] && progress[day.id][i]));
@@ -1197,7 +1260,7 @@ export default function DualTrackConsole() {
         }, 250);
       }
     }
-  }, [progress, setTopicDone, fireToast]);
+  }, [progress, setTopicDone, fireToast, cloudUserId]);
 
   const gradeReview = useCallback((dayId, outcome) => {
     const now = Date.now();

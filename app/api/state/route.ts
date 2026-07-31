@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
+import { backfillBookmarkItems, listBookmarkItems } from "@/lib/db/bookmarkItems";
 import { getDb, hasDatabase } from "@/lib/db/client";
+import { backfillLearnedItems, listLearnedItems } from "@/lib/db/learnedItems";
 import { userState } from "@/lib/db/schema";
+import {
+  backfillTopicCompletions,
+  listTopicCompletions,
+} from "@/lib/db/topicCompletions";
 import { sanitizeAppSnapshot } from "@/lib/exportImport";
 import { isSameOrigin } from "@/lib/httpGuard";
 import { logError } from "@/lib/logError";
-import { SCHEMA_VERSION } from "@/lib/types";
+import { SCHEMA_VERSION, type AppSnapshot } from "@/lib/types";
 
 // A serialized AppSnapshot (plans + progress + notes + srs + learned journal
 // etc.) for a very active user is still well under this — this cap just
@@ -18,6 +24,39 @@ function toIso(value: Date | string | null | undefined): string | null {
   if (value instanceof Date) return value.toISOString();
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+/**
+ * Merges log/learned/bookmarks from their dedicated tables into a snapshot
+ * about to be returned to the client. If the stored blob still has legacy
+ * data in those fields (pre-cutover), backfills it into the new tables
+ * first — idempotent, so this is safe to run on every GET/conflict
+ * response while any legacy data remains. Does NOT gate backfill on
+ * "are the new tables empty" — a user who's made one post-cutover write
+ * but still has other legacy data must still get the rest backfilled.
+ */
+async function hydrateUserdata(userId: string, snapshot: AppSnapshot): Promise<AppSnapshot> {
+  const legacyLog = snapshot.userdata.log;
+  const legacyLearned = snapshot.userdata.learned;
+  const legacyBookmarks = snapshot.userdata.bookmarks;
+  const hasLegacyData =
+    legacyLog.length > 0 || Object.keys(legacyLearned).length > 0 || legacyBookmarks.length > 0;
+
+  if (hasLegacyData) {
+    await Promise.all([
+      backfillTopicCompletions(userId, legacyLog),
+      backfillLearnedItems(userId, legacyLearned),
+      backfillBookmarkItems(userId, legacyBookmarks),
+    ]);
+  }
+
+  const [log, learned, bookmarks] = await Promise.all([
+    listTopicCompletions(userId),
+    listLearnedItems(userId),
+    listBookmarkItems(userId),
+  ]);
+
+  return { ...snapshot, userdata: { ...snapshot.userdata, log, learned, bookmarks } };
 }
 
 export async function GET() {
@@ -41,8 +80,10 @@ export async function GET() {
     if (!row) {
       return NextResponse.json({ snapshot: null, updatedAt: null });
     }
+    const sanitized = sanitizeAppSnapshot(row.snapshot);
+    const snapshot = sanitized ? await hydrateUserdata(userId, sanitized) : row.snapshot;
     return NextResponse.json({
-      snapshot: row.snapshot,
+      snapshot,
       updatedAt: toIso(row.updatedAt),
     });
   } catch (err) {
@@ -97,17 +138,14 @@ export async function PUT(req: NextRequest) {
     if (existing) {
       const serverAt = toIso(existing.updatedAt);
 
-      const conflictResponse = (reason: string, message: string) =>
-        NextResponse.json(
-          {
-            error: "conflict",
-            reason,
-            message,
-            snapshot: sanitizeAppSnapshot(existing.snapshot) || existing.snapshot,
-            updatedAt: serverAt,
-          },
+      const conflictResponse = async (reason: string, message: string) => {
+        const sanitized = sanitizeAppSnapshot(existing.snapshot);
+        const snapshot = sanitized ? await hydrateUserdata(userId, sanitized) : existing.snapshot;
+        return NextResponse.json(
+          { error: "conflict", reason, message, snapshot, updatedAt: serverAt },
           { status: 409 },
         );
+      };
 
       // Requires terminal-stale-client handling in flushCloudSnapshot
       // (components/dualtrack/DualTrackConsole.tsx) before SCHEMA_VERSION is
@@ -120,14 +158,14 @@ export async function PUT(req: NextRequest) {
       // in docs/superpowers/plans/2026-07-31-schema-version-guard.md history
       // for detail.
       if (snapshot.meta.schemaVersion < SCHEMA_VERSION) {
-        return conflictResponse(
+        return await conflictResponse(
           "schema-version",
           "Your app version is out of date. Reloaded the latest copy — please refresh.",
         );
       }
 
       if (baseUpdatedAt != null && serverAt && serverAt !== baseUpdatedAt) {
-        return conflictResponse("stale-base", "Cloud data changed on another device. Reloaded the latest copy.");
+        return await conflictResponse("stale-base", "Cloud data changed on another device. Reloaded the latest copy.");
       }
     }
 
