@@ -8,6 +8,7 @@ import {
 import { hasDatabase } from "@/lib/db/client";
 import { getStripe, hasStripe, tierFromPriceId } from "@/lib/stripe";
 import type { SubscriptionTier } from "@/lib/subscriptions";
+import { logError } from "@/lib/logError";
 
 export const runtime = "nodejs";
 
@@ -36,7 +37,7 @@ async function resolveUserId(sub: Stripe.Subscription): Promise<string | null> {
 async function syncSubscription(sub: Stripe.Subscription): Promise<void> {
   const userId = await resolveUserId(sub);
   if (!userId) {
-    console.error("[stripe webhook] no user for subscription", sub.id);
+    logError("stripe webhook", "no user for subscription", sub.id);
     return;
   }
 
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
 
   const secret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
   if (!secret) {
-    console.error("[stripe webhook] STRIPE_WEBHOOK_SECRET is not set");
+    logError("stripe webhook", "STRIPE_WEBHOOK_SECRET is not set", "");
     return NextResponse.json({ error: "Webhook secret not configured." }, { status: 503 });
   }
 
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
   try {
     event = stripe.webhooks.constructEvent(rawBody, signature, secret);
   } catch (err) {
-    console.error("[stripe webhook] signature verification failed", err);
+    logError("stripe webhook", "signature verification failed", err);
     return NextResponse.json({ error: "Invalid signature." }, { status: 400 });
   }
 
@@ -120,7 +121,7 @@ export async function POST(req: NextRequest) {
         break;
     }
   } catch (err) {
-    console.error("[stripe webhook] handler error", err);
+    logError("stripe webhook", "handler error", err);
     return NextResponse.json({ error: "Webhook handler failed." }, { status: 500 });
   }
 

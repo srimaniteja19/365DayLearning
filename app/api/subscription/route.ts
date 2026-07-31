@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { hasDatabase } from "@/lib/db/client";
 import { getSubscriptionUsage } from "@/lib/db/subscriptionQuota";
+import { logError } from "@/lib/logError";
 
 /** Current signed-in user's subscription tier + rolling-period usage. */
 export async function GET() {
@@ -21,7 +22,7 @@ export async function GET() {
     }
     return NextResponse.json(usage);
   } catch (err) {
-    console.error("[api/subscription] GET failed", err);
+    logError("api/subscription", "GET failed", err);
     return NextResponse.json({ error: "Could not load subscription status." }, { status: 500 });
   }
 }

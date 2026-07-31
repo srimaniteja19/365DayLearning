@@ -7,6 +7,7 @@ import {
 } from "@/lib/db/topicResourceCache";
 import { requireManagedAiTier, reserveAiActionQuota } from "@/lib/db/subscriptionQuota";
 import { clientIp, isRateLimited, isSameOrigin } from "@/lib/httpGuard";
+import { logError } from "@/lib/logError";
 import { openRouterWebSearch } from "@/lib/openrouterWebSearch";
 import {
   cacheKeyForKind,
@@ -239,7 +240,7 @@ export async function POST(req: NextRequest) {
       }
       return NextResponse.json({ resource, topicKey, kind: kindMode });
     } catch (err) {
-      console.error("[api/topic-resources] search failed", kindMode, title, err);
+      logError("api/topic-resources", "search failed", err, { kindMode, title });
       // Fail soft — caller treats null as "no resource".
       if (kindMode === "pair") {
         return NextResponse.json({

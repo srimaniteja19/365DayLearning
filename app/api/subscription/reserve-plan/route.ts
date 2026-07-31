@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { hasDatabase } from "@/lib/db/client";
 import { reservePlanGenerationQuota } from "@/lib/db/subscriptionQuota";
 import { isSameOrigin } from "@/lib/httpGuard";
+import { logError } from "@/lib/logError";
 
 /**
  * Reserves one AI-generated-plan unit against the caller's monthly quota.
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[api/subscription/reserve-plan] failed", err);
+    logError("api/subscription/reserve-plan", "failed", err);
     return NextResponse.json({ error: "Could not reserve plan-generation quota." }, { status: 500 });
   }
 }

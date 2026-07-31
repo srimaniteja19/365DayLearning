@@ -5,6 +5,7 @@ import { getDb, hasDatabase } from "@/lib/db/client";
 import { userState } from "@/lib/db/schema";
 import { sanitizeAppSnapshot } from "@/lib/exportImport";
 import { isSameOrigin } from "@/lib/httpGuard";
+import { logError } from "@/lib/logError";
 import { SCHEMA_VERSION } from "@/lib/types";
 
 // A serialized AppSnapshot (plans + progress + notes + srs + learned journal
@@ -45,7 +46,7 @@ export async function GET() {
       updatedAt: toIso(row.updatedAt),
     });
   } catch (err) {
-    console.error("[api/state] GET failed", err);
+    logError("api/state", "GET failed", err);
     return NextResponse.json({ error: "Could not load cloud data." }, { status: 500 });
   }
 }
@@ -140,7 +141,7 @@ export async function PUT(req: NextRequest) {
       });
     return NextResponse.json({ ok: true, updatedAt: now.toISOString() });
   } catch (err) {
-    console.error("[api/state] PUT failed", err);
+    logError("api/state", "PUT failed", err);
     return NextResponse.json({ error: "Could not save cloud data." }, { status: 500 });
   }
 }

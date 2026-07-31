@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { parseJsonText, sanitizeJsonText } from "@/lib/stripFences";
 import { chatStructured, willUseManagedAi } from "@/lib/claude-client";
+import { newTelemetry, type GenerationTelemetry } from "@/lib/generationTelemetry";
 import { reservePlanGeneration } from "@/lib/subscriptions";
 import {
   buildPeriodScopes,
@@ -739,8 +740,15 @@ export type GeneratePlanOptions = {
   };
 };
 
-export async function generatePlan(opts: GeneratePlanOptions): Promise<Plan> {
+export async function generatePlan(opts: GeneratePlanOptions): Promise<{
+  plan: Plan;
+  telemetry: GenerationTelemetry;
+  totalPeriods: number;
+  failedPeriods: number;
+  placeholderDays: number;
+}> {
   const { draft, signal, onProgress } = opts;
+  const telemetry = newTelemetry();
 
   // Only the first attempt at a plan (not a resume of an interrupted one)
   // consumes a monthly slot, and only when this will actually use managed
@@ -770,7 +778,7 @@ export async function generatePlan(opts: GeneratePlanOptions): Promise<Plan> {
   if (!outline) {
     emit();
     const skeleton = skeletonOutlinePeriods(draft.totalDays, draft.grouping);
-    const rawOutline = await fetchOutline(draft, meta, skeleton, signal);
+    const rawOutline = await fetchOutline(draft, meta, skeleton, signal, telemetry);
     outline = snapOutlineToSkeleton(rawOutline, skeleton);
     progress.outline = outline;
   }
@@ -810,6 +818,7 @@ export async function generatePlan(opts: GeneratePlanOptions): Promise<Plan> {
           period,
           topicsSoFar: topicsSnapshot,
           signal,
+          telemetry,
         }),
       ),
     );
@@ -839,6 +848,7 @@ export async function generatePlan(opts: GeneratePlanOptions): Promise<Plan> {
           topicsSoFar: progress.topicsSoFar,
           violations: validated.issues,
           signal,
+          telemetry,
         });
         validated = validatePeriodDays({
           days: rawDays,
@@ -906,18 +916,26 @@ export async function generatePlan(opts: GeneratePlanOptions): Promise<Plan> {
   }
 
   return {
-    id: planId,
-    name: draft.name.trim() || "CUSTOM PLAN",
-    subtitle: draft.subtitle.trim() || `${draft.totalDays}-day custom campaign`,
-    builtin: false,
-    createdAt: Date.now(),
-    totalDays: draft.totalDays,
-    topicsPerDay: draft.topicsPerDay,
-    accentRole: "auto",
-    periodScopes,
-    days: progress.days,
-    meta,
-    status: progress.failedPeriods.length || hasPlaceholders ? "draft" : "ready",
+    plan: {
+      id: planId,
+      name: draft.name.trim() || "CUSTOM PLAN",
+      subtitle: draft.subtitle.trim() || `${draft.totalDays}-day custom campaign`,
+      builtin: false,
+      createdAt: Date.now(),
+      totalDays: draft.totalDays,
+      topicsPerDay: draft.topicsPerDay,
+      accentRole: "auto",
+      periodScopes,
+      days: progress.days,
+      meta,
+      status: progress.failedPeriods.length || hasPlaceholders ? "draft" : "ready",
+    },
+    telemetry,
+    totalPeriods: outline.length,
+    failedPeriods: progress.failedPeriods.length,
+    placeholderDays: progress.days.filter((d) =>
+      d.topics.some((t) => /needs review/i.test(t)),
+    ).length,
   };
 }
 
@@ -926,6 +944,7 @@ async function fetchOutline(
   meta: PlanRequest,
   skeleton: OutlinePeriod[],
   signal?: AbortSignal,
+  telemetry?: GenerationTelemetry,
 ): Promise<OutlinePeriod[]> {
   const bounds = skeleton
     .map((p) => `- ${p.label}: days ${p.start}-${p.end}`)
@@ -975,6 +994,7 @@ Parser error: ${error}
 Broken input:
 ${bad.slice(0, 6000)}
 Return corrected JSON only.`,
+    telemetry,
   });
   return parsed.periods;
 }
@@ -986,8 +1006,9 @@ async function fetchPeriodDays(opts: {
   topicsSoFar: string[];
   violations?: PeriodValidationIssue[];
   signal?: AbortSignal;
+  telemetry?: GenerationTelemetry;
 }): Promise<Array<{ day: number; topics: string[]; domains?: string[] }>> {
-  const { draft, meta, period, topicsSoFar, violations, signal } = opts;
+  const { draft, meta, period, topicsSoFar, violations, signal, telemetry } = opts;
   const dayCount = period.end - period.start + 1;
   // Keep caps modest — large max_tokens slows many OpenRouter models.
   const maxTokens = Math.min(3500, Math.max(900, 350 + dayCount * draft.topicsPerDay * 55));
@@ -1049,6 +1070,7 @@ Parser error: ${error}
 Broken input:
 ${bad.slice(0, 8000)}
 Return corrected JSON only.`,
+    telemetry,
   });
   return parsed.days;
 }

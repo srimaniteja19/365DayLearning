@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { hasDatabase } from "@/lib/db/client";
 import { requireManagedAiTier, reserveAiActionQuota } from "@/lib/db/subscriptionQuota";
 import { clientIp, isRateLimited, isSameOrigin } from "@/lib/httpGuard";
+import { logError } from "@/lib/logError";
 import { OPENROUTER_DEFAULT_MODEL } from "@/lib/providers/openrouter";
 import { openAiCompatibleChat } from "@/lib/providers/openaiCompat";
 import type { ChatRequest } from "@/lib/providers/types";
@@ -150,7 +151,7 @@ export async function POST(req: NextRequest) {
       err && typeof err === "object" && "status" in err && typeof (err as { status: unknown }).status === "number"
         ? (err as { status: number }).status
         : undefined;
-    console.error(`[api/ai] ${timedOut ? "upstream timeout" : "upstream error"}`, err);
+    logError("api/ai", timedOut ? "upstream timeout" : "upstream error", err, { status });
     if (timedOut) {
       return NextResponse.json({ error: "The AI request timed out." }, { status: 504 });
     }
