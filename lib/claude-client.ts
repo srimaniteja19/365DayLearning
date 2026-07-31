@@ -16,6 +16,7 @@ import {
   shouldSkipRemainingFreeModels,
 } from "@/lib/providers/openrouter";
 import { getCachedSubscriptionTier, tierDef } from "@/lib/subscriptions";
+import type { GenerationTelemetry } from "@/lib/generationTelemetry";
 import type { ZodType } from "zod";
 
 export type ChatKind = "plan" | "action";
@@ -73,7 +74,7 @@ async function chatManaged(
  * BYOK failover: free models → cheap paid models when the primary fails.
  */
 export async function chat(
-  req: Omit<ChatRequest, "prompt"> & { prompt: string; kind?: ChatKind },
+  req: Omit<ChatRequest, "prompt"> & { prompt: string; kind?: ChatKind; telemetry?: GenerationTelemetry },
 ): Promise<string> {
   if (willUseManagedAi()) {
     return chatManaged(req);
@@ -102,6 +103,12 @@ export async function chat(
       throw req.signal.reason ?? new DOMException("Aborted", "AbortError");
     }
 
+    if (req.telemetry) {
+      const outcome = req.telemetry.modelOutcomes[model] ?? { attempts: 0, failures: 0 };
+      outcome.attempts += 1;
+      req.telemetry.modelOutcomes[model] = outcome;
+    }
+
     try {
       const text = await provider.chat(
         {
@@ -127,6 +134,11 @@ export async function chat(
       if (err instanceof DOMException && err.name === "AbortError") throw err;
       if (err instanceof AuthError) throw err;
       if (!isFailoverWorthyError(err)) throw err;
+
+      if (req.telemetry) {
+        const outcome = req.telemetry.modelOutcomes[model];
+        if (outcome) outcome.failures += 1;
+      }
 
       if (shouldSkipRemainingFreeModels(err)) {
         skipFree = true;
@@ -161,6 +173,7 @@ export type ChatStructuredOpts<T> = {
     schema: ZodType<T>,
     repair: (error: string, raw: string) => Promise<string>,
   ) => Promise<T>;
+  telemetry?: GenerationTelemetry;
 };
 
 /**
@@ -177,8 +190,10 @@ export async function chatStructured<T>(opts: ChatStructuredOpts<T>): Promise<T>
     signal: opts.signal,
     kind: opts.kind,
     structured: opts.structured,
+    telemetry: opts.telemetry,
   });
   return opts.parse(raw, opts.schema, async (error, bad) => {
+    if (opts.telemetry) opts.telemetry.repairCalls += 1;
     const repairPrompt =
       opts.repairPrompt?.(error, bad) ||
       `Fix this into valid JSON matching the required schema.
@@ -194,6 +209,7 @@ Return corrected JSON only. No markdown.`;
       signal: opts.signal,
       kind: opts.kind,
       structured: opts.structured,
+      telemetry: opts.telemetry,
     });
   });
 }
