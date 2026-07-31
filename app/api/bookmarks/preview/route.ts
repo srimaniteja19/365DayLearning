@@ -7,7 +7,7 @@ import {
   hostnameOf,
   normalizeBookmarkUrl,
 } from "@/lib/bookmarks";
-import { clientIp, isRateLimited, isSameOrigin } from "@/lib/httpGuard";
+import { isRateLimited, isSameOrigin } from "@/lib/httpGuard";
 import type { BookmarkPreview } from "@/lib/types";
 import { isPrivateHostname } from "@/lib/urlSafety";
 
@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Sign in required." }, { status: 401 });
   }
-  if (isRateLimited(`bookmark-preview:${clientIp(req)}`, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS)) {
+  if (isRateLimited(`bookmark-preview:${session.user.id}`, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS)) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 

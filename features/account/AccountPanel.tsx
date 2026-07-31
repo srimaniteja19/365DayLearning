@@ -79,8 +79,7 @@ export function AccountPanel({
             className="account-btn account-btn-ghost"
             type="button"
             onClick={async () => {
-              await signOut({ redirect: false });
-              onClose();
+              await signOut({ callbackUrl: "/" });
             }}
           >
             Sign out
@@ -140,7 +139,7 @@ export function AccountPanel({
           setError(null);
           setBusy(true);
           try {
-            await signIn("google", { callbackUrl: "/" });
+            await signIn("google", { callbackUrl: "/dashboard" });
           } catch {
             setError("Could not start Google sign-in.");
             setBusy(false);

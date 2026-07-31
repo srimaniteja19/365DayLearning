@@ -12,6 +12,7 @@ import React, {
   useEffect,
 } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import {
   purgeLocalAppData,
 } from "@/lib/storage";
@@ -142,7 +143,10 @@ export default function DualTrackConsole() {
   const hydrateGen = useRef(0);
   /** Last server `updatedAt` we pulled/pushed — used for conflict detection. */
   const cloudBaseUpdatedAt = useRef(null);
+  /** Page restored from sessionStorage on mount, if any — read by the cloud hydrate effect below. */
+  const restoredPageRef = useRef(null);
   const { data: session, status: sessionStatus } = useSession();
+  const router = useRouter();
   const cloudUserId = session?.user?.id || null;
   const pendingAuthAction = useRef(null);
   const [syncRetryToken, setSyncRetryToken] = useState(0);
@@ -364,6 +368,52 @@ export default function DualTrackConsole() {
     }
   }, []);
 
+  // Restore last-open page/view/kit-tab for this browser session (survives a
+  // refresh, cleared when the tab closes — the learning data itself lives in Neon).
+  useEffect(() => {
+    try {
+      const storedPage = window.sessionStorage.getItem("dualtrack:page");
+      const storedView = window.sessionStorage.getItem("dualtrack:view");
+      const storedKitTab = window.sessionStorage.getItem("dualtrack:kit-tab");
+      if (storedPage === "home" || storedPage === "dashboard" || storedPage === "kit") {
+        restoredPageRef.current = storedPage;
+        setPage(storedPage);
+      }
+      if (["console", "grid", "review", "weekly", "log"].includes(storedView)) {
+        setView(storedView);
+      }
+      if (storedKitTab === "learned" || storedKitTab === "bookmarks") {
+        setKitTab(storedKitTab);
+      }
+    } catch {
+      // best-effort only
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem("dualtrack:page", page);
+    } catch {
+      // best-effort only
+    }
+  }, [page]);
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem("dualtrack:view", view);
+    } catch {
+      // best-effort only
+    }
+  }, [view]);
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem("dualtrack:kit-tab", kitTab);
+    } catch {
+      // best-effort only
+    }
+  }, [kitTab]);
+
   const resetWorkspace = useCallback(() => {
     setPlans({});
     setActivePlanId(BUILTIN_365_ID);
@@ -576,6 +626,11 @@ export default function DualTrackConsole() {
         const nextPlans = applyCloudSnapshot(result.snapshot);
         cloudBaseUpdatedAt.current = result.updatedAt;
         fireToast("Synced from your account");
+        // Returning operators land on their dashboard, not the cold-start picker —
+        // unless this session was already restored to a specific page (e.g. Field Kit).
+        if (restoredPageRef.current !== "kit" && Object.values(nextPlans).some((p) => !p.hidden)) {
+          setPage("dashboard");
+        }
         // Defer enrichment so the first cloud save / UI settle isn't raced.
         window.setTimeout(() => enrichPlansMap(nextPlans), 2500);
       } else if (result.ok) {
@@ -1262,7 +1317,7 @@ export default function DualTrackConsole() {
     onOpenBadges: () => setModal({ kind: "badges" }),
     badgeCount: badgeStatuses.filter((s) => s.unlocked).length,
     badgeTotal: badgeStatuses.length,
-    onGoHome: () => setPage("home"),
+    onGoHome: () => router.push("/"),
     onOpenPricing: () => setModal({ kind: "pricing" }),
     kitTab: onKit ? kitTab : null,
     learnedCount,

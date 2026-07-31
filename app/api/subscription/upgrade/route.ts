@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
   if (user.stripeSubscriptionId && hasLiveStripeSubscription(user.subscriptionStatus)) {
     const portal = await stripe.billingPortal.sessions.create({
       customer: customerId,
-      return_url: `${base}/?billing=portal`,
+      return_url: `${base}/dashboard?billing=portal`,
       // Deep-link into plan switch (Operator ↔ Architect) instead of the portal home.
       flow_data: {
         type: "subscription_update",
@@ -110,8 +110,8 @@ export async function POST(req: NextRequest) {
     customer: customerId,
     client_reference_id: userId,
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${base}/?billing=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${base}/?billing=cancelled`,
+    success_url: `${base}/dashboard?billing=success&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${base}/dashboard?billing=cancelled`,
     allow_promotion_codes: true,
     billing_address_collection: "auto",
     // Invoices are created automatically for subscription mode.

@@ -101,10 +101,19 @@ const inter = Inter({
   display: "swap",
 });
 
+const siteUrl = (
+  process.env.AUTH_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  "https://refrainly.dev"
+).replace(/\/$/, "");
+
+const description =
+  "Refrainly is a daily learning campaign runner for any subject — psychology, economics, history, languages, tech, and more. Day-by-day plans, spaced repetition, Field Kit, and bring-your-own-key AI. Create a free account to start.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "Refrainly | Daily learning campaigns for any subject",
-  description:
-    "Refrainly is a daily learning campaign runner for any subject — psychology, economics, history, languages, tech, and more. Day-by-day plans, spaced repetition, Field Kit, and bring-your-own-key AI. Create a free account to start.",
+  description,
   applicationName: "Refrainly",
   keywords: [
     "learning campaigns",
@@ -118,6 +127,17 @@ export const metadata: Metadata = {
     "Field Kit",
     "365 day challenge",
   ],
+  openGraph: {
+    title: "Refrainly | Daily learning campaigns for any subject",
+    description,
+    siteName: "Refrainly",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Refrainly | Daily learning campaigns for any subject",
+    description,
+  },
   appleWebApp: {
     capable: true,
     title: "Refrainly",
