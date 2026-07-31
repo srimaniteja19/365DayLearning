@@ -54,6 +54,26 @@ export const topicResourceCache = pgTable("topic_resource_cache", {
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * One row per client-side generatePlan() run, reported by the client after
+ * generation completes. Powers the /admin/telemetry dashboard's
+ * placeholder-day / failed-period / repair-call / per-model-failure rates.
+ */
+export const generationRuns = pgTable("generation_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  totalDays: integer("total_days").notNull(),
+  placeholderDays: integer("placeholder_days").notNull(),
+  totalPeriods: integer("total_periods").notNull(),
+  failedPeriods: integer("failed_periods").notNull(),
+  repairCalls: integer("repair_calls").notNull(),
+  modelOutcomes: jsonb("model_outcomes").notNull(),
+});
+
 export type UserRow = typeof users.$inferSelect;
 export type UserStateRow = typeof userState.$inferSelect;
 export type TopicResourceCacheRow = typeof topicResourceCache.$inferSelect;
+export type GenerationRunRow = typeof generationRuns.$inferSelect;
