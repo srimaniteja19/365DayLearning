@@ -1133,8 +1133,12 @@
   margin: 0;
   min-width: 0;
 }
-.next-mission-topic {
-  align-items: flex-start;
+/* Must beat .topic-line { flex-direction: column } (same specificity, later in file). */
+.topic-line.next-mission-topic {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: nowrap;
   padding: 10px 11px;
   border: 2px solid var(--text);
   border-radius: 0;
@@ -1142,6 +1146,7 @@
   gap: 9px;
   box-shadow: 2px 2px 0 color-mix(in srgb, var(--text) 14%, transparent);
   transition: transform 0.12s ease, box-shadow 0.12s ease;
+  cursor: pointer;
 }
 .next-mission-topic:hover {
   transform: translate(-1px, -1px);
@@ -6057,8 +6062,23 @@ select.settings-input { cursor: pointer; }
   color: var(--on-accent);
   box-shadow: 2px 2px 0 var(--text);
 }
-.settings-key-row { display: flex; gap: 8px; align-items: center; }
-.settings-key-row .settings-input { flex: 1; }
+.settings-key-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+}
+/* Override .settings-input { width: 100% } so the Show/Add button isn't crushed. */
+.settings-key-row .settings-input {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+}
+.settings-key-row .settings-btn,
+.settings-key-row .secondary-btn {
+  flex-shrink: 0;
+}
 .settings-docs {
   font-family: var(--mono); font-size: 11.5px; font-weight: 650;
   color: var(--text-faint); text-decoration: none; width: fit-content;
@@ -8626,6 +8646,7 @@ select.settings-input { cursor: pointer; }
   color: var(--account-muted);
 }
 .account-input {
+  width: 100%;
   min-height: 48px;
   padding: 0 14px;
   border: 2.5px solid var(--account-ink);
@@ -8633,8 +8654,9 @@ select.settings-input { cursor: pointer; }
   background: var(--account-panel);
   color: var(--account-ink);
   font-family: inherit;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
+  box-sizing: border-box;
   box-shadow: 2px 2px 0 color-mix(in srgb, var(--account-ink) 12%, transparent);
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
@@ -9287,17 +9309,27 @@ select.settings-input { cursor: pointer; }
   .learned-submit,
   .learned-mode-btn { min-height: 44px; }
 
-  /* Modals */
+  /* Modals — full-bleed, scrollable, usable with on-screen keyboard */
   .modal-backdrop {
-    padding: max(12px, env(safe-area-inset-top)) 10px max(12px, env(safe-area-inset-bottom));
+    padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom));
     align-items: stretch;
   }
   .modal {
-    max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     overflow: auto;
+    -webkit-overflow-scrolling: touch;
     border-radius: 0;
+    box-shadow: none;
   }
-  .modal-body { padding: 14px; }
+  .modal-wide,
+  .modal-wide:has(.plan-editor),
+  .modal-account,
+  .modal-pricing {
+    max-width: none;
+  }
+  .modal-body { padding: 14px 12px; min-width: 0; }
   .builder-pane { max-height: none; }
   .editor-table-wrap { max-height: min(52vh, 420px); overflow: auto; -webkit-overflow-scrolling: touch; }
   .editor-table { min-width: 560px; }
@@ -9307,6 +9339,87 @@ select.settings-input { cursor: pointer; }
   .settings-btn,
   .account-btn { width: 100%; min-height: 48px; }
   .pricing-card-btn { width: 100%; min-height: 48px; }
+  .panel-actions,
+  .builder-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .panel-actions .primary-btn,
+  .panel-actions .secondary-btn,
+  .builder-actions .primary-btn,
+  .builder-actions .secondary-btn {
+    width: 100%;
+  }
+  .editor-topic-row {
+    flex-wrap: wrap;
+  }
+  .editor-topic-row .settings-input {
+    flex: 1 1 140px;
+  }
+
+  /* Settings / forms — stop flex rows crushing inputs; avoid iOS focus-zoom */
+  .settings-panel,
+  .account-panel,
+  .data-panel,
+  .plan-builder,
+  .notesgen {
+    min-width: 0;
+  }
+  .settings-key-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .settings-key-row .settings-input {
+    width: 100%;
+    flex: none;
+  }
+  .settings-key-row .settings-btn,
+  .settings-key-row .secondary-btn {
+    width: 100%;
+    min-height: 48px;
+  }
+  .settings-model-groups {
+    max-height: min(200px, 32dvh);
+  }
+  .settings-tier-row {
+    width: 100%;
+    display: flex;
+  }
+  .settings-tier-btn {
+    flex: 1;
+    min-height: 44px;
+  }
+  .settings-test {
+    flex-wrap: wrap;
+    word-break: break-word;
+  }
+  .settings-input,
+  .account-input,
+  .note-input,
+  .ops-search-input,
+  .search-input,
+  .bm-add-input,
+  .bm-search-input,
+  .bm-note-input,
+  .field-kit-lens-input,
+  .draft-text,
+  .learned-body-input,
+  textarea.settings-input,
+  select.settings-input {
+    font-size: 16px;
+  }
+  .account-input {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .bm-add,
+  .bm-search {
+    flex: 1 1 100%;
+    max-width: none;
+    min-width: 0;
+  }
+  .data-share-row { flex-direction: column; align-items: stretch; }
+  .data-share-row .settings-input { min-width: 0; width: 100%; }
 }
 
 @media (max-width: 640px) {
@@ -9330,9 +9443,22 @@ select.settings-input { cursor: pointer; }
   .domain-legend-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
   .primary-btn,
   .secondary-btn { min-height: 44px; }
-  .data-share-row { flex-direction: column; align-items: stretch; }
-  .data-share-row .settings-input { min-width: 0; width: 100%; }
   .view-tab-stamp { display: none; }
+  .settings-ops-mast {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .topic-line.next-mission-topic {
+    flex-wrap: wrap;
+  }
+  .topic-line.next-mission-topic .topic-text {
+    flex: 1 1 120px;
+  }
+  .topic-line.next-mission-topic .topic-resource-controls {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
   .bm-head {
     flex-direction: column;
     align-items: stretch;
