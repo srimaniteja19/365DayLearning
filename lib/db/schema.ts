@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, jsonb, uuid, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, jsonb, uuid, integer, primaryKey } from "drizzle-orm/pg-core";
 
 /**
  * One row per account. Passwords are hashed with bcrypt before storage.
@@ -54,6 +54,85 @@ export const topicResourceCache = pgTable("topic_resource_cache", {
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * One row per client-side generatePlan() run, reported by the client after
+ * generation completes. Powers the /admin/telemetry dashboard's
+ * placeholder-day / failed-period / repair-call / per-model-failure rates.
+ */
+export const generationRuns = pgTable("generation_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  totalDays: integer("total_days").notNull(),
+  placeholderDays: integer("placeholder_days").notNull(),
+  totalPeriods: integer("total_periods").notNull(),
+  failedPeriods: integer("failed_periods").notNull(),
+  repairCalls: integer("repair_calls").notNull(),
+  modelOutcomes: jsonb("model_outcomes").notNull(),
+});
+
+/**
+ * One row per (user, day, topic) completion. Composite PK matches the
+ * client's LogEntry {d, i, at} key exactly (lib/types.ts). Upserted on
+ * topic-check, deleted on topic-uncheck — see app/api/log/route.ts.
+ */
+export const topicCompletions = pgTable(
+  "topic_completions",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    day: text("day").notNull(),
+    topicIndex: integer("topic_index").notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.day, t.topicIndex] })],
+);
+
+/**
+ * One row per "other things I learned" journal entry. `id` is the
+ * client-minted id (createLearnedId(), lib/learned.ts) reused as PK.
+ * `dateKey` is a real column, not derived from createdAt — entries can be
+ * moved to a different date (updateLearned's toDate param).
+ */
+export const learnedItems = pgTable("learned_items", {
+  id: text("id").primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  dateKey: text("date_key").notNull(),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  insight: text("insight"),
+  tags: jsonb("tags"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+});
+
+/**
+ * One row per saved bookmark. `id` is the client-minted id
+ * (createBookmarkId(), lib/bookmarks.ts) reused as PK.
+ */
+export const bookmarkItems = pgTable("bookmark_items", {
+  id: text("id").primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
+  kind: text("kind").notNull(),
+  title: text("title").notNull(),
+  note: text("note"),
+  tags: jsonb("tags"),
+  preview: jsonb("preview"),
+  insight: text("insight"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+});
+
 export type UserRow = typeof users.$inferSelect;
 export type UserStateRow = typeof userState.$inferSelect;
 export type TopicResourceCacheRow = typeof topicResourceCache.$inferSelect;
+export type GenerationRunRow = typeof generationRuns.$inferSelect;
+export type TopicCompletionRow = typeof topicCompletions.$inferSelect;
+export type LearnedItemRow = typeof learnedItems.$inferSelect;
+export type BookmarkItemRow = typeof bookmarkItems.$inferSelect;
