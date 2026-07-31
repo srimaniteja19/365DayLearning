@@ -5,6 +5,7 @@ import { getDb, hasDatabase } from "@/lib/db/client";
 import { userState } from "@/lib/db/schema";
 import { sanitizeAppSnapshot } from "@/lib/exportImport";
 import { isSameOrigin } from "@/lib/httpGuard";
+import { SCHEMA_VERSION } from "@/lib/types";
 
 // A serialized AppSnapshot (plans + progress + notes + srs + learned journal
 // etc.) for a very active user is still well under this — this cap just
@@ -92,19 +93,40 @@ export async function PUT(req: NextRequest) {
       .where(eq(userState.userId, userId))
       .limit(1);
 
-    if (existing && baseUpdatedAt != null) {
+    if (existing) {
       const serverAt = toIso(existing.updatedAt);
-      if (serverAt && serverAt !== baseUpdatedAt) {
-        const serverSnap = sanitizeAppSnapshot(existing.snapshot) || existing.snapshot;
-        return NextResponse.json(
+
+      const conflictResponse = (reason: string, message: string) =>
+        NextResponse.json(
           {
             error: "conflict",
-            message: "Cloud data changed on another device. Reloaded the latest copy.",
-            snapshot: serverSnap,
+            reason,
+            message,
+            snapshot: sanitizeAppSnapshot(existing.snapshot) || existing.snapshot,
             updatedAt: serverAt,
           },
           { status: 409 },
         );
+
+      // Requires terminal-stale-client handling in flushCloudSnapshot
+      // (components/dualtrack/DualTrackConsole.tsx) before SCHEMA_VERSION is
+      // ever incremented past its current value — today, any 409 (including
+      // this one) is treated as retryable and the client just adopts the
+      // server snapshot and retries. For a schema-version conflict that can
+      // never succeed (the client's SCHEMA_VERSION constant is baked into its
+      // JS bundle and won't change), that turns into an infinite retry loop
+      // that silently discards local edits. See the final-review discussion
+      // in docs/superpowers/plans/2026-07-31-schema-version-guard.md history
+      // for detail.
+      if (snapshot.meta.schemaVersion < SCHEMA_VERSION) {
+        return conflictResponse(
+          "schema-version",
+          "Your app version is out of date. Reloaded the latest copy — please refresh.",
+        );
+      }
+
+      if (baseUpdatedAt != null && serverAt && serverAt !== baseUpdatedAt) {
+        return conflictResponse("stale-base", "Cloud data changed on another device. Reloaded the latest copy.");
       }
     }
 
