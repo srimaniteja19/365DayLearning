@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
 
 /** Shared same-origin / rate-limit helpers for mutating API routes. */
-
-const rateBuckets = new Map<string, number[]>();
 
 export function clientIp(req: NextRequest): string {
   const forwarded = req.headers.get("x-forwarded-for");
@@ -26,11 +26,39 @@ export function isSameOrigin(req: NextRequest): boolean {
   }
 }
 
+/** True when an Upstash Redis store is configured for durable rate limiting. */
+export function hasRateLimitStore(): boolean {
+  return !!process.env.UPSTASH_REDIS_REST_URL && !!process.env.UPSTASH_REDIS_REST_TOKEN;
+}
+
+let redisClient: Redis | null = null;
+function getRedis(): Redis {
+  if (!redisClient) redisClient = Redis.fromEnv();
+  return redisClient;
+}
+
+const limiters = new Map<string, Ratelimit>();
+function getLimiter(max: number, windowMs: number): Ratelimit {
+  const cacheKey = `${max}:${windowMs}`;
+  let limiter = limiters.get(cacheKey);
+  if (!limiter) {
+    limiter = new Ratelimit({
+      redis: getRedis(),
+      limiter: Ratelimit.slidingWindow(max, `${windowMs} ms`),
+      analytics: false,
+    });
+    limiters.set(cacheKey, limiter);
+  }
+  return limiter;
+}
+
+const rateBuckets = new Map<string, number[]>();
+
 /**
- * Sliding-window rate limit. In-memory: resets on redeploy and is
- * per-instance — acceptable at current single-region scale.
+ * In-memory sliding-window rate limit. Per-instance — used only as a
+ * fallback when no durable store is configured (e.g. local dev).
  */
-export function isRateLimited(key: string, max: number, windowMs = 60_000): boolean {
+function isRateLimitedInMemory(key: string, max: number, windowMs: number): boolean {
   const now = Date.now();
   const cutoff = now - windowMs;
   const hits = (rateBuckets.get(key) || []).filter((t) => t > cutoff);
@@ -46,4 +74,27 @@ export function isRateLimited(key: string, max: number, windowMs = 60_000): bool
     }
   }
   return false;
+}
+
+/**
+ * Sliding-window rate limit. Backed by Upstash Redis when configured
+ * (durable, shared across instances); falls back to an in-memory limiter
+ * otherwise. Fails open (not limited) if the Upstash call itself errors —
+ * this guards cost/abuse, it is not a security gate.
+ */
+export async function isRateLimited(
+  key: string,
+  max: number,
+  windowMs = 60_000,
+): Promise<boolean> {
+  if (!hasRateLimitStore()) {
+    return isRateLimitedInMemory(key, max, windowMs);
+  }
+  try {
+    const { success } = await getLimiter(max, windowMs).limit(key);
+    return !success;
+  } catch (err) {
+    console.error("[httpGuard] rate limit store error, failing open", err);
+    return false;
+  }
 }

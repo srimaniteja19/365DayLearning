@@ -49,7 +49,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const password = typeof raw?.password === "string" ? raw.password : "";
         if (!email || !password) return null;
 
-        if (isRateLimited(loginRateKey(request, email), LOGIN_RATE_MAX, LOGIN_RATE_WINDOW_MS)) {
+        if (await isRateLimited(loginRateKey(request, email), LOGIN_RATE_MAX, LOGIN_RATE_WINDOW_MS)) {
           return null;
         }
 
