@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { getDb, hasDatabase } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
 import { clientIp, isRateLimited, isSameOrigin } from "@/lib/httpGuard";
+import { logError } from "@/lib/logError";
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 8;
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[api/auth/signup] failed", err);
+    logError("api/auth/signup", "failed", err);
     return NextResponse.json({ error: "Could not create account. Try again shortly." }, { status: 500 });
   }
 }
