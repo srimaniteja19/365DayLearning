@@ -42,6 +42,8 @@ import { seedReview, nextReview, dueList } from "@/lib/srs";
 import { buildRelatedIndex, relatedDaysFor } from "@/lib/related";
 import { accentForPlan } from "@/lib/accents";
 import { purgePlanUserData } from "@/lib/migration";
+import { exportAll, serializeExport } from "@/lib/exportImport";
+import { downloadText } from "@/lib/fileIo";
 import {
   BUILTIN_365_ID,
   SCHEMA_VERSION,
@@ -652,8 +654,9 @@ export default function DualTrackConsole() {
   const flushCloudSnapshot = useCallback(
     async (opts) => {
       if (!cloudReady || !cloudUserId) return false;
+      const localSnapshot = buildSnapshot();
       const result = await pushCloudSnapshot(
-        buildSnapshot(),
+        localSnapshot,
         cloudBaseUpdatedAt.current,
         opts,
       );
@@ -663,11 +666,34 @@ export default function DualTrackConsole() {
       }
       if (result.conflict) {
         if (result.snapshot) {
+          const recoveryPayload = exportAll({
+            plans: localSnapshot.plans,
+            userdata: localSnapshot.userdata,
+            themeKey: localSnapshot.meta.themeKey,
+            activePlanId: localSnapshot.meta.activePlanId,
+          });
+          const recoveryJson = serializeExport(recoveryPayload);
+          const recoveryFilename = `refrainly-recovery-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+          const downloaded = downloadText(recoveryFilename, recoveryJson, "application/json");
+          if (!downloaded) {
+            try {
+              window.localStorage.setItem("refrainly:conflict-recovery", recoveryJson);
+            } catch {
+              /* best-effort; nothing more we can do if storage is unavailable */
+            }
+          }
           applyCloudSnapshot(result.snapshot);
           // Do not re-kick enrichment here — that races with in-flight saves.
+          fireToast(
+            downloaded
+              ? "Your recent changes were saved to a recovery file."
+              : "Your recent changes were saved locally for recovery.",
+            "warn",
+          );
+        } else {
+          fireToast(result.error || "Cloud data changed elsewhere — reloaded.", "warn");
         }
         cloudBaseUpdatedAt.current = result.updatedAt ?? cloudBaseUpdatedAt.current;
-        fireToast(result.error || "Cloud data changed elsewhere — reloaded.", "warn");
         return true;
       }
       return false;
