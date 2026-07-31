@@ -135,5 +135,104 @@ describe("httpGuard rate limiting", () => {
       const { hasRateLimitStore } = await import("@/lib/httpGuard");
       expect(hasRateLimitStore()).toBe(true);
     });
+
+    it("warns once when only one of the two env vars is set", async () => {
+      process.env.UPSTASH_REDIS_REST_URL = "https://example.upstash.io";
+      delete process.env.UPSTASH_REDIS_REST_TOKEN;
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const { hasRateLimitStore } = await import("@/lib/httpGuard");
+      expect(hasRateLimitStore()).toBe(false);
+      expect(hasRateLimitStore()).toBe(false);
+      expect(hasRateLimitStore()).toBe(false);
+
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy.mock.calls[0][0]).toMatch(/partial Upstash configuration/i);
+      warnSpy.mockRestore();
+    });
+
+    it("does not warn when neither or both env vars are set", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const { hasRateLimitStore } = await import("@/lib/httpGuard");
+      expect(hasRateLimitStore()).toBe(false);
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      setStoreEnv();
+      expect(hasRateLimitStore()).toBe(true);
+      expect(warnSpy).not.toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+  });
+
+  describe("consecutive store failure escalation", () => {
+    function mockFailingLimiter(limitMock: ReturnType<typeof vi.fn>) {
+      vi.doMock("@upstash/redis", () => ({
+        Redis: { fromEnv: vi.fn().mockReturnValue({}) },
+      }));
+      vi.doMock("@upstash/ratelimit", () => ({
+        Ratelimit: Object.assign(
+          vi.fn().mockImplementation(function () {
+            return { limit: limitMock };
+          }),
+          { slidingWindow: vi.fn() },
+        ),
+      }));
+    }
+
+    it("does not escalate on a single isolated failure", async () => {
+      setStoreEnv();
+      const limitMock = vi.fn().mockRejectedValue(new Error("upstash down"));
+      mockFailingLimiter(limitMock);
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const { isRateLimited } = await import("@/lib/httpGuard");
+      expect(await isRateLimited("iso", 5, 60_000)).toBe(false);
+
+      expect(errSpy).toHaveBeenCalledTimes(1);
+      expect(errSpy.mock.calls[0][0]).toMatch(/rate limit store error, failing open/i);
+      errSpy.mockRestore();
+    });
+
+    it("escalates the log after repeated consecutive failures", async () => {
+      setStoreEnv();
+      const limitMock = vi.fn().mockRejectedValue(new Error("upstash down"));
+      mockFailingLimiter(limitMock);
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const { isRateLimited } = await import("@/lib/httpGuard");
+      for (let i = 0; i < 5; i++) {
+        await isRateLimited("persistent", 5, 60_000);
+      }
+
+      const messages = errSpy.mock.calls.map((call) => String(call[0]));
+      expect(messages.some((m) => /consecutive times/i.test(m))).toBe(true);
+      // The escalated warning is logged once, not once per failure past the threshold.
+      const escalatedCount = messages.filter((m) => /consecutive times/i.test(m)).length;
+      expect(escalatedCount).toBe(1);
+      errSpy.mockRestore();
+    });
+
+    it("resets the failure count after a successful call", async () => {
+      setStoreEnv();
+      const limitMock = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("blip 1"))
+        .mockRejectedValueOnce(new Error("blip 2"))
+        .mockResolvedValueOnce({ success: true })
+        .mockRejectedValueOnce(new Error("blip 3"));
+      mockFailingLimiter(limitMock);
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const { isRateLimited } = await import("@/lib/httpGuard");
+      await isRateLimited("k", 5, 60_000);
+      await isRateLimited("k", 5, 60_000);
+      await isRateLimited("k", 5, 60_000);
+      await isRateLimited("k", 5, 60_000);
+
+      const messages = errSpy.mock.calls.map((call) => String(call[0]));
+      expect(messages.some((m) => /consecutive times/i.test(m))).toBe(false);
+      errSpy.mockRestore();
+    });
   });
 });
