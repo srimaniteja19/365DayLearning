@@ -5,6 +5,7 @@ import { getDb, hasDatabase } from "@/lib/db/client";
 import { userState } from "@/lib/db/schema";
 import { sanitizeAppSnapshot } from "@/lib/exportImport";
 import { isSameOrigin } from "@/lib/httpGuard";
+import { SCHEMA_VERSION } from "@/lib/types";
 
 // A serialized AppSnapshot (plans + progress + notes + srs + learned journal
 // etc.) for a very active user is still well under this — this cap just
@@ -92,9 +93,23 @@ export async function PUT(req: NextRequest) {
       .where(eq(userState.userId, userId))
       .limit(1);
 
-    if (existing && baseUpdatedAt != null) {
+    if (existing) {
       const serverAt = toIso(existing.updatedAt);
-      if (serverAt && serverAt !== baseUpdatedAt) {
+
+      if (snapshot.meta.schemaVersion < SCHEMA_VERSION) {
+        const serverSnap = sanitizeAppSnapshot(existing.snapshot) || existing.snapshot;
+        return NextResponse.json(
+          {
+            error: "conflict",
+            message: "Your app version is out of date. Reloaded the latest copy — please refresh.",
+            snapshot: serverSnap,
+            updatedAt: serverAt,
+          },
+          { status: 409 },
+        );
+      }
+
+      if (baseUpdatedAt != null && serverAt && serverAt !== baseUpdatedAt) {
         const serverSnap = sanitizeAppSnapshot(existing.snapshot) || existing.snapshot;
         return NextResponse.json(
           {
