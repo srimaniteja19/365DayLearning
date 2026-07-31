@@ -221,10 +221,22 @@ export default function DualTrackConsole() {
     [setKitTab, setPage, requireAuth],
   );
 
-  const theme = THEMES[resolveThemeKey(themeKey)] || THEMES[DEFAULT_THEME_KEY];
+  const resolvedThemeKey = resolveThemeKey(themeKey);
+  const theme = THEMES[resolvedThemeKey] || THEMES[DEFAULT_THEME_KEY];
   const fontPack = FONT_PACKS[resolveFontKey(fontKey)] || FONT_PACKS[DEFAULT_FONT_KEY];
   const domainColors = DOMAIN_PALETTES[theme.palette];
-  const rootStyle = { ...themeVars(theme), ...fontVars(fontPack) };
+  const isNeoTheme = resolvedThemeKey === "doodle";
+  const rootStyle = {
+    ...themeVars(theme),
+    ...fontVars(fontPack),
+    ...(isNeoTheme
+      ? {
+          "--sans": "var(--font-inter), sans-serif",
+          "--display": "var(--font-space), sans-serif",
+          "--mono": "var(--font-jetbrains), ui-monospace, monospace",
+        }
+      : {}),
+  };
 
   const visiblePlans = useMemo(
     () => Object.values(plans).filter((p) => !p.hidden),
@@ -1217,7 +1229,7 @@ export default function DualTrackConsole() {
     // Same hydrate shell until Neon snapshot (or signed-out landing) is ready.
     // after mount, so branching here would flash or rematch incorrectly.
     return (
-      <div className="app-root" style={rootStyle}>
+      <div className={classNames("app-root", isNeoTheme && "theme-neo", theme.mode === "light" && "is-light")} style={rootStyle}>
         <AppHydrateSkeleton />
       </div>
     );
@@ -1271,15 +1283,20 @@ export default function DualTrackConsole() {
           totalDays: globalStats.totalDaysAll,
         }
       : null;
-    // Fixed Briefing skin — same for every visitor; dashboard themes stay personal.
+    // Fixed neo marketing skin — same for every visitor; dashboard themes stay personal.
     const homeTheme = LANDING_THEME;
-    const homeFont = FONT_PACKS.archivo;
-    const homeStyle = { ...themeVars(homeTheme), ...fontVars(homeFont) };
+    const homeStyle = {
+      ...themeVars(homeTheme),
+      "--sans": "var(--font-inter), sans-serif",
+      "--display": "var(--font-space), sans-serif",
+      "--mono": "var(--font-jetbrains), ui-monospace, monospace",
+    };
     return (
       <div
         className={classNames(
           "app-root",
           "landing-root",
+          "theme-neo",
           homeTheme.mode === "light" && "is-light",
           !homeTheme.effects && "no-fx",
         )}
@@ -1337,6 +1354,7 @@ export default function DualTrackConsole() {
           className={classNames(
             "app-root",
             "kit-root",
+            isNeoTheme && "theme-neo",
             theme.mode === "light" && "is-light",
             !theme.effects && "no-fx",
           )}
@@ -1423,6 +1441,7 @@ export default function DualTrackConsole() {
       <div
         className={classNames(
           "app-root",
+          isNeoTheme && "theme-neo",
           theme.mode === "light" && "is-light",
           !theme.effects && "no-fx",
         )}

@@ -5,6 +5,7 @@ import {
   themeVars,
   resolveThemeKey,
   DEFAULT_THEME_KEY,
+  LANDING_THEME,
 } from "@/theme/themes";
 import {
   DEFAULT_FONT_KEY,
@@ -72,6 +73,31 @@ describe("theme tokens", () => {
     expect(vars["--glow"]).toBe("transparent");
     expect(vars["--accent"]).toBe(t.accents.main);
     expect(vars["--on-accent"]).toBe(t.c.onAccent);
+  });
+});
+
+describe("LANDING_THEME (marketing neo)", () => {
+  it("uses neobrutalism yellow / violet / surface / ink", () => {
+    expect(LANDING_THEME.mode).toBe("light");
+    expect(LANDING_THEME.c.bg).toBe("#FBFBF9");
+    expect(LANDING_THEME.c.panel).toBe("#FBFBF9");
+    expect(LANDING_THEME.c.text).toBe("#1C293C");
+    expect(LANDING_THEME.accents.main).toBe("#FDC800");
+    expect(LANDING_THEME.accents.sprint).toBe("#432DD7");
+    expect(LANDING_THEME.c.onAccent).toBe("#1C293C");
+    expect(LANDING_THEME.c.ok).toBe("#16A34A");
+    expect(LANDING_THEME.c.warn).toBe("#D97706");
+    expect(LANDING_THEME.c.err).toBe("#DC2626");
+    expect(LANDING_THEME.radius.card).toBe("0px");
+    expect(LANDING_THEME.radius.ctl).toBe("0px");
+  });
+
+  it("is the default dashboard theme (key doodle → Neo skin)", () => {
+    expect(DEFAULT_THEME_KEY).toBe("doodle");
+    expect(THEMES.doodle).toBe(LANDING_THEME);
+    expect(THEMES.doodle.name).toBe("Neo");
+    expect(THEMES.doodle.mode).toBe("light");
+    expect(THEMES.doodle.accents.main).toBe("#FDC800");
   });
 });
 

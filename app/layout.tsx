@@ -11,6 +11,7 @@ import {
   Host_Grotesk,
   Red_Hat_Mono,
   Delius_Swash_Caps,
+  Inter,
 } from "next/font/google";
 import "./globals.css";
 import "./dualtrack.css";
@@ -93,6 +94,13 @@ const delius = Delius_Swash_Caps({
   display: "swap",
 });
 
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800", "900"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "Refrainly | Daily learning campaigns for any subject",
   description:
@@ -122,7 +130,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#EEF2F6" },
+    { media: "(prefers-color-scheme: light)", color: "#FBFBF9" },
     { media: "(prefers-color-scheme: dark)", color: "#0C1116" },
   ],
   width: "device-width",
@@ -142,6 +150,7 @@ const fontVars = [
   host.variable,
   redmono.variable,
   delius.variable,
+  inter.variable,
 ].join(" ");
 
 export default function RootLayout({
