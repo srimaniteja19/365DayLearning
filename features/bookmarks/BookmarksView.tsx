@@ -1,10 +1,11 @@
 // @ts-nocheck
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { classNames } from "@/lib/classNames";
 import {
+  addBookmarkTag,
   applyPreviewToBookmark,
   createBookmarkId,
   defaultTitleForUrl,
@@ -13,6 +14,7 @@ import {
   extractYoutubeId,
   hostnameOf,
   normalizeBookmarkUrl,
+  removeBookmarkTag,
   seedPreviewFromUrl,
   youtubeEmbedUrl,
   vimeoEmbedUrl,
@@ -106,12 +108,30 @@ export function BookmarksView({
   const [enrichBusy, setEnrichBusy] = useState(null);
   const [noteEditId, setNoteEditId] = useState(null);
   const [noteDraft, setNoteDraft] = useState("");
+  const [tagEditId, setTagEditId] = useState(null);
+  const [tagInput, setTagInput] = useState("");
+  const [flashId, setFlashId] = useState(null);
+  const flashTimer = useRef(null);
+
+  const flashExisting = (id) => {
+    document.getElementById(`bm-card-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setFlashId(id);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlashId(null), 1600);
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return bookmarks || [];
     return (bookmarks || []).filter((item) => {
-      const hay = [item.title, item.url, item.note, item.preview?.description, item.preview?.siteName]
+      const hay = [
+        item.title,
+        item.url,
+        item.note,
+        item.preview?.description,
+        item.preview?.siteName,
+        ...(item.tags || []),
+      ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -120,16 +140,27 @@ export function BookmarksView({
   }, [bookmarks, query]);
 
   const groups = useMemo(() => {
-    return CATEGORIES.map((cat) => ({
+    const base = CATEGORIES.map((cat) => ({
       ...cat,
       items: filtered.filter((item) => cat.kinds.includes(item.kind)),
     })).filter((g) => g.items.length > 0);
+    const favorites = filtered.filter((item) => item.favorite);
+    if (!favorites.length) return base;
+    return [{ key: "favorites", label: "Favorites", tone: "butter", items: favorites }, ...base];
   }, [filtered]);
 
   const submit = async () => {
     const url = normalizeBookmarkUrl(urlInput);
     if (!url) {
       setErr("Paste a valid URL");
+      return;
+    }
+    const dup = (bookmarks || []).find((b) => b.url === url);
+    if (dup) {
+      setUrlInput("");
+      setErr("");
+      fireToast?.("Already pinned — jumped to it", "xp");
+      flashExisting(dup.id);
       return;
     }
     setSaving(true);
@@ -157,6 +188,10 @@ export function BookmarksView({
     } finally {
       setSaving(false);
     }
+  };
+
+  const toggleFavorite = (item) => {
+    onUpdate({ ...item, favorite: !item.favorite });
   };
 
   const reEnrich = async (item) => {
@@ -291,15 +326,26 @@ export function BookmarksView({
                 return (
                   <article
                     key={item.id}
+                    id={`bm-card-${item.id}`}
                     className={classNames(
                       "bm-sticky",
                       `sticky-${tone}`,
                       embed && "bm-sticky-video",
+                      flashId === item.id && "bm-sticky-flash",
                     )}
                     style={{ "--slip-tilt": embed ? "0deg" : slipTilt(item.id) }}
                   >
                     <span className="bm-sticky-tape" aria-hidden="true" />
                     <span className="bm-sticky-pin" aria-hidden="true" />
+                    <button
+                      type="button"
+                      className={classNames("bm-fav-btn", item.favorite && "is-fav")}
+                      onClick={() => toggleFavorite(item)}
+                      aria-label={item.favorite ? "Remove from favorites" : "Add to favorites"}
+                      aria-pressed={!!item.favorite}
+                    >
+                      <Icon.Star size={13} fill={item.favorite ? "currentColor" : "none"} />
+                    </button>
 
                     <div className="bm-sticky-face">
                       <a
@@ -377,6 +423,66 @@ export function BookmarksView({
                       ) : item.note ? (
                         <p className="bm-sticky-note">{item.note}</p>
                       ) : null}
+
+                      {tagEditId === item.id ? (
+                        <div className="bm-tag-edit">
+                          <div className="bm-tag-chips">
+                            {(item.tags || []).map((tag) => (
+                              <span key={tag} className="bm-tag-chip">
+                                {tag}
+                                <button
+                                  type="button"
+                                  className="bm-tag-remove"
+                                  onClick={() =>
+                                    onUpdate({ ...item, tags: removeBookmarkTag(item.tags, tag) })
+                                  }
+                                  aria-label={`Remove tag ${tag}`}
+                                >
+                                  <Icon.X size={9} />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                          <div className="bm-tag-add">
+                            <input
+                              className="bm-tag-input"
+                              value={tagInput}
+                              onChange={(e) => setTagInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === ",") {
+                                  e.preventDefault();
+                                  const next = addBookmarkTag(item.tags, tagInput);
+                                  if (next !== item.tags) onUpdate({ ...item, tags: next });
+                                  setTagInput("");
+                                }
+                              }}
+                              placeholder={
+                                (item.tags?.length || 0) >= 8 ? "Tag limit reached" : "Add tag, Enter…"
+                              }
+                              disabled={(item.tags?.length || 0) >= 8}
+                              maxLength={32}
+                            />
+                            <button
+                              type="button"
+                              className="bm-sticky-action"
+                              onClick={() => {
+                                setTagEditId(null);
+                                setTagInput("");
+                              }}
+                            >
+                              Done
+                            </button>
+                          </div>
+                        </div>
+                      ) : item.tags?.length ? (
+                        <div className="bm-sticky-tags">
+                          {item.tags.map((tag) => (
+                            <span key={tag} className="bm-tag-chip bm-tag-chip-static">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
 
                     <div className="bm-sticky-actions">
@@ -397,6 +503,16 @@ export function BookmarksView({
                         }}
                       >
                         {item.note ? "Edit note" : "Add note"}
+                      </button>
+                      <button
+                        type="button"
+                        className="bm-sticky-action"
+                        onClick={() => {
+                          setTagEditId(item.id);
+                          setTagInput("");
+                        }}
+                      >
+                        {item.tags?.length ? "Edit tags" : "+ Tag"}
                       </button>
                       <button
                         type="button"

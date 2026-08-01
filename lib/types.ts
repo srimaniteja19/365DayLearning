@@ -132,6 +132,7 @@ export type LearnedItem = {
   insight?: string;
   /** Optional stamps: talk, paper, tool, tip, course, other */
   tags?: string[];
+  favorite?: boolean;
   createdAt: number;
 };
 export type LearnedMap = Record<string, LearnedItem[]>;
@@ -157,6 +158,7 @@ export type BookmarkItem = {
   title: string;
   note?: string;
   tags?: string[];
+  favorite?: boolean;
   preview?: BookmarkPreview;
   insight?: string;
   createdAt: number;

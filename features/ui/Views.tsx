@@ -275,6 +275,7 @@ export function TopBar({
   kitTab = null,
   learnedCount = 0,
   bookmarkCount = 0,
+  favoriteCount = 0,
   onOpenKit,
   onOpenCampaign,
 }) {
@@ -354,6 +355,21 @@ export function TopBar({
                   <Icon.Link size={13} />
                   <span className="topbar-item-label">Bookmarks</span>
                   <span className="topbar-kit-count">{bookmarkCount}</span>
+                </button>
+              </Tip>
+              <Tip content="Everything you've starred, from Notes and Bookmarks alike." stamp="★" tone="lemon" side="bottom">
+                <button
+                  type="button"
+                  className={classNames(
+                    "topbar-item topbar-item-favorites",
+                    kitTab === "favorites" && "topbar-item-active topbar-item-favorites-active",
+                  )}
+                  aria-pressed={kitTab === "favorites"}
+                  onClick={() => onOpenKit("favorites")}
+                >
+                  <Icon.Star size={13} />
+                  <span className="topbar-item-label">Favorites</span>
+                  <span className="topbar-kit-count">{favoriteCount}</span>
                 </button>
               </Tip>
             </nav>
@@ -470,6 +486,16 @@ export function TopBar({
                         <Icon.Link size={14} />
                         <span>Bookmarks</span>
                         <span className="topbar-ops-meta">{bookmarkCount}</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className={classNames("topbar-ops-item", kitTab === "favorites" && "is-on")}
+                        onClick={go(() => onOpenKit("favorites"))}
+                      >
+                        <Icon.Star size={14} />
+                        <span>Favorites</span>
+                        <span className="topbar-ops-meta">{favoriteCount}</span>
                       </button>
                     </>
                   )}
@@ -1162,6 +1188,7 @@ export function FieldKitChrome({
   setTab,
   learnedCount,
   bookmarkCount,
+  favoriteCount = 0,
   hasCampaign,
   onBackToCampaign,
   accent,
@@ -1218,6 +1245,17 @@ export function FieldKitChrome({
             <span className="field-kit-tab-stamp">BM</span>
             <span className="field-kit-tab-label">Bookmarks</span>
             <span className="field-kit-tab-count">{bookmarkCount}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "favorites"}
+            className={classNames("field-kit-tab field-kit-tab-favorites", tab === "favorites" && "is-on")}
+            onClick={() => setTab("favorites")}
+          >
+            <span className="field-kit-tab-stamp">★</span>
+            <span className="field-kit-tab-label">Favorites</span>
+            <span className="field-kit-tab-count">{favoriteCount}</span>
           </button>
         </div>
         {typeof setLensQuery === "function" && (

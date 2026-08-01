@@ -20,6 +20,7 @@ export async function upsertLearnedItem(
       body: item.body,
       insight: item.insight ?? null,
       tags: item.tags ?? null,
+      favorite: item.favorite === true,
       createdAt: new Date(item.createdAt),
     })
     .onConflictDoUpdate({
@@ -30,6 +31,7 @@ export async function upsertLearnedItem(
         body: item.body,
         insight: item.insight ?? null,
         tags: item.tags ?? null,
+        favorite: item.favorite === true,
       },
     });
 }
@@ -58,6 +60,7 @@ export async function listLearnedItems(userId: string): Promise<LearnedMap> {
       body: r.body,
       insight: r.insight ?? undefined,
       tags: (r.tags as string[] | null) ?? undefined,
+      favorite: r.favorite === true,
       createdAt: r.createdAt.getTime(),
     };
     (out[r.dateKey] ??= []).push(item);
@@ -80,6 +83,7 @@ export async function backfillLearnedItems(userId: string, learned: LearnedMap):
       body: item.body,
       insight: item.insight ?? null,
       tags: item.tags ?? null,
+      favorite: item.favorite === true,
       createdAt: new Date(item.createdAt),
     })),
   );

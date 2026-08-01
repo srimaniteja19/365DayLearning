@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, jsonb, uuid, integer, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, jsonb, uuid, integer, boolean, primaryKey } from "drizzle-orm/pg-core";
 
 /**
  * One row per account. Passwords are hashed with bcrypt before storage.
@@ -110,6 +110,7 @@ export const learnedItems = pgTable("learned_items", {
   body: text("body").notNull(),
   insight: text("insight"),
   tags: jsonb("tags"),
+  favorite: boolean("favorite").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 });
 
@@ -127,6 +128,7 @@ export const bookmarkItems = pgTable("bookmark_items", {
   title: text("title").notNull(),
   note: text("note"),
   tags: jsonb("tags"),
+  favorite: boolean("favorite").notNull().default(false),
   preview: jsonb("preview"),
   insight: text("insight"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),

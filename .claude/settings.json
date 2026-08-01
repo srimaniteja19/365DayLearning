@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(awk -F: '$1<1446')",
+      "Bash(ps -p 36804 -o pid,lstart,command)",
+      "Bash(pkill -f \"next dev --turbopack.*3001\")",
+      "Bash(kill 36803 36804)"
+    ]
+  }
+}

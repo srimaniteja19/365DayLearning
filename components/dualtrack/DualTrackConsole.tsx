@@ -91,6 +91,7 @@ import {
 } from "@/features/ui/Views";
 import { LearnedView } from "@/features/learned/LearnedView";
 import { BookmarksView } from "@/features/bookmarks/BookmarksView";
+import { FavoritesView } from "@/features/favorites/FavoritesView";
 import {
   applyPreviewToBookmark,
   createBookmarkId,
@@ -112,11 +113,13 @@ const emptyUserSnapshot = () => ({
 });
 
 const DASHBOARD_VIEWS = ["console", "grid", "review", "weekly", "log"];
+const KIT_TABS = ["learned", "bookmarks", "favorites"];
+const normalizeKitTab = (tab) => (KIT_TABS.includes(tab) ? tab : "learned");
 
 function parseDashboardRoute(pathname) {
   const parts = pathname.split("/").filter(Boolean).slice(1);
   if (parts[0] === "kit") {
-    return { page: "kit", kitTab: parts[1] === "bookmarks" ? "bookmarks" : "learned" };
+    return { page: "kit", kitTab: normalizeKitTab(parts[1]) };
   }
   return {
     page: "dashboard",
@@ -262,7 +265,7 @@ export default function DualTrackConsole() {
   const openKit = useCallback(
     (tab = "learned") => {
       requireAuth(() => {
-        goTo({ page: "kit", kitTab: tab === "bookmarks" ? "bookmarks" : "learned" });
+        goTo({ page: "kit", kitTab: normalizeKitTab(tab) });
       });
     },
     [goTo, requireAuth],
@@ -450,7 +453,7 @@ export default function DualTrackConsole() {
         page,
         planId: storedPlanId && plans[storedPlanId] ? storedPlanId : selectedPlanId,
         view: DASHBOARD_VIEWS.includes(storedView) ? storedView : "console",
-        kitTab: storedKitTab === "bookmarks" ? "bookmarks" : "learned",
+        kitTab: normalizeKitTab(storedKitTab),
       }), { scroll: false });
     } catch {
       // best-effort only
@@ -1425,6 +1428,15 @@ export default function DualTrackConsole() {
     [learned, bookmarks],
   );
 
+  const favoriteCount = useMemo(() => {
+    const noteFavs = Object.values(learned || {}).reduce(
+      (n, items) => n + (items || []).filter((it) => it.favorite).length,
+      0,
+    );
+    const bookmarkFavs = (bookmarks || []).filter((b) => b.favorite).length;
+    return noteFavs + bookmarkFavs;
+  }, [learned, bookmarks]);
+
   if (saveStatus === "loading") {
     // Same hydrate shell until Neon snapshot (or signed-out landing) is ready.
     // after mount, so branching here would flash or rematch incorrectly.
@@ -1467,6 +1479,7 @@ export default function DualTrackConsole() {
     kitTab: onKit ? kitTab : null,
     learnedCount,
     bookmarkCount,
+    favoriteCount,
     onOpenKit: openKit,
     onOpenCampaign: campaign ? () => goTo({ page: "dashboard" }) : undefined,
   };
@@ -1567,13 +1580,14 @@ export default function DualTrackConsole() {
             setTab={setKitTab}
             learnedCount={learnedCount}
             bookmarkCount={bookmarkCount}
+            favoriteCount={favoriteCount}
             hasCampaign={!!campaign}
             onBackToCampaign={() => goTo({ page: "dashboard" })}
             accent={kitAccent}
             lensQuery={kitQuery}
             setLensQuery={setKitQuery}
           />
-          {kitTab === "learned" ? (
+          {kitTab === "learned" && (
             <LearnedView
               learned={learned}
               onAdd={addLearned}
@@ -1590,7 +1604,8 @@ export default function DualTrackConsole() {
               onKitSeedConsumed={() => setKitSeed(null)}
               onPinBookmark={pinBookmarkFromUrl}
             />
-          ) : (
+          )}
+          {kitTab === "bookmarks" && (
             <BookmarksView
               bookmarks={bookmarks}
               onAdd={addBookmark}
@@ -1599,6 +1614,19 @@ export default function DualTrackConsole() {
               accent={kitAccent}
               fireToast={fireToast}
               onOpenNotes={() => setKitTab("learned")}
+              lensQuery={kitQuery}
+              onLensQueryChange={setKitQuery}
+            />
+          )}
+          {kitTab === "favorites" && (
+            <FavoritesView
+              learned={learned}
+              bookmarks={bookmarks}
+              onUpdateLearned={updateLearned}
+              onUpdateBookmark={updateBookmark}
+              onJumpToDate={openKitToDate}
+              accent={kitAccent}
+              fireToast={fireToast}
               lensQuery={kitQuery}
               onLensQueryChange={setKitQuery}
             />

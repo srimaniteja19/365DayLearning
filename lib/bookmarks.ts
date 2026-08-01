@@ -206,6 +206,7 @@ export function sanitizeBookmarks(raw: unknown): BookmarksList {
       title,
       note,
       tags: tags?.length ? tags : undefined,
+      favorite: e.favorite === true,
       preview,
       insight,
       createdAt: typeof e.createdAt === "number" ? e.createdAt : Date.now(),
@@ -239,6 +240,23 @@ function sanitizePreview(raw: unknown): BookmarkPreview | undefined {
   }
   if (typeof p.fetchedAt === "number") preview.fetchedAt = p.fetchedAt;
   return Object.keys(preview).length ? preview : undefined;
+}
+
+const MAX_TAGS = 8;
+
+/** Add a user tag, trimmed/capped to match sanitizeBookmarks' limits; case-insensitive dedupe. */
+export function addBookmarkTag(tags: string[] | undefined, raw: string): string[] | undefined {
+  const tag = raw.trim().slice(0, 32);
+  if (!tag) return tags;
+  const existing = tags || [];
+  if (existing.length >= MAX_TAGS) return existing;
+  if (existing.some((t) => t.toLowerCase() === tag.toLowerCase())) return existing;
+  return [...existing, tag];
+}
+
+export function removeBookmarkTag(tags: string[] | undefined, tag: string): string[] | undefined {
+  const next = (tags || []).filter((t) => t !== tag);
+  return next.length ? next : undefined;
 }
 
 export function mergeBookmarks(a: BookmarksList, b: BookmarksList): BookmarksList {

@@ -635,6 +635,10 @@ export function LearnedView({
     }
   };
 
+  const toggleFavorite = (dateStr, item) => {
+    onUpdate(dateStr, { ...item, favorite: !item.favorite });
+  };
+
   const refreshInsight = async (dateKeyStr, item) => {
     setInsightBusy(item.id);
     try {
@@ -1139,6 +1143,18 @@ export function LearnedView({
                         )}
                         style={{ "--slip-tilt": open ? "0deg" : slipTilt(item.id) }}
                       >
+                        <button
+                          type="button"
+                          className={classNames("learned-fav-btn", item.favorite && "is-fav")}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(d, item);
+                          }}
+                          aria-label={item.favorite ? "Remove from favorites" : "Add to favorites"}
+                          aria-pressed={!!item.favorite}
+                        >
+                          <Icon.Star size={12} fill={item.favorite ? "currentColor" : "none"} />
+                        </button>
                         <button
                           type="button"
                           className={classNames("sticky-note-face", open && "sticky-note-face-open")}
