@@ -23,7 +23,7 @@ export type ChatKind = "plan" | "action";
 
 /**
  * True when the next `chat()` call would use server-managed AI
- * (paid tier, no OpenRouter key in Settings). BYOK always wins when present.
+ * (signed-in tier, no OpenRouter key in Settings). BYOK always wins when present.
  */
 export function willUseManagedAi(): boolean {
   const creds = getCredentials();
@@ -70,7 +70,7 @@ async function chatManaged(
 
 /**
  * Chat through OpenRouter — BYOK key from Settings, or the server-managed
- * OpenRouter proxy (`/api/ai`) for Operator/Architect when no key is set.
+ * OpenRouter proxy (`/api/ai`) when no key is set.
  * BYOK failover: free models → cheap paid models when the primary fails.
  */
 export async function chat(
@@ -85,7 +85,7 @@ export async function chat(
 
   if (!creds.apiKey?.trim()) {
     throw new AuthError(
-      "Add your OpenRouter API key in Settings, or upgrade to Operator/Architect for managed AI.",
+      "Add your OpenRouter API key in Settings, or use your managed AI allowance.",
     );
   }
 

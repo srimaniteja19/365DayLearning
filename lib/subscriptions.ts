@@ -6,7 +6,8 @@ import { SubscriptionError } from "@/lib/providers/errors";
  * in-app callback rather than introducing a second, disconnected vocabulary.
  *
  * Paid tiers use Stripe Checkout + webhooks. Managed AI (server OpenRouter
- * proxy) is available on Operator/Architect; Recruit stays OpenRouter BYOK.
+ * proxy) is available to every signed-in tier. Recruit receives a small,
+ * one-time managed allowance; BYOK remains available at every tier.
  */
 export type SubscriptionTier = "free" | "operator" | "architect";
 
@@ -19,9 +20,13 @@ export type TierDefinition = {
   priceLabel: string;
   /** Whether this tier can use server-managed AI without supplying an API key. */
   managedAi: boolean;
-  /** null = unlimited / not billed (BYOK). Numbers are quotas for managed AI. */
+  /** Numbers are quotas for server-managed AI; BYOK is always unlimited. */
   planGenerationsPerPeriod: number | null;
   aiActionsPerPeriod: number | null;
+  /** Maximum days for a managed plan generation; null means no length gate. */
+  maxDaysManaged: number | null;
+  /** Recruit allowances never reset; paid allowances use the rolling period. */
+  managedAllowanceWindow: "lifetime" | "rolling";
   /** When true, UI shows Coming soon and checkout is blocked. */
   comingSoon: boolean;
   tagline: string;
@@ -34,12 +39,16 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierDefinition> = {
     rankLabel: "Recruit",
     priceMonthlyUsd: 0,
     priceLabel: "Free",
-    managedAi: false,
-    planGenerationsPerPeriod: null,
-    aiActionsPerPeriod: null,
+    managedAi: true,
+    planGenerationsPerPeriod: 1,
+    aiActionsPerPeriod: 10,
+    maxDaysManaged: 90,
+    managedAllowanceWindow: "lifetime",
     comingSoon: false,
-    tagline: "Bring your own OpenRouter key.",
+    tagline: "Try managed AI once — or bring your own key anytime.",
     features: [
+      "1 managed plan generation (up to 90 days), lifetime",
+      "10 managed AI actions, lifetime",
       "Unlimited custom plans on your OpenRouter key",
       "Unlimited quiz, notes, LinkedIn drafts & journal insights",
       "Example campaigns, multi-plan switcher, XP & streaks",
@@ -56,6 +65,8 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierDefinition> = {
     managedAi: true,
     planGenerationsPerPeriod: 3,
     aiActionsPerPeriod: 150,
+    maxDaysManaged: null,
+    managedAllowanceWindow: "rolling",
     comingSoon: false,
     tagline: "Managed AI on us — light monthly quota.",
     features: [
@@ -75,6 +86,8 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierDefinition> = {
     managedAi: true,
     planGenerationsPerPeriod: 5,
     aiActionsPerPeriod: 400,
+    maxDaysManaged: null,
+    managedAllowanceWindow: "rolling",
     comingSoon: false,
     tagline: "More managed AI headroom.",
     features: [
@@ -132,7 +145,10 @@ export type SubscriptionUsage = {
   planGenerationsLimit: number | null;
   aiActionsUsed: number;
   aiActionsLimit: number | null;
-  periodResetAt: string;
+  /** Whether displayed managed usage is lifetime rather than rolling. */
+  managedAllowanceWindow: "lifetime" | "rolling";
+  /** Null for lifetime allowances. */
+  periodResetAt: string | null;
 };
 
 /** Statuses that mean the account already has a live Stripe subscription. */
@@ -163,10 +179,15 @@ export async function fetchSubscriptionStatus(): Promise<
  * quota. Only meaningful when managed AI is live (`willUseManagedAi()`).
  * Throws a `SubscriptionError` with a user-facing message on rejection.
  */
-export async function reservePlanGeneration(signal?: AbortSignal): Promise<void> {
+export async function reservePlanGeneration(totalDays: number, signal?: AbortSignal): Promise<void> {
   let res: Response;
   try {
-    res = await fetch("/api/subscription/reserve-plan", { method: "POST", signal });
+    res = await fetch("/api/subscription/reserve-plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ totalDays }),
+      signal,
+    });
   } catch {
     throw new SubscriptionError("Network error while checking your plan quota.");
   }

@@ -241,25 +241,25 @@ export default async function HomePage() {
         <section id="ai" className="landing-section landing-ai" aria-labelledby="landing-ai-title">
           <span className="landing-stamp">AI</span>
           <h2 id="landing-ai-title" className="landing-section-title">
-            Bring your own key. Keep the loop free.
+            Start with managed AI. Bring your own key anytime.
           </h2>
           <div className="landing-ai-grid">
             <div className="landing-ai-card landing-ai-card-main landing-neo-card">
-              <h3 className="landing-ai-card-title">Recruit · BYOK (live)</h3>
+              <h3 className="landing-ai-card-title">Recruit · managed trial + BYOK</h3>
               <p className="landing-ai-card-copy">
-                Add your own AI key in Settings. Quiz, notes, LinkedIn drafts, plan generation, and
-                Field Kit polish run on your credits — no vendor lock-in on day one.
+                Start with 1 managed plan generation up to 90 days and 10 managed AI actions — no
+                key required. Add your own key anytime for unlimited use on your credits.
               </p>
               <ul className="landing-ai-list">
                 <li>Key stays in memory by default</li>
                 <li>Optional remember-on-device</li>
-                <li>Without a key, the campaign loop still works</li>
+                <li>Managed trial is lifetime, not monthly</li>
               </ul>
             </div>
             <div className="landing-ai-card landing-neo-card">
               <h3 className="landing-ai-card-title">Managed AI · live</h3>
               <p className="landing-ai-card-copy">
-                Operator and Architect include managed AI quotas. Paid tiers keep BYOK too.
+                Operator and Architect include larger monthly managed quotas. Paid tiers keep BYOK too.
               </p>
               <a className="landing-surface-cta landing-ai-link" href="#pricing">
                 See plans

@@ -20,12 +20,14 @@ describe("tier definitions", () => {
     expect(prices).toEqual([...prices].sort((a, b) => a - b));
   });
 
-  it("free tier has no managed AI and no quotas", () => {
+  it("free tier includes a one-time managed AI allowance", () => {
     const free = SUBSCRIPTION_TIERS.free;
-    expect(free.managedAi).toBe(false);
+    expect(free.managedAi).toBe(true);
     expect(free.comingSoon).toBe(false);
-    expect(free.planGenerationsPerPeriod).toBeNull();
-    expect(free.aiActionsPerPeriod).toBeNull();
+    expect(free.planGenerationsPerPeriod).toBe(1);
+    expect(free.aiActionsPerPeriod).toBe(10);
+    expect(free.maxDaysManaged).toBe(90);
+    expect(free.managedAllowanceWindow).toBe("lifetime");
   });
 
   it("paid tiers are live with managed AI quotas", () => {
@@ -38,6 +40,7 @@ describe("tier definitions", () => {
     expect(architect.planGenerationsPerPeriod!).toBeGreaterThan(operator.planGenerationsPerPeriod!);
     expect(architect.aiActionsPerPeriod!).toBeGreaterThan(operator.aiActionsPerPeriod!);
     expect(architect.priceMonthlyUsd).toBeGreaterThan(operator.priceMonthlyUsd);
+    expect(operator.managedAllowanceWindow).toBe("rolling");
   });
 
   it("tierDef falls back to free for unknown/missing tiers", () => {
@@ -82,6 +85,7 @@ describe("client fetch helpers", () => {
       planGenerationsLimit: 3,
       aiActionsUsed: 10,
       aiActionsLimit: 150,
+      managedAllowanceWindow: "rolling",
       periodResetAt: new Date().toISOString(),
     };
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => usage })));
@@ -99,7 +103,11 @@ describe("client fetch helpers", () => {
 
   it("reservePlanGeneration resolves silently on success", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ ok: true }) })));
-    await expect(reservePlanGeneration()).resolves.toBeUndefined();
+    await expect(reservePlanGeneration(90)).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/subscription/reserve-plan",
+      expect.objectContaining({ body: JSON.stringify({ totalDays: 90 }) }),
+    );
   });
 
   it("reservePlanGeneration throws SubscriptionError with the server message on rejection", async () => {
@@ -110,8 +118,8 @@ describe("client fetch helpers", () => {
         json: async () => ({ error: "You've used all 3 AI-generated plans for this billing period." }),
       })),
     );
-    await expect(reservePlanGeneration()).rejects.toBeInstanceOf(SubscriptionError);
-    await expect(reservePlanGeneration()).rejects.toThrow(/used all 3 AI-generated plans/);
+    await expect(reservePlanGeneration(91)).rejects.toBeInstanceOf(SubscriptionError);
+    await expect(reservePlanGeneration(91)).rejects.toThrow(/used all 3 AI-generated plans/);
   });
 
   it("requestUpgrade returns the Stripe Checkout URL on success", async () => {

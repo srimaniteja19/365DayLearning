@@ -5,7 +5,7 @@ import {
   lookupTopicResources,
   storeTopicResources,
 } from "@/lib/db/topicResourceCache";
-import { requireManagedAiTier, reserveAiActionQuota } from "@/lib/db/subscriptionQuota";
+import { requireManagedAiAccess, reserveAiActionQuota } from "@/lib/db/subscriptionQuota";
 import { clientIp, isRateLimited, isSameOrigin } from "@/lib/httpGuard";
 import { logError } from "@/lib/logError";
 import { openRouterWebSearch } from "@/lib/openrouterWebSearch";
@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
       kindRaw === "video" ? "video" : kindRaw === "pair" ? "pair" : "article";
 
     if (hasDatabase()) {
-      const tierOk = await requireManagedAiTier(session.user.id);
+      const tierOk = await requireManagedAiAccess(session.user.id);
       if (!tierOk.ok) {
         return NextResponse.json({ error: tierOk.message }, { status: tierOk.status });
       }

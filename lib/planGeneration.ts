@@ -752,10 +752,10 @@ export async function generatePlan(opts: GeneratePlanOptions): Promise<{
   const telemetry = newTelemetry();
 
   // Only the first attempt at a plan (not a resume of an interrupted one)
-  // consumes a monthly slot, and only when this will actually use managed
+  // consumes a managed allowance, and only when this will actually use managed
   // (server-key) AI rather than the caller's own BYOK key.
   if (!opts.resume && willUseManagedAi()) {
-    await reservePlanGeneration(signal);
+    await reservePlanGeneration(draft.totalDays, signal);
   }
 
   const meta = draftToPlanRequest(draft);

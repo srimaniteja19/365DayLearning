@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { hasDatabase } from "@/lib/db/client";
-import { requireManagedAiTier, reserveAiActionQuota } from "@/lib/db/subscriptionQuota";
+import { requireManagedAiQuota, reserveAiActionQuota } from "@/lib/db/subscriptionQuota";
 import { clientIp, isRateLimited, isSameOrigin } from "@/lib/httpGuard";
 import { logError } from "@/lib/logError";
 import { OPENROUTER_DEFAULT_MODEL } from "@/lib/providers/openrouter";
@@ -45,7 +45,7 @@ function readStructured(
 }
 
 /**
- * Managed AI for Operator / Architect: proxies to OpenRouter with the
+ * Managed AI: proxies to OpenRouter with the
  * server `OPENROUTER_API_KEY`, gated by subscription quotas.
  */
 export async function POST(req: NextRequest) {
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
       );
     }
     const result =
-      kind === "plan" ? await requireManagedAiTier(userId) : await reserveAiActionQuota(userId);
+      kind === "plan" ? await requireManagedAiQuota(userId) : await reserveAiActionQuota(userId);
     if (!result.ok) {
       return NextResponse.json({ error: result.message }, { status: result.status });
     }

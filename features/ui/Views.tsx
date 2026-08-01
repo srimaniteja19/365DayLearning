@@ -997,8 +997,8 @@ function PricingPanel({ onClose, onOpenAccount, refreshToken = 0 }) {
     <div className="pricing-panel">
       <div className="pricing-intro">
         <p className="pricing-intro-lead">
-          Recruit is free with your OpenRouter key. Operator and Architect unlock managed AI
-          with monthly quotas — checkout via Stripe, invoices included.
+          Recruit includes a one-time managed AI trial; add your OpenRouter key anytime for
+          unlimited BYOK use. Operator and Architect add monthly managed quotas.
         </p>
       </div>
 
@@ -1084,7 +1084,9 @@ function PricingPanel({ onClose, onOpenAccount, refreshToken = 0 }) {
 
       {session?.user && usage && !loadingUsage && (
         <div className="pricing-usage">
-          <div className="pricing-usage-title">This period</div>
+          <div className="pricing-usage-title">
+            {usage.managedAllowanceWindow === "lifetime" ? "Lifetime allowance" : "This period"}
+          </div>
           <UsageBar
             label="AI-generated plans"
             used={usage.planGenerationsUsed}
@@ -1095,14 +1097,14 @@ function PricingPanel({ onClose, onOpenAccount, refreshToken = 0 }) {
             used={usage.aiActionsUsed}
             limit={usage.aiActionsLimit}
           />
-          {(usage.planGenerationsLimit != null || usage.aiActionsLimit != null) && (
+          {usage.managedAllowanceWindow === "rolling" && usage.periodResetAt && (
             <div className="pricing-usage-reset">
               Resets {new Date(usage.periodResetAt).toLocaleDateString()}
             </div>
           )}
-          {usage.planGenerationsLimit == null && usage.aiActionsLimit == null && (
+          {usage.managedAllowanceWindow === "lifetime" && (
             <div className="pricing-usage-reset">
-              Recruit · unlimited on your OpenRouter key
+              Recruit · BYOK remains unlimited and never uses this allowance
             </div>
           )}
           {usage.hasBillingAccount && (
@@ -3646,6 +3648,5 @@ export function Footer() {
     </footer>
   );
 }
-
 
 

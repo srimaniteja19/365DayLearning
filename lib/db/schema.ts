@@ -23,6 +23,9 @@ export const users = pgTable("users", {
   stripeSubscriptionId: text("stripe_subscription_id"),
   planGenerationsUsed: integer("plan_generations_used").notNull().default(0),
   aiActionsUsed: integer("ai_actions_used").notNull().default(0),
+  /** Recruit's one-time managed allowance; never reset with paid billing periods. */
+  freePlanGenerationsUsed: integer("free_plan_generations_used").notNull().default(0),
+  freeAiActionsUsed: integer("free_ai_actions_used").notNull().default(0),
   usagePeriodStart: timestamp("usage_period_start", { withTimezone: true }).notNull().defaultNow(),
 });
 
