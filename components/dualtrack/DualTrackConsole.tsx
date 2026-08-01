@@ -114,7 +114,7 @@ const emptyUserSnapshot = () => ({
   bookmarks: [],
 });
 
-const DASHBOARD_VIEWS = ["console", "grid", "review", "weekly", "log"];
+const DASHBOARD_VIEWS = ["console", "grid", "review", "weekly", "log", "constellation"];
 const KIT_TABS = ["learned", "bookmarks", "favorites"];
 const normalizeKitTab = (tab) => (KIT_TABS.includes(tab) ? tab : "learned");
 
