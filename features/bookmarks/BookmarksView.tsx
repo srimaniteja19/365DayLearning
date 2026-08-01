@@ -367,11 +367,13 @@ export function BookmarksView({
                     className={classNames(
                       "bm-sticky",
                       `sticky-${tone}`,
+                      `bm-sticky-${item.kind}`,
                       embed && "bm-sticky-video",
                       flashId === item.id && "bm-sticky-flash",
                     )}
-                    style={{ "--slip-tilt": embed ? "0deg" : slipTilt(item.id) }}
+                    style={{ "--slip-tilt": embed ? "0deg" : index % 2 === 0 ? "-1.8deg" : "1.8deg" }}
                   >
+                    <span className="bm-sticky-backing" aria-hidden="true" />
                     <span className="bm-sticky-tape" aria-hidden="true" />
                     <span className={classNames("bm-fav-corner", item.favorite && "bm-fav-corner-on")} aria-hidden="true" />
                     <button
@@ -386,6 +388,7 @@ export function BookmarksView({
                     </button>
 
                     <div className="bm-sticky-face">
+                      <span className="bm-sticky-ribbon" aria-hidden="true" />
                       <a
                         className="bm-sticky-meta"
                         href={item.url}
@@ -521,55 +524,54 @@ export function BookmarksView({
                           ))}
                         </div>
                       ) : null}
-                    </div>
-
-                    <div className="bm-sticky-actions">
-                      <a
-                        className="bm-sticky-action"
-                        href={item.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Open
-                      </a>
-                      <button
-                        type="button"
-                        className="bm-sticky-action"
-                        onClick={() => {
-                          setNoteEditId(item.id);
-                          setNoteDraft(item.note || "");
-                        }}
-                      >
-                        {item.note ? "Edit note" : "Add note"}
-                      </button>
-                      <button
-                        type="button"
-                        className="bm-sticky-action"
-                        onClick={() => {
-                          setTagEditId(item.id);
-                          setTagInput("");
-                        }}
-                      >
-                        {item.tags?.length ? "Edit tags" : "+ Tag"}
-                      </button>
-                      <button
-                        type="button"
-                        className="bm-sticky-action"
-                        disabled={enrichBusy === item.id}
-                        onClick={() => reEnrich(item)}
-                      >
-                        {enrichBusy === item.id ? "…" : "Refresh"}
-                      </button>
-                      <button
-                        type="button"
-                        className="bm-sticky-action bm-sticky-action-mute"
-                        onClick={() => {
-                          onRemove(item.id);
-                          fireToast?.("Removed", "xp");
-                        }}
-                      >
-                        Remove
-                      </button>
+                      <div className="bm-sticky-actions">
+                        <a
+                          className="bm-sticky-action"
+                          href={item.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Open
+                        </a>
+                        <button
+                          type="button"
+                          className="bm-sticky-action"
+                          onClick={() => {
+                            setNoteEditId(item.id);
+                            setNoteDraft(item.note || "");
+                          }}
+                        >
+                          {item.note ? "Edit note" : "Add note"}
+                        </button>
+                        <button
+                          type="button"
+                          className="bm-sticky-action"
+                          onClick={() => {
+                            setTagEditId(item.id);
+                            setTagInput("");
+                          }}
+                        >
+                          {item.tags?.length ? "Edit tags" : "+ Tag"}
+                        </button>
+                        <button
+                          type="button"
+                          className="bm-sticky-action"
+                          disabled={enrichBusy === item.id}
+                          onClick={() => reEnrich(item)}
+                        >
+                          {enrichBusy === item.id ? "…" : "Refresh"}
+                        </button>
+                        <button
+                          type="button"
+                          className="bm-sticky-action bm-sticky-action-mute"
+                          onClick={() => {
+                            onRemove(item.id);
+                            fireToast?.("Removed", "xp");
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   </article>
                 );
