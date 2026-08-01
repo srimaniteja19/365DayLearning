@@ -2473,52 +2473,246 @@ export function ReviewView({ queue, srs, notes, scheduledCount, onGrade, onOpenD
 }
 
 /* ============================== CONSTELLATION VIEW ============================== */
+/** Lower wins when two node types share an edge — sets the edge's color. */
+const CONSTELLATION_TYPE_PRIORITY = { day: 0, learned: 1, bookmark: 2 };
+
 const CONSTELLATION_NODE_TYPE_META = {
-  day: { label: "Day", stamp: "DAY", tone: "mint" },
-  learned: { label: "Note", stamp: "LOG", tone: "sky" },
-  bookmark: { label: "Bookmark", stamp: "BM", tone: "violet" },
+  day: { label: "Day", chip: "Deck days", stamp: "DAY", tone: "mint" },
+  learned: { label: "Slip", chip: "Field kit slips", stamp: "LOG", tone: "sky" },
+  bookmark: { label: "Bookmark", chip: "Bookmarks", stamp: "BM", tone: "violet" },
 };
 
-function ConstellationNodeDot({ node, onOpen }) {
+const CONSTELLATION_ENTER_STAGGER_MS = 9;
+const CONSTELLATION_ENTER_STAGGER_CAP_MS = 260;
+const CONSTELLATION_CARD_WIDTH = 232;
+const CONSTELLATION_CARD_HEIGHT = 168;
+const CONSTELLATION_CARD_OFFSET = 38;
+const CONSTELLATION_CARD_MARGIN = 14;
+
+/**
+ * Cheap "night sky" texture: a fixed scatter of dots baked once at module
+ * load with a seeded PRNG (not Math.random — stays identical across renders
+ * and SSR/client), reused as a tiled background-image. No per-node or
+ * per-render cost; pure decoration.
+ */
+function buildConstellationStarfield() {
+  let seed = 907633;
+  const rand = () => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+  const dots = Array.from({ length: 90 }, () => {
+    const cx = (rand() * 100).toFixed(1);
+    const cy = (rand() * 100).toFixed(1);
+    const r = (0.5 + rand() * 0.65).toFixed(2);
+    return `<circle cx="${cx}" cy="${cy}" r="${r}"/>`;
+  }).join("");
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><g fill='currentColor'>${dots}</g></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+const CONSTELLATION_STARFIELD_BG = buildConstellationStarfield();
+
+/** Small deterministic string hash — picks each edge's arc side/strength without per-render randomness. */
+function hashString(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return h;
+}
+
+/** Gentle single-control-point arc — costs the same to render as a straight line, no per-edge noise/wobble. */
+function constellationArcPath(a, b, edgeKey) {
+  const mx = (a.x + b.x) / 2;
+  const my = (a.y + b.y) / 2;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+  const h = hashString(edgeKey);
+  const sign = (h & 1) === 0 ? 1 : -1;
+  const bend = sign * Math.min(46, Math.max(7, dist * 0.16));
+  const cx = mx + (-dy / dist) * bend;
+  const cy = my + (dx / dist) * bend;
+  return `M ${a.x} ${a.y} Q ${cx} ${cy} ${b.x} ${b.y}`;
+}
+
+function ConstellationNodeDot({ node, index, onSelect }) {
   const meta = CONSTELLATION_NODE_TYPE_META[node.type];
-  const radius = node.type === "day" ? Math.min(16, 9 + node.weight * 1.1) : 10;
+  const radius = Math.min(18, 7 + node.weight * 1.4);
+  const size = radius * 2;
   const dateLabel = node.createdAt ? new Date(node.createdAt).toLocaleDateString() : null;
   const subtitle = node.subtitle && node.subtitle.length > 140
     ? `${node.subtitle.slice(0, 140)}…`
     : node.subtitle;
+  const enterDelay = Math.min(index * CONSTELLATION_ENTER_STAGGER_MS, CONSTELLATION_ENTER_STAGGER_CAP_MS);
   return (
-    <Tip
-      content={
-        <>
-          <strong>{node.label}</strong>
-          {subtitle && <><br />{subtitle}</>}
-          {dateLabel && <><br />{dateLabel}</>}
-          {node.domains.length > 0 && <><br />{node.domains.join(", ")}</>}
-        </>
-      }
-      stamp={meta.stamp}
-      tone={meta.tone}
-      side="top"
-      maxWidth={260}
+    // Tip measures its wrapper span's rendered rect to place the popup, so the
+    // span it wraps must be normal in-flow content — position the *slot*, not
+    // the button, or the (position:absolute) button leaves the span a
+    // zero-size box at the container's top-left corner.
+    <div
+      id={`constellation-node-slot-${node.id}`}
+      className="constellation-node-slot"
+      style={{
+        left: `${(node.x / CONSTELLATION_WIDTH) * 100}%`,
+        top: `${(node.y / CONSTELLATION_HEIGHT) * 100}%`,
+        width: size,
+        height: size,
+      }}
     >
-      <button
-        type="button"
-        className={classNames("constellation-node", `constellation-node-${node.type}`)}
-        style={{
-          left: `${(node.x / CONSTELLATION_WIDTH) * 100}%`,
-          top: `${(node.y / CONSTELLATION_HEIGHT) * 100}%`,
-          width: radius * 2,
-          height: radius * 2,
-        }}
-        onClick={() => onOpen(node)}
-        aria-label={`${meta.label}: ${node.label}`}
-      />
-    </Tip>
+      <Tip
+        content={
+          <>
+            <strong>{node.label}</strong>
+            {subtitle && <><br />{subtitle}</>}
+            {dateLabel && <><br />{dateLabel}</>}
+            {node.domains.length > 0 && <><br />{node.domains.join(", ")}</>}
+          </>
+        }
+        stamp={meta.stamp}
+        tone={meta.tone}
+        side="top"
+        maxWidth={260}
+      >
+        <button
+          type="button"
+          className={classNames("constellation-node", `constellation-node-${node.type}`)}
+          style={{
+            width: size,
+            height: size,
+            "--enter-delay": `${enterDelay}ms`,
+          }}
+          onClick={() => onSelect(node)}
+          aria-label={`${meta.label}: ${node.label}`}
+        />
+      </Tip>
+    </div>
   );
 }
 
-export function ConstellationView({ nodes, edges, onOpenNode }) {
+/** Reticle + leader line + info card for the currently-selected node — the only rotated, per-selection UI (never per-node). */
+function ConstellationSelection({ node, layout, edges, nodeById, onOpen, onClose }) {
+  const meta = CONSTELLATION_NODE_TYPE_META[node.type];
+  const tagChips = node.type === "day"
+    ? Array.from(new Set(node.domains)).map((d) => DOMAIN_META[d]?.label || d)
+    : node.domains;
+  const neighborCounts = useMemo(() => {
+    const counts = { day: 0, learned: 0, bookmark: 0 };
+    edges.forEach((e) => {
+      if (e.source !== node.id && e.target !== node.id) return;
+      const other = nodeById.get(e.source === node.id ? e.target : e.source);
+      if (other) counts[other.type] += 1;
+    });
+    return counts;
+  }, [edges, node.id, nodeById]);
+  const connectionLine = [
+    neighborCounts.day > 0 && `${neighborCounts.day} day${neighborCounts.day === 1 ? "" : "s"}`,
+    neighborCounts.learned > 0 && `${neighborCounts.learned} slip${neighborCounts.learned === 1 ? "" : "s"}`,
+    neighborCounts.bookmark > 0 && `${neighborCounts.bookmark} bookmark${neighborCounts.bookmark === 1 ? "" : "s"}`,
+  ].filter(Boolean).join(", ");
+  return (
+    <>
+      <div
+        className="constellation-reticle"
+        style={{ left: layout.nx, top: layout.ny, width: layout.reticleSize, height: layout.reticleSize }}
+        aria-hidden="true"
+      />
+      <div
+        className="constellation-leader"
+        style={{ left: layout.nx, top: layout.ny, width: layout.leaderLength, transform: `rotate(${layout.leaderAngle}deg)` }}
+        aria-hidden="true"
+      />
+      <div
+        className={classNames("constellation-card", `constellation-card-${node.type}`)}
+        style={{ left: layout.cardLeft, top: layout.cardTop, width: layout.cardW }}
+        role="dialog"
+        aria-label={`${meta.label} details`}
+      >
+        <button type="button" className="constellation-card-close" onClick={onClose} aria-label="Close">
+          <Icon.X size={11} />
+        </button>
+        <span className="constellation-card-stamp">{meta.stamp}</span>
+        <div className="constellation-card-title">{node.label}</div>
+        {tagChips.length > 0 && (
+          <div className="constellation-card-tags">
+            {node.type === "day" ? "domain" : "tags"}: {tagChips.slice(0, 4).join(", ")}
+            {node.type === "day" && ", fully cleared"}
+          </div>
+        )}
+        <div className="constellation-card-meta">
+          {connectionLine ? `${connectionLine} nearby` : "nothing linked yet"}
+        </div>
+        <button type="button" className="constellation-card-open" onClick={() => onOpen(node)}>
+          Open <Icon.Chevron size={11} />
+        </button>
+      </div>
+    </>
+  );
+}
+
+/** Static, floating — shown once if any node has zero connections. Not per-node, not animated. */
+function ConstellationUnexploredCallout() {
+  return (
+    <div className="constellation-callout constellation-callout-unexplored">
+      <div className="constellation-callout-title">Unexplored</div>
+      <div className="constellation-callout-copy">A dot out here has nothing linked yet — try tagging it to match the rest.</div>
+    </div>
+  );
+}
+
+export function ConstellationView({ nodes, edges, onOpenNode, onShuffle }) {
   const posById = useMemo(() => new Map((nodes || []).map((n) => [n.id, n])), [nodes]);
+  const canvasRef = useRef(null);
+  const [selectedId, setSelectedId] = useState(null);
+  const [cardLayout, setCardLayout] = useState(null);
+  const selectedNode = selectedId ? posById.get(selectedId) || null : null;
+
+  useEffect(() => {
+    if (!selectedNode || !canvasRef.current) {
+      setCardLayout(null);
+      return;
+    }
+    const compute = () => {
+      const canvasEl = canvasRef.current;
+      const nodeEl = document.getElementById(`constellation-node-slot-${selectedNode.id}`);
+      if (!canvasEl || !nodeEl) return;
+      const canvasRect = canvasEl.getBoundingClientRect();
+      const nodeRect = nodeEl.getBoundingClientRect();
+      const nx = nodeRect.left + nodeRect.width / 2 - canvasRect.left;
+      const ny = nodeRect.top + nodeRect.height / 2 - canvasRect.top;
+      const cardW = CONSTELLATION_CARD_WIDTH;
+      const cardH = CONSTELLATION_CARD_HEIGHT;
+      const margin = CONSTELLATION_CARD_MARGIN;
+      const goLeft = nx > canvasRect.width * 0.6;
+      const goUp = ny > canvasRect.height * 0.6;
+      let cardLeft = goLeft ? nx - CONSTELLATION_CARD_OFFSET - cardW : nx + CONSTELLATION_CARD_OFFSET;
+      let cardTop = goUp ? ny - CONSTELLATION_CARD_OFFSET - cardH : ny + CONSTELLATION_CARD_OFFSET;
+      cardLeft = Math.max(margin, Math.min(cardLeft, canvasRect.width - cardW - margin));
+      cardTop = Math.max(margin, Math.min(cardTop, canvasRect.height - cardH - margin));
+      const anchorX = cardLeft + (goLeft ? cardW : 0);
+      const anchorY = cardTop + cardH / 2;
+      const dx = anchorX - nx;
+      const dy = anchorY - ny;
+      setCardLayout({
+        nx,
+        ny,
+        reticleSize: Math.max(nodeRect.width, nodeRect.height) * 1.9,
+        cardLeft,
+        cardTop,
+        cardW,
+        leaderLength: Math.sqrt(dx * dx + dy * dy),
+        leaderAngle: (Math.atan2(dy, dx) * 180) / Math.PI,
+      });
+    };
+    compute();
+    window.addEventListener("resize", compute);
+    return () => window.removeEventListener("resize", compute);
+  }, [selectedNode]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    const onKey = (e) => { if (e.key === "Escape") setSelectedId(null); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selectedId]);
 
   if (!nodes || nodes.length < CONSTELLATION_MIN_NODES) {
     return (
@@ -2526,7 +2720,7 @@ export function ConstellationView({ nodes, edges, onOpenNode }) {
         <OpsEmpty
           stamp="MAP"
           title="Not enough data yet"
-          copy="Complete a few days, drop a note, or pin a bookmark — the constellation forms once there's enough to connect."
+          copy="Complete a few days, drop a slip, or pin a bookmark — the constellation forms once there's enough to connect."
         />
       </div>
     );
@@ -2535,26 +2729,46 @@ export function ConstellationView({ nodes, edges, onOpenNode }) {
   const dayCount = nodes.filter((n) => n.type === "day").length;
   const learnedCount = nodes.filter((n) => n.type === "learned").length;
   const bookmarkCount = nodes.filter((n) => n.type === "bookmark").length;
+  const hasUnexplored = nodes.some((n) => n.weight === 0);
 
   return (
     <div className="constellation-view ops-view-enter">
+      <div className="constellation-banner">
+        <h2 className="constellation-banner-title">the constellation</h2>
+        <span className="constellation-banner-sub">your whole brain, mapped</span>
+        <span className="constellation-banner-badge">
+          <span className="constellation-banner-badge-num">{nodes.length}</span>
+          <span className="constellation-banner-badge-label">stars</span>
+        </span>
+      </div>
+
       <section className="constellation-ops">
-        <div className="grid-ops-mast constellation-mast">
-          <div className="grid-ops-mast-text">
-            <span className="grid-ops-title">Constellation</span>
-            <span className="grid-ops-sub">
-              Every dot is a day, note, or bookmark · lines connect related work · click to jump in
-            </span>
-          </div>
-          <div className="grid-ops-stats" aria-hidden="true">
-            <span className="grid-ops-stat"><em>{dayCount}</em> days</span>
-            <span className="grid-ops-stat"><em>{learnedCount}</em> notes</span>
-            <span className="grid-ops-stat"><em>{bookmarkCount}</em> bookmarks</span>
-            <span className="grid-ops-stat"><em>{edges.length}</em> links</span>
-          </div>
+        <div className="constellation-chips" role="group" aria-label="Node categories">
+          <span className="constellation-chip constellation-chip-day">
+            {CONSTELLATION_NODE_TYPE_META.day.chip} · {dayCount}
+          </span>
+          <span className="constellation-chip constellation-chip-learned">
+            {CONSTELLATION_NODE_TYPE_META.learned.chip} · {learnedCount}
+          </span>
+          <span className="constellation-chip constellation-chip-bookmark">
+            {CONSTELLATION_NODE_TYPE_META.bookmark.chip} · {bookmarkCount}
+          </span>
+          {typeof onShuffle === "function" && (
+            <button type="button" className="constellation-chip constellation-chip-shuffle" onClick={onShuffle}>
+              <Icon.Sparkle size={11} /> shuffle sky
+            </button>
+          )}
+          <span className="constellation-chip-links">{edges.length} links</span>
         </div>
 
-        <div className="constellation-canvas">
+        <div
+          className="constellation-canvas"
+          ref={canvasRef}
+          style={{ "--constellation-starfield": CONSTELLATION_STARFIELD_BG }}
+        >
+          <Icon.Sparkle size={12} className="constellation-sparkle constellation-sparkle-1" aria-hidden="true" />
+          <Icon.Sparkle size={10} className="constellation-sparkle constellation-sparkle-2" aria-hidden="true" />
+          <Icon.Sparkle size={14} className="constellation-sparkle constellation-sparkle-3" aria-hidden="true" />
           <svg
             className="constellation-edges"
             viewBox={`0 0 ${CONSTELLATION_WIDTH} ${CONSTELLATION_HEIGHT}`}
@@ -2565,43 +2779,42 @@ export function ConstellationView({ nodes, edges, onOpenNode }) {
               const a = posById.get(e.source);
               const b = posById.get(e.target);
               if (!a || !b) return null;
+              const edgeKey = `${e.source}|${e.target}`;
+              const primary = CONSTELLATION_TYPE_PRIORITY[a.type] <= CONSTELLATION_TYPE_PRIORITY[b.type] ? a : b;
               return (
-                <line
-                  key={`${e.source}|${e.target}`}
-                  x1={a.x}
-                  y1={a.y}
-                  x2={b.x}
-                  y2={b.y}
-                  className={classNames("constellation-edge", `constellation-edge-${e.kind}`)}
-                  strokeOpacity={e.kind === "similarity" ? Math.min(0.85, 0.25 + e.score * 0.12) : 0.3}
+                <path
+                  key={edgeKey}
+                  d={constellationArcPath(a, b, edgeKey)}
+                  fill="none"
+                  className={classNames(
+                    "constellation-edge",
+                    `constellation-edge-${primary.type}`,
+                    e.kind === "domain" && "constellation-edge-domain",
+                  )}
+                  strokeOpacity={e.kind === "similarity" ? Math.min(0.85, 0.25 + e.score * 0.12) : 0.28}
                 />
               );
             })}
           </svg>
-          <div className="constellation-nodes">
-            {nodes.map((node) => (
-              <ConstellationNodeDot key={node.id} node={node} onOpen={onOpenNode} />
+          <div
+            className="constellation-nodes"
+            onClick={(e) => { if (e.target === e.currentTarget) setSelectedId(null); }}
+          >
+            {nodes.map((node, index) => (
+              <ConstellationNodeDot key={node.id} node={node} index={index} onSelect={(n) => setSelectedId(n.id)} />
             ))}
           </div>
-        </div>
-
-        <div className="constellation-legend">
-          <span className="constellation-legend-item">
-            <span className="constellation-legend-dot constellation-legend-dot-day" /> Day
-          </span>
-          <span className="constellation-legend-item">
-            <span className="constellation-legend-dot constellation-legend-dot-learned" /> Note
-          </span>
-          <span className="constellation-legend-item">
-            <span className="constellation-legend-dot constellation-legend-dot-bookmark" /> Bookmark
-          </span>
-          <span className="constellation-legend-sep" aria-hidden="true" />
-          <span className="constellation-legend-item">
-            <span className="constellation-legend-line constellation-legend-line-similarity" /> Similar content
-          </span>
-          <span className="constellation-legend-item">
-            <span className="constellation-legend-line constellation-legend-line-domain" /> Same sector
-          </span>
+          {selectedNode && cardLayout && (
+            <ConstellationSelection
+              node={selectedNode}
+              layout={cardLayout}
+              edges={edges}
+              nodeById={posById}
+              onOpen={onOpenNode}
+              onClose={() => setSelectedId(null)}
+            />
+          )}
+          {hasUnexplored && !selectedNode && <ConstellationUnexploredCallout />}
         </div>
       </section>
     </div>

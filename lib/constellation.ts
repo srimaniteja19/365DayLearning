@@ -27,7 +27,9 @@ export type ConstellationNode = {
   subtitle: string;
   dayNumber?: number;
   createdAt?: number;
+  /** Plan domains for a day node; free-form tags for a learned/bookmark node. Display-only chips. */
   domains: string[];
+  /** Edge degree after layout — drives node size and the info card's "N connections" line. */
   weight: number;
   x: number;
   y: number;
@@ -74,7 +76,7 @@ export function buildConstellationGraph(input: {
       subtitle: d.topics.join(" · "),
       dayNumber: d.day,
       domains: d.domains || [],
-      weight: d.topics.length,
+      weight: 0,
       x: 0,
       y: 0,
     });
@@ -96,8 +98,8 @@ export function buildConstellationGraph(input: {
         label: item.title,
         subtitle: item.insight || item.body || "",
         createdAt: item.createdAt,
-        domains: [],
-        weight: 1,
+        domains: item.tags || [],
+        weight: 0,
         x: 0,
         y: 0,
       });
@@ -119,8 +121,8 @@ export function buildConstellationGraph(input: {
       label: item.title,
       subtitle: item.note || item.url,
       createdAt: item.createdAt,
-      domains: [],
-      weight: 1,
+      domains: item.tags || [],
+      weight: 0,
       x: 0,
       y: 0,
     });
@@ -133,8 +135,40 @@ export function buildConstellationGraph(input: {
   });
 
   const edges = buildEdges(docs, threshold);
+
+  // Node size reads as connectivity, not source-data volume — a well-linked
+  // note should look as prominent as a well-linked day.
+  const degree = new Map<string, number>();
+  edges.forEach((e) => {
+    degree.set(e.source, (degree.get(e.source) || 0) + 1);
+    degree.set(e.target, (degree.get(e.target) || 0) + 1);
+  });
+  nodes.forEach((n) => {
+    n.weight = degree.get(n.id) || 0;
+  });
+
   return { nodes, edges };
 }
+
+/**
+ * How many same-domain neighbors (in day order) a domain-fallback edge chains
+ * to. Kept small on purpose: connecting *every* pair sharing a domain turns a
+ * 30-day domain block into a 435-edge complete subgraph — a hairball. A short
+ * chain still guarantees the whole domain cluster is connected (transitively)
+ * without drawing a mesh.
+ */
+export const CONSTELLATION_DOMAIN_CHAIN_NEIGHBORS = 2;
+
+/**
+ * Cap on similarity edges per node (each node keeps only its strongest
+ * matches). A pool of similarly-worded notes/bookmarks (e.g. a run of
+ * AI-summarized videos on the same topic, sharing template phrasing) can put
+ * *most* pairs over CONSTELLATION_SIMILARITY_THRESHOLD — an absolute
+ * threshold alone doesn't bound density for a correlated corpus. Capping
+ * out-degree does: it keeps only each node's best matches, same idea as
+ * relatedDaysFor's `limit` in lib/related.ts.
+ */
+export const CONSTELLATION_SIMILARITY_NEIGHBORS = 3;
 
 function buildEdges(docs: DocEntry[], threshold: number): ConstellationEdge[] {
   const df = new Map<string, number>();
@@ -143,7 +177,10 @@ function buildEdges(docs: DocEntry[], threshold: number): ConstellationEdge[] {
   const idf = new Map<string, number>();
   df.forEach((c, w) => idf.set(w, Math.log(n / (1 + c))));
 
-  const edges: ConstellationEdge[] = [];
+  const pairKey = (aId: string, bId: string) => (aId < bId ? `${aId}|${bId}` : `${bId}|${aId}`);
+
+  // Candidate similarity pairs at or above threshold, before the per-node cap.
+  const candidates: Array<{ i: number; j: number; score: number }> = [];
   for (let i = 0; i < docs.length; i++) {
     const a = docs[i];
     for (let j = i + 1; j < docs.length; j++) {
@@ -152,16 +189,62 @@ function buildEdges(docs: DocEntry[], threshold: number): ConstellationEdge[] {
       a.tokens.forEach((w) => {
         if (b.tokens.has(w)) score += Math.max(0.15, idf.get(w) || 0);
       });
-      if (score >= threshold) {
-        edges.push({ source: a.id, target: b.id, kind: "similarity", score });
-        continue;
-      }
-      // Cheaper, guaranteed-connected fallback: same-domain plan days only.
-      if (a.isDay && b.isDay && a.domains.some((dm) => b.domains.includes(dm))) {
+      if (score >= threshold) candidates.push({ i, j, score });
+    }
+  }
+
+  // Keep a candidate only if it's among either endpoint's top-K strongest
+  // matches — this is what actually bounds density for a correlated corpus,
+  // not the absolute threshold above.
+  const neighborsByNode = new Map<number, Array<{ other: number; score: number }>>();
+  candidates.forEach(({ i, j, score }) => {
+    if (!neighborsByNode.has(i)) neighborsByNode.set(i, []);
+    if (!neighborsByNode.has(j)) neighborsByNode.set(j, []);
+    neighborsByNode.get(i)!.push({ other: j, score });
+    neighborsByNode.get(j)!.push({ other: i, score });
+  });
+  const keepPairs = new Set<string>();
+  neighborsByNode.forEach((list, i) => {
+    list
+      .sort((a, b) => b.score - a.score)
+      .slice(0, CONSTELLATION_SIMILARITY_NEIGHBORS)
+      .forEach(({ other }) => keepPairs.add(pairKey(docs[i].id, docs[other].id)));
+  });
+
+  const edges: ConstellationEdge[] = [];
+  const seenPairs = new Set<string>();
+  candidates.forEach(({ i, j, score }) => {
+    const key = pairKey(docs[i].id, docs[j].id);
+    if (!keepPairs.has(key)) return;
+    edges.push({ source: docs[i].id, target: docs[j].id, kind: "similarity", score });
+    seenPairs.add(key);
+  });
+
+  // Cheaper, guaranteed-connected fallback: chain same-domain plan days to
+  // their nearest neighbors (in day order) rather than connecting every pair.
+  const domainGroups = new Map<string, DocEntry[]>();
+  docs.forEach((d) => {
+    if (!d.isDay) return;
+    d.domains.forEach((dm) => {
+      if (!domainGroups.has(dm)) domainGroups.set(dm, []);
+      domainGroups.get(dm)!.push(d);
+    });
+  });
+  domainGroups.forEach((group) => {
+    for (let i = 0; i < group.length; i++) {
+      for (let step = 1; step <= CONSTELLATION_DOMAIN_CHAIN_NEIGHBORS; step++) {
+        const j = i + step;
+        if (j >= group.length) break;
+        const a = group[i];
+        const b = group[j];
+        const key = pairKey(a.id, b.id);
+        if (seenPairs.has(key)) continue;
+        seenPairs.add(key);
         edges.push({ source: a.id, target: b.id, kind: "domain", score: 0.45 });
       }
     }
-  }
+  });
+
   return edges;
 }
 
@@ -201,12 +284,14 @@ export const CONSTELLATION_HEIGHT = 600;
 export function layoutConstellation(
   nodes: ConstellationNode[],
   edges: ConstellationEdge[],
+  /** Bump this ("shuffle sky") to get a different, still-deterministic arrangement of the same graph. */
+  shuffleSeed = 0,
 ): ConstellationNode[] {
   const n = nodes.length;
   if (n === 0) return nodes;
   const W = CONSTELLATION_WIDTH;
   const H = CONSTELLATION_HEIGHT;
-  const rand = mulberry32(seedFromNodes(nodes) || 1);
+  const rand = mulberry32((seedFromNodes(nodes) + shuffleSeed * 0x9e3779b1) >>> 0 || 1);
   const cx = W / 2;
   const cy = H / 2;
 

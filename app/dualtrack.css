@@ -4002,74 +4002,122 @@
 }
 
 /* ---------- constellation view ---------- */
-.constellation-view { position: relative; z-index: 2; padding: 14px 28px 24px; }
+/*
+  Node identity here is color alone (circles only, per design direction) —
+  accent-main / accent-sprint / text. Two of eleven themes (Folio, Voltaic)
+  collide two of those three at the same hex by the theme's own design
+  (Folio's accent literally *is* its ink; Voltaic's secondary accent is
+  near-white). The legend chips and the Tip/hover label always name the type,
+  so identity never depends on the collision-prone pair alone.
+*/
+.constellation-view { position: relative; z-index: 2; padding: 18px 28px 24px; }
+
+/* Flag-banner title card — the one place static rotation is allowed to be loud. */
+.constellation-banner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 260px;
+  margin: 0 0 22px 2px;
+  padding: 12px 46px 12px 20px;
+  background: var(--text);
+  color: var(--bg);
+  clip-path: polygon(0% 0%, 88% 0%, 100% 50%, 88% 100%, 0% 100%);
+  transform: rotate(-2.4deg);
+  transform-origin: top left;
+  box-shadow: 5px 5px 0 color-mix(in srgb, var(--text) 34%, transparent);
+}
+.constellation-banner-title {
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.constellation-banner-sub {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: color-mix(in srgb, var(--bg) 72%, transparent);
+}
+.constellation-banner-badge {
+  position: absolute;
+  top: -14px;
+  right: -12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--err);
+  color: var(--on-accent);
+  border: 2.5px solid var(--text);
+  transform: rotate(5deg);
+  box-shadow: 3px 3px 0 var(--text);
+}
+.constellation-banner-badge-num {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+}
+.constellation-banner-badge-label {
+  font-family: var(--mono);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .constellation-ops {
   border: 2.5px solid var(--text);
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 42%),
-    var(--bg-panel);
+  background: var(--bg-panel);
   box-shadow: 4px 4px 0 color-mix(in srgb, var(--text) 16%, transparent);
   overflow: hidden;
 }
-.constellation-mast { border-bottom: 2px solid var(--text); }
 
-.constellation-canvas {
-  position: relative;
-  width: 100%;
-  /* Must match CONSTELLATION_WIDTH / CONSTELLATION_HEIGHT in lib/constellation.ts. */
-  aspect-ratio: 960 / 600;
-  background:
-    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--text) 3%, transparent) 0%, transparent 70%),
-    var(--bg);
-  overflow: hidden;
-}
-.constellation-edges {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-.constellation-edge { stroke-width: 1.5; }
-.constellation-edge-similarity { stroke: var(--accent-main); }
-.constellation-edge-domain { stroke: var(--border); stroke-dasharray: 3 3; }
-
-.constellation-nodes {
-  position: absolute;
-  inset: 0;
-}
-.constellation-node {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  padding: 0;
-  border: 1.5px solid var(--text);
-  background: var(--accent-main);
-  cursor: pointer;
-  box-shadow: 1px 1px 0 color-mix(in srgb, var(--text) 24%, transparent);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
-}
-.constellation-node:hover,
-.constellation-node:focus-visible {
-  z-index: 3;
-  transform: translate(-50%, -50%) scale(1.25);
-  box-shadow: 2px 2px 0 color-mix(in srgb, var(--text) 34%, transparent);
-}
-.constellation-node-day { border-radius: 50%; background: var(--accent-main); }
-.constellation-node-learned { border-radius: 4px; background: var(--info); }
-.constellation-node-bookmark {
-  border-radius: 0;
-  background: var(--accent-sprint);
-  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-}
-
-.constellation-legend {
+/* Category chips — outline style: colored border + colored text, minimal fill. */
+.constellation-chips {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-top: 2px solid var(--text);
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 2px solid var(--text);
   background: color-mix(in srgb, var(--text) 4%, var(--bg-panel));
+}
+.constellation-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 2px solid var(--text);
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--text);
+}
+.constellation-chip-day { border-color: var(--accent-main); color: var(--accent-main); background: color-mix(in srgb, var(--accent-main) 8%, transparent); }
+.constellation-chip-learned { border-color: var(--accent-sprint); color: var(--accent-sprint); background: color-mix(in srgb, var(--accent-sprint) 8%, transparent); }
+.constellation-chip-bookmark { border-color: var(--text); color: var(--text); background: color-mix(in srgb, var(--text) 6%, transparent); }
+.constellation-chip-shuffle {
+  border-style: dashed;
+  border-color: var(--border-hover);
+  color: var(--text-dim);
+  cursor: pointer;
+  text-transform: lowercase;
+}
+.constellation-chip-shuffle:hover { border-color: var(--text); color: var(--text); }
+.constellation-chip-links {
+  margin-left: auto;
   font-family: var(--mono);
   font-size: 10px;
   font-weight: 650;
@@ -4077,31 +4125,251 @@
   text-transform: uppercase;
   color: var(--text-faint);
 }
-.constellation-legend-item { display: inline-flex; align-items: center; gap: 5px; }
-.constellation-legend-sep {
-  width: 1px;
-  height: 12px;
-  background: var(--border);
+
+.constellation-canvas {
+  position: relative;
+  width: 100%;
+  /* Must match CONSTELLATION_WIDTH / CONSTELLATION_HEIGHT in lib/constellation.ts. */
+  aspect-ratio: 960 / 600;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--accent-main) 5%, transparent) 0%, transparent 60%),
+    var(--constellation-starfield, none);
+  background-repeat: no-repeat, repeat;
+  background-size: auto, 240px 240px;
+  color: var(--grid-color);
+  overflow: hidden;
 }
-.constellation-legend-dot { display: inline-block; width: 9px; height: 9px; border: 1.5px solid var(--text); }
-.constellation-legend-dot-day { border-radius: 50%; background: var(--accent-main); }
-.constellation-legend-dot-learned { border-radius: 3px; background: var(--info); }
-.constellation-legend-dot-bookmark {
-  background: var(--accent-sprint);
-  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+.constellation-sparkle {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0.55;
+  z-index: 1;
 }
-.constellation-legend-line { display: inline-block; width: 16px; height: 0; border-top: 2px solid var(--accent-main); }
-.constellation-legend-line-similarity { border-top-color: var(--accent-main); border-top-style: solid; }
-.constellation-legend-line-domain { border-top-color: var(--border); border-top-style: dashed; }
+.constellation-sparkle-1 { top: 8%; left: 5%; color: var(--accent-sprint); }
+.constellation-sparkle-2 { bottom: 12%; left: 12%; color: var(--accent-main); }
+.constellation-sparkle-3 { top: 14%; right: 8%; color: var(--text-faint); }
+.constellation-edges {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+.constellation-edge {
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  opacity: 0;
+  animation: constellationEdgeIn 0.6s ease-out 0.05s both;
+}
+.constellation-edge-day { stroke: var(--accent-main); }
+.constellation-edge-learned { stroke: var(--accent-sprint); }
+.constellation-edge-bookmark { stroke: var(--text); }
+.constellation-edge-domain { stroke-dasharray: 1 4; }
+@keyframes constellationEdgeIn { to { opacity: 1; } }
+
+.constellation-nodes {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+/*
+  The Tip component measures its wrapper span's rendered rect to place the
+  popup — that span has to stay normal in-flow content, or it collapses to a
+  zero-size box and every tooltip lands at the container's top-left corner.
+  So the slot (this element) carries the absolute x/y placement, and the
+  button inside it (.constellation-node) is ordinary flow content sized to
+  fill the slot — Tip can measure it correctly.
+*/
+.constellation-node-slot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+.constellation-node {
+  display: block;
+  border-radius: 50%;
+  transform: scale(0.2);
+  padding: 0;
+  border: 2.5px solid currentColor;
+  cursor: pointer;
+  opacity: 0;
+  box-shadow: 0 0 0 2px var(--bg);
+  transition: transform 0.16s cubic-bezier(0.2, 0.9, 0.25, 1.4), box-shadow 0.16s ease, filter 0.16s ease;
+  animation: constellationNodeIn 0.42s cubic-bezier(0.2, 0.9, 0.25, 1.1) both;
+  animation-delay: var(--enter-delay, 0ms);
+}
+@keyframes constellationNodeIn {
+  from { opacity: 0; transform: scale(0.2); }
+  to { opacity: 1; transform: scale(1); }
+}
+.constellation-node:hover,
+.constellation-node:focus-visible {
+  z-index: 4;
+  transform: scale(1.35);
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 12px 2px color-mix(in srgb, currentColor 55%, transparent);
+}
+.constellation-node-day { background: color-mix(in srgb, var(--accent-main) 32%, var(--bg)); color: var(--accent-main); }
+.constellation-node-learned { background: color-mix(in srgb, var(--accent-sprint) 32%, var(--bg)); color: var(--accent-sprint); }
+.constellation-node-bookmark { background: color-mix(in srgb, var(--text) 24%, var(--bg)); color: var(--text); }
+
+/* Selection — diamond reticle + leader line + rotated chevron info card. Static rotation is fine here: at most one on screen at a time. */
+.constellation-reticle {
+  position: absolute;
+  transform: translate(-50%, -50%) rotate(45deg);
+  border: 2px dashed var(--text);
+  pointer-events: none;
+  z-index: 3;
+}
+.constellation-leader {
+  position: absolute;
+  height: 0;
+  border-top: 1.5px dashed var(--text-faint);
+  transform-origin: 0 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.constellation-card {
+  position: absolute;
+  transform: rotate(-1.4deg);
+  background: var(--bg-panel);
+  border: 2.5px solid var(--text);
+  clip-path: polygon(0% 50%, 6% 0%, 100% 0%, 100% 100%, 6% 100%);
+  box-shadow: 4px 4px 0 color-mix(in srgb, var(--text) 24%, transparent);
+  padding: 14px 14px 12px 22px;
+  z-index: 5;
+}
+.constellation-card-day { box-shadow: 4px 4px 0 color-mix(in srgb, var(--text) 24%, transparent), inset 5px 0 0 var(--accent-main); }
+.constellation-card-learned { box-shadow: 4px 4px 0 color-mix(in srgb, var(--text) 24%, transparent), inset 5px 0 0 var(--accent-sprint); }
+.constellation-card-bookmark { box-shadow: 4px 4px 0 color-mix(in srgb, var(--text) 24%, transparent), inset 5px 0 0 var(--text); }
+.constellation-card-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--text);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+.constellation-card-stamp {
+  display: inline-block;
+  margin-bottom: 4px;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.constellation-card-title {
+  padding-right: 20px;
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text);
+}
+.constellation-card-tags {
+  margin-top: 5px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.constellation-card-meta {
+  margin-top: 7px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.constellation-card-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 9px;
+  padding: 6px 10px;
+  border: 2px solid var(--text);
+  background: var(--accent-main);
+  color: var(--on-accent);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 color-mix(in srgb, var(--text) 30%, transparent);
+}
+.constellation-card-open:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 color-mix(in srgb, var(--text) 30%, transparent); }
+
+/* "Unexplored" callout — static, floating, dashed. Shown only when a zero-degree node exists. */
+.constellation-callout {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  max-width: 220px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--text) 6%, var(--bg-panel));
+  border: 2px dashed var(--border-hover);
+  z-index: 3;
+  pointer-events: none;
+}
+.constellation-callout-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.constellation-callout-copy {
+  margin-top: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 550;
+  line-height: 1.45;
+  color: var(--text-faint);
+}
 
 .no-fx .constellation-ops,
+.no-fx .constellation-banner,
+.no-fx .constellation-banner-badge,
 .no-fx .constellation-node,
 .no-fx .constellation-node:hover,
-.no-fx .constellation-node:focus-visible { box-shadow: none; }
+.no-fx .constellation-node:focus-visible,
+.no-fx .constellation-card,
+.no-fx .constellation-card-day,
+.no-fx .constellation-card-learned,
+.no-fx .constellation-card-bookmark,
+.no-fx .constellation-card-open,
+.no-fx .constellation-card-open:hover { box-shadow: none; }
+.no-fx .constellation-canvas { background-image: none; }
+.no-fx .constellation-sparkle { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .constellation-node,
+  .constellation-edge {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+  .constellation-node { transform: scale(1) !important; }
+}
 
 @media (max-width: 640px) {
   .constellation-view { padding: 10px 14px 18px; }
+  .constellation-banner { padding: 10px 40px 10px 16px; min-width: 0; }
+  .constellation-banner-title { font-size: 16px; }
   .constellation-canvas { aspect-ratio: 4 / 5; }
+  .constellation-callout { max-width: calc(100% - 32px); left: 16px; }
 }
 
 /* ---------- weekly view ---------- */

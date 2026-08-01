@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  CONSTELLATION_DOMAIN_CHAIN_NEIGHBORS,
   CONSTELLATION_HEIGHT,
+  CONSTELLATION_SIMILARITY_NEIGHBORS,
   CONSTELLATION_SIMILARITY_THRESHOLD,
   CONSTELLATION_WIDTH,
   buildConstellationGraph,
@@ -58,6 +60,37 @@ describe("buildConstellationGraph", () => {
     });
     expect(graph.edges).toHaveLength(1);
     expect(graph.edges[0].kind).toBe("domain");
+  });
+
+  it("chains a large same-domain cluster instead of connecting every pair (no hairball)", () => {
+    const days = Array.from({ length: 30 }, (_, i) =>
+      day(`d${i}`, i + 1, [`Unrelated topic ${i} zz${i}`], ["frontend"]),
+    );
+    const graph = buildConstellationGraph({ completedDays: days, learned: {}, bookmarks: [] });
+    expect(graph.edges.every((e) => e.kind === "domain")).toBe(true);
+    // A complete subgraph over 30 same-domain days would be 30*29/2 = 435 edges;
+    // the chained fallback caps each day at CONSTELLATION_DOMAIN_CHAIN_NEIGHBORS forward links.
+    expect(graph.edges.length).toBeLessThanOrEqual(days.length * CONSTELLATION_DOMAIN_CHAIN_NEIGHBORS);
+    expect(graph.edges.length).toBeGreaterThan(0);
+  });
+
+  it("caps similarity edges per node instead of connecting every templated-text pair (no hairball)", () => {
+    // Simulates a run of AI-summarized notes that share heavy template phrasing —
+    // an absolute score threshold alone doesn't bound density for a corpus like this.
+    const shared = "the video exposes critical but often overlooked obstacles in advancement particularly focusing on";
+    const items = Array.from({ length: 30 }, (_, i) =>
+      learnedItem(`l${i}`, `Note ${i}`, `${shared} topic${i} detail${i}`),
+    );
+    const graph = buildConstellationGraph({
+      completedDays: [],
+      learned: { "2026-01-01": items },
+      bookmarks: [],
+      threshold: 0.2,
+    });
+    expect(graph.edges.every((e) => e.kind === "similarity")).toBe(true);
+    // A complete graph over 30 nodes would be 30*29/2 = 435 edges.
+    expect(graph.edges.length).toBeLessThan(items.length * CONSTELLATION_SIMILARITY_NEIGHBORS);
+    expect(graph.edges.length).toBeGreaterThan(0);
   });
 
   it("never draws a domain-fallback edge between two non-day nodes", () => {

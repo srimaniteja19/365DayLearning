@@ -10,7 +10,8 @@
       "Bash(awk 'NR>=3693 && NR<=4100 && /==============/{print NR\": \"$0}' app/dualtrack.css)",
       "Bash(awk -F: '$1>3693')",
       "Bash(timeout 40 bash -c 'until curl -sf http://localhost:3000 >/dev/null; do sleep 1; done')",
-      "Bash(lsof -ti:3000 -sTCP:LISTEN)"
+      "Bash(lsof -ti:3000 -sTCP:LISTEN)",
+      "Bash(grep -n \"ConstellationSelection$\\\\|<ConstellationSelection\" features/ui/Views.tsx)"
     ]
   }
 }

@@ -1443,10 +1443,12 @@ export default function DualTrackConsole() {
     () => buildConstellationGraph({ completedDays: constellationCompletedDays, learned, bookmarks }),
     [constellationCompletedDays, learned, bookmarks],
   );
+  const [constellationShuffleSeed, setConstellationShuffleSeed] = useState(0);
   const constellationNodes = useMemo(
-    () => layoutConstellation(constellationGraph.nodes, constellationGraph.edges),
-    [constellationGraph],
+    () => layoutConstellation(constellationGraph.nodes, constellationGraph.edges, constellationShuffleSeed),
+    [constellationGraph, constellationShuffleSeed],
   );
+  const handleShuffleConstellation = useCallback(() => setConstellationShuffleSeed((s) => s + 1), []);
   const handleOpenConstellationNode = useCallback(
     (node) => {
       if (node.type === "day") {
@@ -1932,6 +1934,7 @@ export default function DualTrackConsole() {
             nodes={constellationNodes}
             edges={constellationGraph.edges}
             onOpenNode={handleOpenConstellationNode}
+            onShuffle={handleShuffleConstellation}
           />
         )}
 
