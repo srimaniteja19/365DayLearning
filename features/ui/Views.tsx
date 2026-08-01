@@ -379,17 +379,6 @@ export function TopBar({
               </Tip>
             </nav>
           )}
-
-          {kitTab && onOpenCampaign && (
-            <button
-              type="button"
-              className="topbar-deck-btn"
-              onClick={onOpenCampaign}
-            >
-              <Icon.LayoutDashboard size={13} />
-              <span>Deck</span>
-            </button>
-          )}
         </div>
 
         <div className="topbar-right">
