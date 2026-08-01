@@ -8707,6 +8707,36 @@ select.settings-input { cursor: pointer; }
 .bm-add-btn:disabled { opacity: 0.45; cursor: default; }
 .bm-err { margin: 0; font-size: 12px; }
 
+.bm-filter-row { display: flex; gap: 8px; margin-top: 10px; }
+.bm-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 2px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--bg-panel);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.bm-filter-chip:hover { border-color: var(--border-hover); color: var(--text); }
+.bm-filter-chip-active {
+  border-color: var(--warn);
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 14%, var(--bg-panel));
+}
+.bm-filter-chip-count {
+  padding: 1px 6px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  font-size: 10px;
+}
+
 .bm-search {
   display: flex;
   align-items: center;
@@ -8916,44 +8946,61 @@ select.settings-input { cursor: pointer; }
     );
   border-color: color-mix(in srgb, var(--text) 22%, transparent);
 }
-.bm-sticky-pin {
+/*
+  Favorite corner — one fixed diagonal-cut triangle, not a per-card random
+  shape. Unfavorited: a faint torn-corner outline (present so the click
+  target doesn't visually jump when toggled). Favorited: the corner "reveals"
+  a --warn-tinted layer underneath, with the star crossfading from outline to
+  filled on top. --warn is a real theme token (amber/gold in all 11 themes),
+  not the sticky-note palette's hardcoded hex, so this stays theme-correct.
+*/
+.bm-fav-corner {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #fff 0 28%, var(--accent) 32% 100%);
-  border: 1px solid color-mix(in srgb, #000 30%, transparent);
+  top: 0;
+  right: 0;
+  width: 34px;
+  height: 34px;
+  clip-path: polygon(100% 0, 100% 100%, 0 0);
+  background: color-mix(in srgb, var(--sticky-ink, var(--text)) 8%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--sticky-ink, var(--text)) 20%, transparent);
+  transition: background 0.18s ease, border-color 0.18s ease;
   z-index: 2;
   pointer-events: none;
+}
+.bm-fav-corner-on {
+  background: color-mix(in srgb, var(--warn) 55%, transparent);
+  border-color: color-mix(in srgb, var(--warn) 80%, var(--text));
 }
 
 .bm-fav-btn {
   position: absolute;
-  top: 7px;
-  left: 7px;
+  top: 3px;
+  right: 3px;
   z-index: 3;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 17px;
-  height: 17px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: none;
   background: none;
-  color: color-mix(in srgb, var(--sticky-ink, var(--text)) 32%, transparent);
+  color: color-mix(in srgb, var(--sticky-ink, var(--text)) 45%, transparent);
   cursor: pointer;
-  transition: color 0.15s ease, transform 0.15s ease;
+  transition: transform 0.15s ease;
 }
-.bm-fav-btn:hover {
-  color: color-mix(in srgb, var(--sticky-ink, var(--text)) 65%, transparent);
-  transform: scale(1.15);
+.bm-fav-btn:hover { transform: scale(1.15); }
+.bm-fav-btn.is-fav { color: var(--warn); }
+.bm-fav-star {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  transition: opacity 0.18s ease, transform 0.18s ease;
 }
-.bm-fav-btn.is-fav { color: #c8850a; }
-.bm-fav-btn.is-fav:hover { color: #a86c05; }
-.app-root:not(.is-light) .bm-fav-btn.is-fav { color: #f0c89a; }
-.app-root:not(.is-light) .bm-fav-btn.is-fav:hover { color: #f5dcae; }
+.bm-fav-star-outline { opacity: 1; transform: scale(1); }
+.bm-fav-star-filled { opacity: 0; transform: scale(0.7); }
+.bm-fav-btn.is-fav .bm-fav-star-outline { opacity: 0; transform: scale(0.7); }
+.bm-fav-btn.is-fav .bm-fav-star-filled { opacity: 1; transform: scale(1); }
 
 @keyframes bm-sticky-flash-pulse {
   0%, 100% { box-shadow: 3px 3px 0 color-mix(in srgb, var(--text) 22%, transparent); }

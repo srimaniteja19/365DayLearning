@@ -158,15 +158,16 @@ export function BookmarksView({
     });
   }, [bookmarks, query]);
 
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const favoritesCount = useMemo(() => (bookmarks || []).filter((b) => b.favorite).length, [bookmarks]);
+
   const groups = useMemo(() => {
-    const base = CATEGORIES.map((cat) => ({
+    const base = favoritesOnly ? filtered.filter((item) => item.favorite) : filtered;
+    return CATEGORIES.map((cat) => ({
       ...cat,
-      items: filtered.filter((item) => cat.kinds.includes(item.kind)),
+      items: base.filter((item) => cat.kinds.includes(item.kind)),
     })).filter((g) => g.items.length > 0);
-    const favorites = filtered.filter((item) => item.favorite);
-    if (!favorites.length) return base;
-    return [{ key: "favorites", label: "Favorites", tone: "butter", items: favorites }, ...base];
-  }, [filtered]);
+  }, [filtered, favoritesOnly]);
 
   const submit = async () => {
     const url = normalizeBookmarkUrl(urlInput);
@@ -305,19 +306,36 @@ export function BookmarksView({
         </p>
       )}
 
+      {favoritesCount > 0 && (
+        <div className="bm-filter-row">
+          <button
+            type="button"
+            className={classNames("bm-filter-chip", favoritesOnly && "bm-filter-chip-active")}
+            aria-pressed={favoritesOnly}
+            onClick={() => setFavoritesOnly((v) => !v)}
+          >
+            <Icon.Star size={12} fill={favoritesOnly ? "currentColor" : "none"} />
+            Favorites
+            <span className="bm-filter-chip-count">{favoritesCount}</span>
+          </button>
+        </div>
+      )}
+
       {groups.length === 0 && (
         <div className="ops-empty bm-empty">
           <span className="ops-empty-mark" aria-hidden="true" />
           <div className="ops-empty-title">
-            {query.trim() ? "No matches" : "Board is clear"}
+            {favoritesOnly ? "No favorites yet" : query.trim() ? "No matches" : "Board is clear"}
           </div>
           <p className="ops-empty-copy">
-            {query.trim()
-              ? "No bookmarks match that search. Try another term or clear Find."
-              : "Paste a link above — it’ll land on a sticky in its category."}
+            {favoritesOnly
+              ? "Tap the star on a card to pin it here."
+              : query.trim()
+                ? "No bookmarks match that search. Try another term or clear Find."
+                : "Paste a link above — it’ll land on a sticky in its category."}
           </p>
-          <span className="ops-empty-stamp">{query.trim() ? "SCAN" : "PIN"}</span>
-          {!query.trim() && onOpenNotes && (
+          <span className="ops-empty-stamp">{favoritesOnly ? "STAR" : query.trim() ? "SCAN" : "PIN"}</span>
+          {!query.trim() && !favoritesOnly && onOpenNotes && (
             <button type="button" className="bm-empty-cross" onClick={onOpenNotes}>
               Or log a note
             </button>
@@ -355,7 +373,7 @@ export function BookmarksView({
                     style={{ "--slip-tilt": embed ? "0deg" : slipTilt(item.id) }}
                   >
                     <span className="bm-sticky-tape" aria-hidden="true" />
-                    <span className="bm-sticky-pin" aria-hidden="true" />
+                    <span className={classNames("bm-fav-corner", item.favorite && "bm-fav-corner-on")} aria-hidden="true" />
                     <button
                       type="button"
                       className={classNames("bm-fav-btn", item.favorite && "is-fav")}
@@ -363,7 +381,8 @@ export function BookmarksView({
                       aria-label={item.favorite ? "Remove from favorites" : "Add to favorites"}
                       aria-pressed={!!item.favorite}
                     >
-                      <Icon.Star size={13} fill={item.favorite ? "currentColor" : "none"} />
+                      <Icon.Star size={14} className="bm-fav-star bm-fav-star-outline" />
+                      <Icon.Star size={14} fill="currentColor" className="bm-fav-star bm-fav-star-filled" />
                     </button>
 
                     <div className="bm-sticky-face">
