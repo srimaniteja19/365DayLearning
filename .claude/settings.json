@@ -4,7 +4,13 @@
       "Bash(awk -F: '$1<1446')",
       "Bash(ps -p 36804 -o pid,lstart,command)",
       "Bash(pkill -f \"next dev --turbopack.*3001\")",
-      "Bash(kill 36803 36804)"
+      "Bash(kill 36803 36804)",
+      "Bash(grep -n \"id={\\\\`\\\\|getElementById\\\\|scrollIntoView\\\\|entry.id\\\\|item.id\" features/learned/LearnedView.tsx)",
+      "Bash(awk 'NR>=3693 && NR<=4100 && /^\\\\/\\\\* ===/{print NR\": \"$0}' app/dualtrack.css)",
+      "Bash(awk 'NR>=3693 && NR<=4100 && /==============/{print NR\": \"$0}' app/dualtrack.css)",
+      "Bash(awk -F: '$1>3693')",
+      "Bash(timeout 40 bash -c 'until curl -sf http://localhost:3000 >/dev/null; do sleep 1; done')",
+      "Bash(lsof -ti:3000 -sTCP:LISTEN)"
     ]
   }
 }

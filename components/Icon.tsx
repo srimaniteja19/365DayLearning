@@ -146,4 +146,13 @@ export const Icon = {
       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
     </svg>
   ),
+  Constellation: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M5 18 11 7l4 4 4-7M5 18l6-4" />
+      <circle cx="5" cy="18" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="11" cy="7" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="11" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="4" r="1.6" fill="currentColor" stroke="none" />
+    </svg>
+  ),
 };

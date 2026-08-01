@@ -1,7 +1,7 @@
 // @ts-nocheck
 "use client";
 
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { classNames } from "@/lib/classNames";
 import {
@@ -97,6 +97,8 @@ export function BookmarksView({
   onOpenNotes,
   lensQuery,
   onLensQueryChange,
+  focusId = null,
+  onFocusIdConsumed,
 }) {
   const [urlInput, setUrlInput] = useState("");
   const [saving, setSaving] = useState(false);
@@ -119,6 +121,23 @@ export function BookmarksView({
     if (flashTimer.current) clearTimeout(flashTimer.current);
     flashTimer.current = setTimeout(() => setFlashId(null), 1600);
   };
+
+  const pendingFocusRef = useRef(null);
+
+  // Constellation (or other deep-links) → clear any filter hiding the target, then scroll + flash it.
+  useEffect(() => {
+    if (!focusId) return;
+    setQuery("");
+    pendingFocusRef.current = focusId;
+    onFocusIdConsumed?.();
+  }, [focusId, onFocusIdConsumed, setQuery]);
+
+  useEffect(() => {
+    if (!pendingFocusRef.current) return;
+    const id = pendingFocusRef.current;
+    pendingFocusRef.current = null;
+    flashExisting(id);
+  }, [query]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

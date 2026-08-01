@@ -314,6 +314,8 @@ export function LearnedView({
   fireToast,
   focusDate = null,
   onFocusDateConsumed,
+  focusId = null,
+  onFocusIdConsumed,
   onOpenBookmarks,
   lensQuery,
   onLensQueryChange,
@@ -343,6 +345,7 @@ export function LearnedView({
   const [sourceStatus, setSourceStatus] = useState(null);
   const sourceBlockRef = useRef("");
   const taRef = useRef(null);
+  const pendingFocusScrollRef = useRef(null);
 
   const bodyUrls = useMemo(() => extractUrlsFromText(body), [body]);
 
@@ -360,6 +363,33 @@ export function LearnedView({
     }
     onFocusDateConsumed?.();
   }, [focusDate, onFocusDateConsumed]);
+
+  // Constellation (or other deep-links) → jump Chrono to the entry's date, expand it, and scroll to it.
+  useEffect(() => {
+    if (!focusId) return;
+    let foundDate = null;
+    for (const [d, items] of Object.entries(learned || {})) {
+      if ((items || []).some((it) => it.id === focusId)) {
+        foundDate = d;
+        break;
+      }
+    }
+    if (foundDate) {
+      const parts = parseLearnedDateParts(foundDate);
+      if (parts) setChrono({ year: parts.year, month: parts.month, day: parts.day });
+      setExpandedId(focusId);
+      setQuery("");
+      pendingFocusScrollRef.current = focusId;
+    }
+    onFocusIdConsumed?.();
+  }, [focusId, learned, onFocusIdConsumed]);
+
+  useEffect(() => {
+    if (!pendingFocusScrollRef.current) return;
+    const id = pendingFocusScrollRef.current;
+    pendingFocusScrollRef.current = null;
+    document.getElementById(`learned-card-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [chrono]);
 
   // Campaign day → Field Kit draft seed.
   useEffect(() => {
@@ -1125,6 +1155,7 @@ export function LearnedView({
                     return (
                       <article
                         key={item.id}
+                        id={`learned-card-${item.id}`}
                         className={classNames(
                           "sticky-note",
                           `sticky-${tone}`,

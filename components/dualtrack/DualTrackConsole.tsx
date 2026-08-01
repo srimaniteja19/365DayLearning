@@ -40,6 +40,7 @@ import { classNames } from "@/lib/classNames";
 import { XP_PER_TOPIC, XP_PER_DAY_BONUS, levelFromXp, rankForLevel } from "@/lib/xp";
 import { seedReview, nextReview, dueList } from "@/lib/srs";
 import { buildRelatedIndex, relatedDaysFor } from "@/lib/related";
+import { buildConstellationGraph, layoutConstellation } from "@/lib/constellation";
 import { accentForPlan } from "@/lib/accents";
 import { purgePlanUserData } from "@/lib/migration";
 import { exportAll, serializeExport } from "@/lib/exportImport";
@@ -78,6 +79,7 @@ import {
   ConsoleView,
   GridView,
   ReviewView,
+  ConstellationView,
   WeeklyView,
   LogView,
   ModalHost,
@@ -262,10 +264,19 @@ export default function DualTrackConsole() {
     [requireAuth],
   );
 
+  /** When set, LearnedView/BookmarksView expand + scroll to this entry id (e.g. Constellation). */
+  const [kitFocusEntryId, setKitFocusEntryId] = useState(null);
+  const [kitFocusBookmarkId, setKitFocusBookmarkId] = useState(null);
+
   const openKit = useCallback(
-    (tab = "learned") => {
+    (tab = "learned", focusId = null) => {
       requireAuth(() => {
-        goTo({ page: "kit", kitTab: normalizeKitTab(tab) });
+        const normalized = normalizeKitTab(tab);
+        if (focusId) {
+          if (normalized === "learned") setKitFocusEntryId(focusId);
+          else if (normalized === "bookmarks") setKitFocusBookmarkId(focusId);
+        }
+        goTo({ page: "kit", kitTab: normalized });
       });
     },
     [goTo, requireAuth],
@@ -1424,6 +1435,34 @@ export default function DualTrackConsole() {
     [campaign, relatedIndex],
   );
 
+  const constellationCompletedDays = useMemo(
+    () => (campaign?.days || []).filter(isDayComplete),
+    [campaign, isDayComplete],
+  );
+  const constellationGraph = useMemo(
+    () => buildConstellationGraph({ completedDays: constellationCompletedDays, learned, bookmarks }),
+    [constellationCompletedDays, learned, bookmarks],
+  );
+  const constellationNodes = useMemo(
+    () => layoutConstellation(constellationGraph.nodes, constellationGraph.edges),
+    [constellationGraph],
+  );
+  const handleOpenConstellationNode = useCallback(
+    (node) => {
+      if (node.type === "day") {
+        if (!constellationCompletedDays.some((d) => d.id === node.refId)) return;
+        goTo({ page: "dashboard", view: "console" });
+        setExpandedDay(node.refId);
+        setScope("all");
+      } else if (node.type === "learned") {
+        openKit("learned", node.refId);
+      } else if (node.type === "bookmark") {
+        openKit("bookmarks", node.refId);
+      }
+    },
+    [constellationCompletedDays, goTo, openKit],
+  );
+
   const reviewQueue = useMemo(() => {
     const all = visiblePlans.flatMap((p) => p.days);
     return dueList(srs, all, Date.now());
@@ -1615,6 +1654,8 @@ export default function DualTrackConsole() {
                 fireToast={fireToast}
                 focusDate={kitFocusDate}
                 onFocusDateConsumed={() => setKitFocusDate(null)}
+                focusId={kitFocusEntryId}
+                onFocusIdConsumed={() => setKitFocusEntryId(null)}
                 onOpenBookmarks={() => setKitTab("bookmarks")}
                 lensQuery={kitQuery}
                 onLensQueryChange={setKitQuery}
@@ -1636,6 +1677,8 @@ export default function DualTrackConsole() {
                 onOpenNotes={() => setKitTab("learned")}
                 lensQuery={kitQuery}
                 onLensQueryChange={setKitQuery}
+                focusId={kitFocusBookmarkId}
+                onFocusIdConsumed={() => setKitFocusBookmarkId(null)}
               />
             </div>
           )}
@@ -1882,6 +1925,13 @@ export default function DualTrackConsole() {
             stats={stats}
             progress={progress}
             notes={notes}
+          />
+        )}
+        {view === "constellation" && (
+          <ConstellationView
+            nodes={constellationNodes}
+            edges={constellationGraph.edges}
+            onOpenNode={handleOpenConstellationNode}
           />
         )}
 

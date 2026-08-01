@@ -29,6 +29,11 @@ import { parseJsonText } from "@/lib/stripFences";
 import { downloadText, copyText } from "@/lib/fileIo";
 import { buildMarkdown } from "@/lib/markdown";
 import { relativeDue, SRS_INTERVALS, DAY_MS, dueList } from "@/lib/srs";
+import {
+  CONSTELLATION_HEIGHT,
+  CONSTELLATION_MIN_NODES,
+  CONSTELLATION_WIDTH,
+} from "@/lib/constellation";
 import { seedBuiltinPlans } from "@/data/builtinPlans";
 import { HomeView } from "@/features/landing/HomeView";
 export { HomeView };
@@ -1156,6 +1161,7 @@ export function ViewTabs({ view, setView, dueCount }) {
   const secondary = [
     { key: "weekly", label: "Weekly", icon: Icon.Calendar, stamp: "7D", tone: "lemon", tip: "Last seven days of clears, notes, and open questions." },
     { key: "log", label: "Analytics", icon: Icon.List, stamp: "STATS", tone: "ink", tip: "Completion, streaks, and domain coverage for this plan." },
+    { key: "constellation", label: "Constellation", icon: Icon.Constellation, stamp: "MESH", tone: "violet", tip: "Force-directed map of completed days, notes, and bookmarks — lines show what's related." },
   ];
   const renderTab = (t, secondaryTone = false) => (
     <Tip key={t.key} content={t.tip} stamp={t.stamp} tone={t.tone} side="bottom">
@@ -2462,6 +2468,142 @@ export function ReviewView({ queue, srs, notes, scheduledCount, onGrade, onOpenD
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ============================== CONSTELLATION VIEW ============================== */
+const CONSTELLATION_NODE_TYPE_META = {
+  day: { label: "Day", stamp: "DAY", tone: "mint" },
+  learned: { label: "Note", stamp: "LOG", tone: "sky" },
+  bookmark: { label: "Bookmark", stamp: "BM", tone: "violet" },
+};
+
+function ConstellationNodeDot({ node, onOpen }) {
+  const meta = CONSTELLATION_NODE_TYPE_META[node.type];
+  const radius = node.type === "day" ? Math.min(16, 9 + node.weight * 1.1) : 10;
+  const dateLabel = node.createdAt ? new Date(node.createdAt).toLocaleDateString() : null;
+  const subtitle = node.subtitle && node.subtitle.length > 140
+    ? `${node.subtitle.slice(0, 140)}…`
+    : node.subtitle;
+  return (
+    <Tip
+      content={
+        <>
+          <strong>{node.label}</strong>
+          {subtitle && <><br />{subtitle}</>}
+          {dateLabel && <><br />{dateLabel}</>}
+          {node.domains.length > 0 && <><br />{node.domains.join(", ")}</>}
+        </>
+      }
+      stamp={meta.stamp}
+      tone={meta.tone}
+      side="top"
+      maxWidth={260}
+    >
+      <button
+        type="button"
+        className={classNames("constellation-node", `constellation-node-${node.type}`)}
+        style={{
+          left: `${(node.x / CONSTELLATION_WIDTH) * 100}%`,
+          top: `${(node.y / CONSTELLATION_HEIGHT) * 100}%`,
+          width: radius * 2,
+          height: radius * 2,
+        }}
+        onClick={() => onOpen(node)}
+        aria-label={`${meta.label}: ${node.label}`}
+      />
+    </Tip>
+  );
+}
+
+export function ConstellationView({ nodes, edges, onOpenNode }) {
+  const posById = useMemo(() => new Map((nodes || []).map((n) => [n.id, n])), [nodes]);
+
+  if (!nodes || nodes.length < CONSTELLATION_MIN_NODES) {
+    return (
+      <div className="constellation-view ops-view-enter">
+        <OpsEmpty
+          stamp="MAP"
+          title="Not enough data yet"
+          copy="Complete a few days, drop a note, or pin a bookmark — the constellation forms once there's enough to connect."
+        />
+      </div>
+    );
+  }
+
+  const dayCount = nodes.filter((n) => n.type === "day").length;
+  const learnedCount = nodes.filter((n) => n.type === "learned").length;
+  const bookmarkCount = nodes.filter((n) => n.type === "bookmark").length;
+
+  return (
+    <div className="constellation-view ops-view-enter">
+      <section className="constellation-ops">
+        <div className="grid-ops-mast constellation-mast">
+          <div className="grid-ops-mast-text">
+            <span className="grid-ops-title">Constellation</span>
+            <span className="grid-ops-sub">
+              Every dot is a day, note, or bookmark · lines connect related work · click to jump in
+            </span>
+          </div>
+          <div className="grid-ops-stats" aria-hidden="true">
+            <span className="grid-ops-stat"><em>{dayCount}</em> days</span>
+            <span className="grid-ops-stat"><em>{learnedCount}</em> notes</span>
+            <span className="grid-ops-stat"><em>{bookmarkCount}</em> bookmarks</span>
+            <span className="grid-ops-stat"><em>{edges.length}</em> links</span>
+          </div>
+        </div>
+
+        <div className="constellation-canvas">
+          <svg
+            className="constellation-edges"
+            viewBox={`0 0 ${CONSTELLATION_WIDTH} ${CONSTELLATION_HEIGHT}`}
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            {edges.map((e) => {
+              const a = posById.get(e.source);
+              const b = posById.get(e.target);
+              if (!a || !b) return null;
+              return (
+                <line
+                  key={`${e.source}|${e.target}`}
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                  className={classNames("constellation-edge", `constellation-edge-${e.kind}`)}
+                  strokeOpacity={e.kind === "similarity" ? Math.min(0.85, 0.25 + e.score * 0.12) : 0.3}
+                />
+              );
+            })}
+          </svg>
+          <div className="constellation-nodes">
+            {nodes.map((node) => (
+              <ConstellationNodeDot key={node.id} node={node} onOpen={onOpenNode} />
+            ))}
+          </div>
+        </div>
+
+        <div className="constellation-legend">
+          <span className="constellation-legend-item">
+            <span className="constellation-legend-dot constellation-legend-dot-day" /> Day
+          </span>
+          <span className="constellation-legend-item">
+            <span className="constellation-legend-dot constellation-legend-dot-learned" /> Note
+          </span>
+          <span className="constellation-legend-item">
+            <span className="constellation-legend-dot constellation-legend-dot-bookmark" /> Bookmark
+          </span>
+          <span className="constellation-legend-sep" aria-hidden="true" />
+          <span className="constellation-legend-item">
+            <span className="constellation-legend-line constellation-legend-line-similarity" /> Similar content
+          </span>
+          <span className="constellation-legend-item">
+            <span className="constellation-legend-line constellation-legend-line-domain" /> Same sector
+          </span>
+        </div>
+      </section>
     </div>
   );
 }
