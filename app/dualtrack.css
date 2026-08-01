@@ -3199,9 +3199,10 @@
 
 /* ---------- view enter + fill punch ---------- */
 @keyframes opsRise {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+.kit-panel-hidden { display: none; }
 @keyframes opsStampSettle {
   from { opacity: 0; transform: rotate(-8deg) scale(0.7); }
   65% { opacity: 1; transform: rotate(16deg) scale(1.06); }
@@ -3213,7 +3214,7 @@
   to { transform: scaleX(1); }
 }
 .ops-view-enter {
-  animation: opsRise 0.38s ease-out both;
+  animation: opsRise 0.22s ease-out both;
 }
 .xp-bar-mini-fill,
 .period-chip-fill,

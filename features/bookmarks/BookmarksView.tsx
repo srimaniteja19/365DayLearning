@@ -210,7 +210,7 @@ export function BookmarksView({
   };
 
   return (
-    <div className="bm-view ops-view-enter" style={{ "--accent": accent }}>
+    <div className="bm-view" style={{ "--accent": accent }}>
       <header className="bm-head">
         <div className="bm-head-copy">
           <div className="bm-kicker">

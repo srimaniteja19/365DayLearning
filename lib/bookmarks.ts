@@ -259,6 +259,59 @@ export function removeBookmarkTag(tags: string[] | undefined, tag: string): stri
   return next.length ? next : undefined;
 }
 
+type PreviewResponse = { url: string; kind: BookmarkKind; preview: BookmarkPreview; warning?: string };
+
+const PREVIEW_CONCURRENCY = 4;
+const previewCache = new Map<string, Promise<PreviewResponse>>();
+const previewQueue: Array<() => void> = [];
+let previewActive = 0;
+
+function runNextPreview() {
+  if (previewActive >= PREVIEW_CONCURRENCY) return;
+  const job = previewQueue.shift();
+  if (!job) return;
+  previewActive++;
+  job();
+}
+
+async function rawFetchPreview(url: string): Promise<PreviewResponse> {
+  const res = await fetch("/api/bookmarks/preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Preview failed");
+  return data as PreviewResponse;
+}
+
+/**
+ * Concurrency-limited, de-duped preview fetch. A board can mount many link
+ * previews at once (every linked slip on Field notes, a fresh Bookmarks pull) —
+ * firing them all in parallel used to blow through the API's per-user rate
+ * limit in one burst. This coalesces repeat requests for the same URL and
+ * paces the rest a few at a time instead.
+ */
+export function fetchPreviewQueued(url: string): Promise<PreviewResponse> {
+  const existing = previewCache.get(url);
+  if (existing) return existing;
+
+  const promise = new Promise<PreviewResponse>((resolve, reject) => {
+    previewQueue.push(() => {
+      rawFetchPreview(url).then(resolve, reject).finally(() => {
+        previewActive--;
+        runNextPreview();
+      });
+    });
+    runNextPreview();
+  });
+
+  previewCache.set(url, promise);
+  // Drop failures so a later explicit retry (e.g. manual refresh) can go again.
+  promise.catch(() => previewCache.delete(url));
+  return promise;
+}
+
 export function mergeBookmarks(a: BookmarksList, b: BookmarksList): BookmarksList {
   const map = new Map<string, BookmarkItem>();
   for (const item of a || []) map.set(item.id, item);

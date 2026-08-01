@@ -28,6 +28,7 @@ import {
 import {
   extractVimeoId,
   extractYoutubeId,
+  fetchPreviewQueued,
   hostnameOf,
   seedPreviewFromUrl,
   vimeoEmbedUrl,
@@ -93,23 +94,17 @@ function LearnedLinkEmbed({ url, compact = false }) {
 
   useEffect(() => {
     setPreview(seed);
-    const ac = new AbortController();
-    (async () => {
-      try {
-        const res = await fetch("/api/bookmarks/preview", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url }),
-          signal: ac.signal,
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data?.preview) return;
-        setPreview((prev) => ({ ...prev, ...data.preview }));
-      } catch {
+    let cancelled = false;
+    fetchPreviewQueued(url)
+      .then((data) => {
+        if (!cancelled && data?.preview) setPreview((prev) => ({ ...prev, ...data.preview }));
+      })
+      .catch(() => {
         /* keep seed */
-      }
-    })();
-    return () => ac.abort();
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [url, seed]);
 
   if (compact) {
@@ -400,19 +395,13 @@ export function LearnedView({
       return next;
     });
 
-    const ac = new AbortController();
+    let cancelled = false;
     (async () => {
       for (const url of bodyUrls) {
-        if (ac.signal.aborted) return;
+        if (cancelled) return;
         try {
-          const res = await fetch("/api/bookmarks/preview", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url }),
-            signal: ac.signal,
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok || !data?.preview) continue;
+          const data = await fetchPreviewQueued(url);
+          if (cancelled || !data?.preview) continue;
           setLinkPreviews((prev) => ({
             ...prev,
             [url]: { ...(prev[url] || seedPreviewFromUrl(url)), ...data.preview },
@@ -422,7 +411,9 @@ export function LearnedView({
         }
       }
     })();
-    return () => ac.abort();
+    return () => {
+      cancelled = true;
+    };
   }, [bodyUrls]);
 
   // Prefetch captions / article text when polish is on and URLs are present.
@@ -660,7 +651,7 @@ export function LearnedView({
   };
 
   return (
-    <div className="learned-view ops-view-enter" style={{ "--accent": accent }}>
+    <div className="learned-view" style={{ "--accent": accent }}>
       <header className="learned-mast">
         <div className="learned-mast-copy">
           <div className="learned-kicker">

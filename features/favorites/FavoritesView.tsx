@@ -101,7 +101,7 @@ export function FavoritesView({
   };
 
   return (
-    <div className="fav-view ops-view-enter" style={{ "--accent": accent }}>
+    <div className="fav-view" style={{ "--accent": accent }}>
       <header className="fav-head">
         <div className="fav-head-copy">
           <div className="fav-kicker">

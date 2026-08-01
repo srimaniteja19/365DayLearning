@@ -275,6 +275,17 @@ export default function DualTrackConsole() {
   const [kitFocusDate, setKitFocusDate] = useState(null);
   const [kitQuery, setKitQuery] = useState("");
   const [kitSeed, setKitSeed] = useState(null);
+  /**
+   * Kit tabs stay mounted once visited (for instant, glitch-free re-switching),
+   * but must NOT mount eagerly — Notes renders a link-preview embed per linked
+   * slip on the whole board, so mounting it just because Bookmarks was opened
+   * fires a burst of /api/bookmarks/preview requests nobody asked for.
+   */
+  const [visitedKitTabs, setVisitedKitTabs] = useState(() => new Set());
+  useEffect(() => {
+    if (page !== "kit") return;
+    setVisitedKitTabs((prev) => (prev.has(kitTab) ? prev : new Set(prev).add(kitTab)));
+  }, [page, kitTab]);
   const openKitToDate = useCallback(
     (dateStr) => {
       requireAuth(() => {
@@ -1587,49 +1598,61 @@ export default function DualTrackConsole() {
             lensQuery={kitQuery}
             setLensQuery={setKitQuery}
           />
-          {kitTab === "learned" && (
-            <LearnedView
-              learned={learned}
-              onAdd={addLearned}
-              onUpdate={updateLearned}
-              onRemove={removeLearned}
-              accent={kitAccent}
-              fireToast={fireToast}
-              focusDate={kitFocusDate}
-              onFocusDateConsumed={() => setKitFocusDate(null)}
-              onOpenBookmarks={() => setKitTab("bookmarks")}
-              lensQuery={kitQuery}
-              onLensQueryChange={setKitQuery}
-              kitSeed={kitSeed}
-              onKitSeedConsumed={() => setKitSeed(null)}
-              onPinBookmark={pinBookmarkFromUrl}
-            />
+          {/* Once a tab has been opened it stays mounted and just toggles visibility,
+              so re-switching to it is instant with no remount/reflow/entrance-animation
+              blink. But it must NOT mount before that first visit — Notes renders a
+              link-preview embed per linked slip on the whole board, so mounting it
+              just because Bookmarks was opened fires a burst of unwanted
+              /api/bookmarks/preview requests. */}
+          {(kitTab === "learned" || visitedKitTabs.has("learned")) && (
+            <div className={classNames("kit-panel", kitTab !== "learned" && "kit-panel-hidden")}>
+              <LearnedView
+                learned={learned}
+                onAdd={addLearned}
+                onUpdate={updateLearned}
+                onRemove={removeLearned}
+                accent={kitAccent}
+                fireToast={fireToast}
+                focusDate={kitFocusDate}
+                onFocusDateConsumed={() => setKitFocusDate(null)}
+                onOpenBookmarks={() => setKitTab("bookmarks")}
+                lensQuery={kitQuery}
+                onLensQueryChange={setKitQuery}
+                kitSeed={kitSeed}
+                onKitSeedConsumed={() => setKitSeed(null)}
+                onPinBookmark={pinBookmarkFromUrl}
+              />
+            </div>
           )}
-          {kitTab === "bookmarks" && (
-            <BookmarksView
-              bookmarks={bookmarks}
-              onAdd={addBookmark}
-              onUpdate={updateBookmark}
-              onRemove={removeBookmark}
-              accent={kitAccent}
-              fireToast={fireToast}
-              onOpenNotes={() => setKitTab("learned")}
-              lensQuery={kitQuery}
-              onLensQueryChange={setKitQuery}
-            />
+          {(kitTab === "bookmarks" || visitedKitTabs.has("bookmarks")) && (
+            <div className={classNames("kit-panel", kitTab !== "bookmarks" && "kit-panel-hidden")}>
+              <BookmarksView
+                bookmarks={bookmarks}
+                onAdd={addBookmark}
+                onUpdate={updateBookmark}
+                onRemove={removeBookmark}
+                accent={kitAccent}
+                fireToast={fireToast}
+                onOpenNotes={() => setKitTab("learned")}
+                lensQuery={kitQuery}
+                onLensQueryChange={setKitQuery}
+              />
+            </div>
           )}
-          {kitTab === "favorites" && (
-            <FavoritesView
-              learned={learned}
-              bookmarks={bookmarks}
-              onUpdateLearned={updateLearned}
-              onUpdateBookmark={updateBookmark}
-              onJumpToDate={openKitToDate}
-              accent={kitAccent}
-              fireToast={fireToast}
-              lensQuery={kitQuery}
-              onLensQueryChange={setKitQuery}
-            />
+          {(kitTab === "favorites" || visitedKitTabs.has("favorites")) && (
+            <div className={classNames("kit-panel", kitTab !== "favorites" && "kit-panel-hidden")}>
+              <FavoritesView
+                learned={learned}
+                bookmarks={bookmarks}
+                onUpdateLearned={updateLearned}
+                onUpdateBookmark={updateBookmark}
+                onJumpToDate={openKitToDate}
+                accent={kitAccent}
+                fireToast={fireToast}
+                lensQuery={kitQuery}
+                onLensQueryChange={setKitQuery}
+              />
+            </div>
           )}
           {modal && (
             <ModalHost
