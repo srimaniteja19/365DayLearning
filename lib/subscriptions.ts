@@ -27,6 +27,11 @@ export type TierDefinition = {
   maxDaysManaged: number | null;
   /** Recruit allowances never reset; paid allowances use the rolling period. */
   managedAllowanceWindow: "lifetime" | "rolling";
+  /** Product capabilities apply whether AI is managed or BYOK. */
+  maxCampaignDays: number;
+  activeCampaignLimit: number | null;
+  automaticResourceEnrichment: boolean;
+  generationConcurrency: number;
   /** When true, UI shows Coming soon and checkout is blocked. */
   comingSoon: boolean;
   tagline: string;
@@ -44,11 +49,17 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierDefinition> = {
     aiActionsPerPeriod: 10,
     maxDaysManaged: 90,
     managedAllowanceWindow: "lifetime",
+    maxCampaignDays: 90,
+    activeCampaignLimit: 1,
+    automaticResourceEnrichment: false,
+    generationConcurrency: 3,
     comingSoon: false,
     tagline: "Try managed AI once — or bring your own key anytime.",
     features: [
       "1 managed plan generation (up to 90 days), lifetime",
       "10 managed AI actions, lifetime",
+      "1 active campaign · up to 90 days",
+      "Manual resource generation",
       "Unlimited custom plans on your OpenRouter key",
       "Unlimited quiz, notes, LinkedIn drafts & journal insights",
       "Example campaigns, multi-plan switcher, XP & streaks",
@@ -67,12 +78,18 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierDefinition> = {
     aiActionsPerPeriod: 150,
     maxDaysManaged: null,
     managedAllowanceWindow: "rolling",
+    maxCampaignDays: 365,
+    activeCampaignLimit: 3,
+    automaticResourceEnrichment: true,
+    generationConcurrency: 5,
     comingSoon: false,
     tagline: "Managed AI on us — light monthly quota.",
     features: [
       "Everything in Recruit",
       "3 managed plan generations / month",
       "150 managed AI actions / month",
+      "3 active campaigns · up to 365 days",
+      "Automatic resource enrichment · faster generation",
       "No OpenRouter key required for those quotas",
       "BYOK remains available anytime",
       "Invoices & self-serve billing portal",
@@ -88,12 +105,18 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierDefinition> = {
     aiActionsPerPeriod: 400,
     maxDaysManaged: null,
     managedAllowanceWindow: "rolling",
+    maxCampaignDays: 730,
+    activeCampaignLimit: null,
+    automaticResourceEnrichment: true,
+    generationConcurrency: 6,
     comingSoon: false,
     tagline: "More managed AI headroom.",
     features: [
       "Everything in Operator",
       "5 managed plan generations / month",
       "400 managed AI actions / month",
+      "Unlimited campaigns · up to 730 days",
+      "Automatic resource enrichment · fastest generation",
       "Highest managed monthly allowance",
       "BYOK remains available anytime",
       "Invoices & self-serve billing portal",

@@ -28,6 +28,10 @@ describe("tier definitions", () => {
     expect(free.aiActionsPerPeriod).toBe(10);
     expect(free.maxDaysManaged).toBe(90);
     expect(free.managedAllowanceWindow).toBe("lifetime");
+    expect(free.maxCampaignDays).toBe(90);
+    expect(free.activeCampaignLimit).toBe(1);
+    expect(free.automaticResourceEnrichment).toBe(false);
+    expect(free.generationConcurrency).toBe(3);
   });
 
   it("paid tiers are live with managed AI quotas", () => {
@@ -41,6 +45,13 @@ describe("tier definitions", () => {
     expect(architect.aiActionsPerPeriod!).toBeGreaterThan(operator.aiActionsPerPeriod!);
     expect(architect.priceMonthlyUsd).toBeGreaterThan(operator.priceMonthlyUsd);
     expect(operator.managedAllowanceWindow).toBe("rolling");
+    expect(operator.maxCampaignDays).toBe(365);
+    expect(operator.activeCampaignLimit).toBe(3);
+    expect(operator.automaticResourceEnrichment).toBe(true);
+    expect(operator.generationConcurrency).toBe(5);
+    expect(architect.maxCampaignDays).toBe(730);
+    expect(architect.activeCampaignLimit).toBeNull();
+    expect(architect.generationConcurrency).toBe(6);
   });
 
   it("tierDef falls back to free for unknown/missing tiers", () => {

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { parseJsonText, sanitizeJsonText } from "@/lib/stripFences";
 import { chatStructured, willUseManagedAi } from "@/lib/claude-client";
 import { newTelemetry, type GenerationTelemetry } from "@/lib/generationTelemetry";
-import { reservePlanGeneration } from "@/lib/subscriptions";
+import { getCachedSubscriptionTier, reservePlanGeneration, tierDef } from "@/lib/subscriptions";
 import {
   buildPeriodScopes,
   draftToPlanRequest,
@@ -12,8 +12,10 @@ import type { Plan, PlanDay, PlanGrouping, PlanRequest } from "@/lib/types";
 import { createPlanRouteSlug } from "@/lib/planRoute";
 import { ContentError } from "@/lib/providers/errors";
 
-/** How many period day-gens to run at once. Cuts wall-clock without huge prompt drift. */
-const PERIOD_CONCURRENCY = 3;
+/** Tier capability; applies to managed AI and BYOK generations alike. */
+export function generationConcurrency(): number {
+  return tierDef(getCachedSubscriptionTier()).generationConcurrency;
+}
 const outlinePeriodSchema = z.object({
   label: z.coerce.string().transform((s) => s.trim() || "Period"),
   theme: z.coerce.string().transform((s) => s.trim() || "Core topics"),
@@ -793,7 +795,8 @@ export async function generatePlan(opts: GeneratePlanOptions): Promise<{
   progress.topicsSoFar = progress.days.flatMap((d) => d.topics);
 
   const startIdx = opts.resume?.periodIndex ?? 0;
-  for (let i = startIdx; i < outline.length; i += PERIOD_CONCURRENCY) {
+  const concurrency = generationConcurrency();
+  for (let i = startIdx; i < outline.length; i += concurrency) {
     if (signal?.aborted) {
       progress.phase = "cancelled";
       progress.message = "Cancelled";
@@ -802,7 +805,7 @@ export async function generatePlan(opts: GeneratePlanOptions): Promise<{
       throw new DOMException("Aborted", "AbortError");
     }
 
-    const batch = outline.slice(i, Math.min(i + PERIOD_CONCURRENCY, outline.length));
+    const batch = outline.slice(i, Math.min(i + concurrency, outline.length));
     const topicsSnapshot = [...progress.topicsSoFar];
     progress.periodIndex = i;
     progress.message =

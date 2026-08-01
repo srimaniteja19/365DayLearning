@@ -456,6 +456,7 @@ export function HomeView({
                         <li>Console, XP, Review queue, Field Kit</li>
                         <li>1 managed plan (up to 90 days) + 10 actions, lifetime</li>
                         <li>Bring-your-own-key AI, unlimited</li>
+                        <li>1 active campaign · manual resource generation</li>
                         <li>Cloud sync · export / import</li>
                         <li>Multi-plan switcher, themes, badges</li>
                       </>
@@ -463,6 +464,8 @@ export function HomeView({
                       <>
                         <li>Everything in Recruit</li>
                         <li>Managed AI — 3 plan gens + 150 actions / month</li>
+                        <li>3 active campaigns · up to 365 days</li>
+                        <li>Automatic resource enrichment · faster generation</li>
                         <li>No key required for those quotas</li>
                         <li>BYOK remains available</li>
                         <li>Stripe checkout · billing portal</li>
@@ -471,6 +474,8 @@ export function HomeView({
                       <>
                         <li>Everything in Operator</li>
                         <li>Managed AI — 5 plan gens + 400 actions / month</li>
+                        <li>Unlimited campaigns · up to 730 days</li>
+                        <li>Automatic resource enrichment · fastest generation</li>
                         <li>Highest managed allowance</li>
                         <li>BYOK remains available</li>
                         <li>Stripe checkout · billing portal</li>

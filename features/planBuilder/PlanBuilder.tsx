@@ -28,6 +28,7 @@ import { sanitizePlanDays } from "@/lib/planEdit";
 import { suggestDomainsFromGoal } from "@/lib/domainSuggest";
 import { formatAiError } from "@/lib/providers/errors";
 import { PlanEditor } from "@/features/planBuilder/PlanEditor";
+import { getCachedSubscriptionTier, tierDef } from "@/lib/subscriptions";
 
 const DAY_PRESETS = [30, 45, 90, 180, 365];
 const GROUPING_OPTS: Array<{ key: PlanGrouping; label: string; hint: string }> = [
@@ -45,6 +46,8 @@ type Props = {
 };
 
 export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
+  const tier = tierDef(getCachedSubscriptionTier());
+  const maxCampaignDays = tier.maxCampaignDays;
   const [step, setStep] = useState<BuilderStep>(1);
   const [draft, setDraft] = useState<BuilderDraft>(defaultBuilderDraft);
   const [newDomain, setNewDomain] = useState("");
@@ -63,7 +66,13 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
     draftRef.current = draft;
   }, [draft]);
 
-  const shapeErrors = useMemo(() => validateShape(draft), [draft]);
+  const shapeErrors = useMemo(() => {
+    const errors = validateShape(draft);
+    if (draft.totalDays > maxCampaignDays) {
+      errors.push(`${tier.rankLabel} supports campaigns up to ${maxCampaignDays} days.`);
+    }
+    return errors;
+  }, [draft, maxCampaignDays, tier.rankLabel]);
   const contentErrors = useMemo(() => validateContent(draft), [draft]);
   const estimate = useMemo(() => estimateGeneration(draft), [draft]);
 
@@ -312,7 +321,7 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
           <div className="gen-field">
             <label className="gen-label">Total days</label>
             <div className="seg-row">
-              {DAY_PRESETS.map((n) => (
+              {DAY_PRESETS.filter((n) => n <= maxCampaignDays).map((n) => (
                 <button
                   key={n}
                   type="button"
@@ -327,7 +336,7 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
               className="settings-input"
               type="number"
               min={1}
-              max={730}
+              max={maxCampaignDays}
               value={draft.totalDays}
               onChange={(e) => patch({ totalDays: Number(e.target.value) || 1 })}
             />

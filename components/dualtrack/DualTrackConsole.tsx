@@ -164,6 +164,7 @@ export default function DualTrackConsole() {
   const cloudUserId = session?.user?.id || null;
   const pendingAuthAction = useRef(null);
   const [syncRetryToken, setSyncRetryToken] = useState(0);
+  const [subscriptionTier, setSubscriptionTier] = useState("free");
 
   const routePlan = useMemo(
     () => findPlanByRouteSegment(plans, route.planSegment),
@@ -210,12 +211,14 @@ export default function DualTrackConsole() {
   useEffect(() => {
     if (!cloudUserId) {
       setCachedSubscriptionTier(null);
+      setSubscriptionTier("free");
       return;
     }
     let cancelled = false;
     fetchSubscriptionStatus().then((res) => {
       if (cancelled || !res.ok) return;
       setCachedSubscriptionTier(res.usage.tier);
+      setSubscriptionTier(res.usage.tier);
     });
     return () => {
       cancelled = true;
@@ -300,6 +303,7 @@ export default function DualTrackConsole() {
     () => Object.values(plans).filter((p) => !p.hidden),
     [plans],
   );
+  const subscription = tierDef(subscriptionTier);
 
   const themedPlans = useMemo(() => {
     const out = {};
@@ -346,6 +350,16 @@ export default function DualTrackConsole() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 2600);
   }, []);
+
+  const requestNewPlan = useCallback(() => {
+    requireAuth(() => {
+      if (subscription.activeCampaignLimit != null && visiblePlans.length >= subscription.activeCampaignLimit) {
+        fireToast(`${subscription.rankLabel} supports ${subscription.activeCampaignLimit} active campaign${subscription.activeCampaignLimit === 1 ? "" : "s"}. Upgrade to add another.`, "warn");
+        return;
+      }
+      setModal({ kind: "builder" });
+    });
+  }, [fireToast, requireAuth, subscription, visiblePlans.length]);
 
   /** Handle Stripe Checkout / Portal return (`?billing=success|cancelled|portal`). */
   useEffect(() => {
@@ -544,6 +558,7 @@ export default function DualTrackConsole() {
   /** Progressive OpenRouter web_search fill for topic resource links (fail-soft). */
   const startResourceEnrichment = useCallback((plan, { force = false } = {}) => {
     if (!plan?.id || plan.hidden) return;
+    if (!subscription.automaticResourceEnrichment) return;
     if (builderOpenRef.current && !force) return;
     if (enrichingRef.current.has(plan.id)) return;
     if (!force && enrichAttemptedRef.current.has(plan.id)) return;
@@ -585,7 +600,7 @@ export default function DualTrackConsole() {
           enrichAbortRef.current.delete(plan.id);
         }
       });
-  }, []);
+  }, [subscription.automaticResourceEnrichment]);
 
   const enrichPlansMap = useCallback((plansMap, { force = false } = {}) => {
     if (builderOpenRef.current && !force) return;
@@ -602,7 +617,7 @@ export default function DualTrackConsole() {
       goTo({ page: "dashboard", planId: cleaned.id, plan: cleaned, view: "console" });
       fireToast(`Plan ready · ${cleaned.totalDays} days`, "day");
       // Defer enrichment until after the page transition settles.
-      window.setTimeout(() => startResourceEnrichment(cleaned, { force: true }), 1500);
+      window.setTimeout(() => startResourceEnrichment(cleaned), 1500);
     },
     [fireToast, goTo, startResourceEnrichment],
   );
@@ -1078,6 +1093,18 @@ export default function DualTrackConsole() {
   );
 
   const addExamplePlan = useCallback((planId) => {
+    const existing = plans[planId];
+    const candidate = existing || createBuiltinById(planId);
+    const wouldActivate = !existing || existing.hidden;
+    if (!candidate) return;
+    if (candidate.totalDays > subscription.maxCampaignDays) {
+      fireToast(`${subscription.rankLabel} supports campaigns up to ${subscription.maxCampaignDays} days.`, "warn");
+      return;
+    }
+    if (wouldActivate && subscription.activeCampaignLimit != null && visiblePlans.length >= subscription.activeCampaignLimit) {
+      fireToast(`${subscription.rankLabel} supports ${subscription.activeCampaignLimit} active campaign${subscription.activeCampaignLimit === 1 ? "" : "s"}. Upgrade to add another.`, "warn");
+      return;
+    }
     let added = null;
     setPlans((prev) => {
       if (prev[planId]) {
@@ -1094,9 +1121,9 @@ export default function DualTrackConsole() {
     fireToast("Plan added", "day");
     // Defer enrichment so the home→dashboard transition isn't fighting sync writes.
     if (added) {
-      window.setTimeout(() => startResourceEnrichment(added, { force: true }), 1500);
+      window.setTimeout(() => startResourceEnrichment(added), 1500);
     }
-  }, [fireToast, goTo, startResourceEnrichment]);
+  }, [fireToast, goTo, plans, startResourceEnrichment, subscription, visiblePlans.length]);
 
   const setTopicDone = useCallback((dayId, topicIdx, done) => {
     setProgress((prev) => {
@@ -1421,7 +1448,7 @@ export default function DualTrackConsole() {
     onOpenSettings: () => setModal({ kind: "settings" }),
     onOpenAccount: () => setModal({ kind: "account" }),
     accountLabel: session?.user?.email || null,
-    onNewPlan: () => setModal({ kind: "builder" }),
+    onNewPlan: requestNewPlan,
     themeKey,
     setThemeKey,
     fontKey,
@@ -1480,7 +1507,7 @@ export default function DualTrackConsole() {
           summary={homeSummary}
           examples={examplePlans}
           onAddExample={addExamplePlan}
-          onOpenBuilder={() => setModal({ kind: "builder" })}
+          onOpenBuilder={requestNewPlan}
           onOpenAccount={() => setModal({ kind: "account" })}
           onOpenPricing={() => setModal({ kind: "pricing" })}
           accountLabel={session?.user?.email || null}
@@ -1630,7 +1657,7 @@ export default function DualTrackConsole() {
           confirmDeletePlanId={confirmDeletePlanId}
           setConfirmDeletePlanId={setConfirmDeletePlanId}
           onDeletePlan={handleDeletePlan}
-          onNewPlan={() => setModal({ kind: "builder" })}
+          onNewPlan={requestNewPlan}
         />
         <CampaignHero
           campaign={campaign}
