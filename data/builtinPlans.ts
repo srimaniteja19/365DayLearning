@@ -63,6 +63,7 @@ const emptyMeta: PlanRequest = {};
 export function createBuiltin365(): Plan {
   return {
     id: BUILTIN_365_ID,
+    routeSlug: "operation-longhaul-builtin365",
     name: "OPERATION LONGHAUL",
     subtitle: "365-Day Full-Stack & Systems Campaign",
     builtin: true,
@@ -85,6 +86,7 @@ export function createBuiltin365(): Plan {
 export function createBuiltin45(): Plan {
   return {
     id: BUILTIN_45_ID,
+    routeSlug: "operation-fastburn-builtin45",
     name: "OPERATION FASTBURN",
     subtitle: "45-Day AI / LLM Engineer Intensive",
     builtin: true,
@@ -112,6 +114,7 @@ const WEEKS_30_MIND: PlanPeriod[] = [
 export function createBuiltin30Mind(): Plan {
   return {
     id: BUILTIN_30_MIND_ID,
+    routeSlug: "operation-mindfield-builtin30mind",
     name: "OPERATION MINDFIELD",
     subtitle: "30-Day Psychology & Decision Science Sprint",
     builtin: true,
@@ -153,4 +156,3 @@ export function periodsForPlan(plan: Plan, scope: string): PlanPeriod[] | null {
   if (!found || !found.periods.length) return null;
   return found.periods;
 }
-

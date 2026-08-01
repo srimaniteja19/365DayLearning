@@ -9,6 +9,7 @@ import {
   type BuilderDraft,
 } from "@/lib/planBuilder";
 import type { Plan, PlanDay, PlanGrouping, PlanRequest } from "@/lib/types";
+import { createPlanRouteSlug } from "@/lib/planRoute";
 import { ContentError } from "@/lib/providers/errors";
 
 /** How many period day-gens to run at once. Cuts wall-clock without huge prompt drift. */
@@ -918,6 +919,7 @@ export async function generatePlan(opts: GeneratePlanOptions): Promise<{
   return {
     plan: {
       id: planId,
+      routeSlug: createPlanRouteSlug(draft.name.trim() || "CUSTOM PLAN", planId),
       name: draft.name.trim() || "CUSTOM PLAN",
       subtitle: draft.subtitle.trim() || `${draft.totalDays}-day custom campaign`,
       builtin: false,

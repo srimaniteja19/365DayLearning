@@ -67,6 +67,8 @@ export type PlanStatus = "draft" | "ready";
 
 export type Plan = {
   id: string;
+  /** Stable URL segment assigned at creation; old snapshots may omit it. */
+  routeSlug?: string;
   name: string;
   subtitle: string;
   builtin: boolean;

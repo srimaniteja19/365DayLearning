@@ -179,6 +179,7 @@ const planPeriodSchema = z.object({
 
 const planSchema = z.object({
   id: z.string().min(1),
+  routeSlug: z.string().min(1).optional().catch(undefined),
   name: z.string().min(1),
   subtitle: z.string().catch(""),
   builtin: z.boolean().catch(false),

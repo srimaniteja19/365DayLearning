@@ -12,7 +12,7 @@ import React, {
   useEffect,
 } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   purgeLocalAppData,
 } from "@/lib/storage";
@@ -65,6 +65,7 @@ import {
   generateTopicResourcePair,
 } from "@/lib/topicResources";
 import { sanitizePlanDays } from "@/lib/planEdit";
+import { findPlanByRouteSegment, planRouteSegment } from "@/lib/planRoute";
 
 import {
   BackgroundFX,
@@ -110,6 +111,20 @@ const emptyUserSnapshot = () => ({
   bookmarks: [],
 });
 
+const DASHBOARD_VIEWS = ["console", "grid", "review", "weekly", "log"];
+
+function parseDashboardRoute(pathname) {
+  const parts = pathname.split("/").filter(Boolean).slice(1);
+  if (parts[0] === "kit") {
+    return { page: "kit", kitTab: parts[1] === "bookmarks" ? "bookmarks" : "learned" };
+  }
+  return {
+    page: "dashboard",
+    planSegment: parts[0] || null,
+    view: DASHBOARD_VIEWS.includes(parts[1]) ? parts[1] : "console",
+  };
+}
+
 export default function DualTrackConsole() {
   const [plans, setPlans] = useState({});
   const [activePlanId, setActivePlanId] = useState(BUILTIN_365_ID);
@@ -117,7 +132,6 @@ export default function DualTrackConsole() {
   const [notes, setNotes] = useState({});
   const [learned, setLearned] = useState({});
   const [bookmarks, setBookmarks] = useState([]);
-  const [view, setView] = useState("console");
   const [query, setQuery] = useState("");
   const [domainFilter, setDomainFilter] = useState(null);
   const [expandedDay, setExpandedDay] = useState(null);
@@ -136,10 +150,6 @@ export default function DualTrackConsole() {
   const [confirmDeletePlanId, setConfirmDeletePlanId] = useState(null);
   /** True after Neon hydrate finishes for the signed-in user (gates cloud autosave). */
   const [cloudReady, setCloudReady] = useState(false);
-  /** Top-level page (Home / Dashboard / Field Kit). Session-only — Neon holds learning data. */
-  const [page, setPage] = useState("home");
-  /** Field Kit tab — notes vs bookmarks. */
-  const [kitTab, setKitTab] = useState("learned");
 
   const toastTimer = useRef(null);
   const saveTimer = useRef(null);
@@ -147,13 +157,55 @@ export default function DualTrackConsole() {
   /** Last server `updatedAt` we pulled/pushed — used for conflict detection. */
   const cloudBaseUpdatedAt = useRef(null);
   const warnedSnapshotSizeRef = useRef(false);
-  /** Page restored from sessionStorage on mount, if any — read by the cloud hydrate effect below. */
-  const restoredPageRef = useRef(null);
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
+  const route = useMemo(() => parseDashboardRoute(pathname || "/dashboard"), [pathname]);
   const cloudUserId = session?.user?.id || null;
   const pendingAuthAction = useRef(null);
   const [syncRetryToken, setSyncRetryToken] = useState(0);
+
+  const routePlan = useMemo(
+    () => findPlanByRouteSegment(plans, route.planSegment),
+    [plans, route.planSegment],
+  );
+  const page = route.page;
+  const view = route.view || "console";
+  const kitTab = route.kitTab || "learned";
+  const selectedPlanId = routePlan?.id || activePlanId;
+
+  const hrefFor = useCallback((next = {}) => {
+    const nextPage = next.page || page;
+    if (nextPage === "home") return "/";
+    if (nextPage === "kit") {
+      return `/dashboard/kit/${next.kitTab || kitTab}`;
+    }
+    const planId = next.planId || selectedPlanId;
+    const plan = next.plan || plans[planId];
+    const segment = plan ? encodeURIComponent(planRouteSegment(plan)) : encodeURIComponent(planId);
+    const nextView = DASHBOARD_VIEWS.includes(next.view) ? next.view : view;
+    return `/dashboard/${segment}/${nextView}`;
+  }, [kitTab, page, plans, selectedPlanId, view]);
+
+  const goTo = useCallback((next) => {
+    const planId = next?.planId || next?.plan?.id;
+    if (planId && planId !== activePlanId) setActivePlanId(planId);
+    router.push(hrefFor(next), { scroll: false });
+  }, [activePlanId, hrefFor, router]);
+
+  const setView = useCallback(
+    (nextView) => goTo({ page: "dashboard", view: nextView }),
+    [goTo],
+  );
+  const setKitTab = useCallback((nextTab) => goTo({ page: "kit", kitTab: nextTab }), [goTo]);
+  const selectPlan = useCallback(
+    (planId) => goTo({ page: "dashboard", planId, view: "console" }),
+    [goTo],
+  );
+
+  useEffect(() => {
+    if (routePlan && routePlan.id !== activePlanId) setActivePlanId(routePlan.id);
+  }, [routePlan, activePlanId]);
 
   useEffect(() => {
     if (!cloudUserId) {
@@ -207,11 +259,10 @@ export default function DualTrackConsole() {
   const openKit = useCallback(
     (tab = "learned") => {
       requireAuth(() => {
-        setKitTab(tab === "bookmarks" ? "bookmarks" : "learned");
-        setPage("kit");
+        goTo({ page: "kit", kitTab: tab === "bookmarks" ? "bookmarks" : "learned" });
       });
     },
-    [setKitTab, setPage, requireAuth],
+    [goTo, requireAuth],
   );
 
   /** When set, LearnedView jumps Chrono to this YYYY-MM-DD (e.g. On This Day). */
@@ -222,11 +273,10 @@ export default function DualTrackConsole() {
     (dateStr) => {
       requireAuth(() => {
         setKitFocusDate(dateStr || null);
-        setKitTab("learned");
-        setPage("kit");
+        goTo({ page: "kit", kitTab: "learned" });
       });
     },
-    [setKitTab, setPage, requireAuth],
+    [goTo, requireAuth],
   );
 
   const resolvedThemeKey = resolveThemeKey(themeKey);
@@ -372,51 +422,38 @@ export default function DualTrackConsole() {
     }
   }, []);
 
-  // Restore last-open page/view/kit-tab for this browser session (survives a
-  // refresh, cleared when the tab closes — the learning data itself lives in Neon).
+  // A bare dashboard URL is the sole storage fallback. Every canonical route
+  // is driven by the pathname, so browser history never fights component state.
   useEffect(() => {
+    if (pathname !== "/dashboard" || !cloudReady) return;
     try {
       const storedPage = window.sessionStorage.getItem("dualtrack:page");
       const storedView = window.sessionStorage.getItem("dualtrack:view");
       const storedKitTab = window.sessionStorage.getItem("dualtrack:kit-tab");
-      if (storedPage === "home" || storedPage === "dashboard" || storedPage === "kit") {
-        restoredPageRef.current = storedPage;
-        setPage(storedPage);
-      }
-      if (["console", "grid", "review", "weekly", "log"].includes(storedView)) {
-        setView(storedView);
-      }
-      if (storedKitTab === "learned" || storedKitTab === "bookmarks") {
-        setKitTab(storedKitTab);
-      }
+      const storedPlanId = window.sessionStorage.getItem("dualtrack:plan");
+      const page = storedPage === "kit" ? "kit" : "dashboard";
+      router.replace(hrefFor({
+        page,
+        planId: storedPlanId && plans[storedPlanId] ? storedPlanId : selectedPlanId,
+        view: DASHBOARD_VIEWS.includes(storedView) ? storedView : "console",
+        kitTab: storedKitTab === "bookmarks" ? "bookmarks" : "learned",
+      }), { scroll: false });
     } catch {
       // best-effort only
     }
-  }, []);
+  }, [cloudReady, hrefFor, pathname, plans, router, selectedPlanId]);
 
   useEffect(() => {
+    if (pathname === "/dashboard") return;
     try {
       window.sessionStorage.setItem("dualtrack:page", page);
-    } catch {
-      // best-effort only
-    }
-  }, [page]);
-
-  useEffect(() => {
-    try {
+      window.sessionStorage.setItem("dualtrack:plan", selectedPlanId);
       window.sessionStorage.setItem("dualtrack:view", view);
-    } catch {
-      // best-effort only
-    }
-  }, [view]);
-
-  useEffect(() => {
-    try {
       window.sessionStorage.setItem("dualtrack:kit-tab", kitTab);
     } catch {
       // best-effort only
     }
-  }, [kitTab]);
+  }, [kitTab, page, pathname, selectedPlanId, view]);
 
   const resetWorkspace = useCallback(() => {
     setPlans({});
@@ -561,15 +598,13 @@ export default function DualTrackConsole() {
     (plan) => {
       const cleaned = sanitizePlanDays(plan);
       setPlans((prev) => ({ ...prev, [cleaned.id]: cleaned }));
-      setActivePlanId(cleaned.id);
       setScope("all");
-      setView("console");
-      setPage("dashboard");
+      goTo({ page: "dashboard", planId: cleaned.id, plan: cleaned, view: "console" });
       fireToast(`Plan ready · ${cleaned.totalDays} days`, "day");
       // Defer enrichment until after the page transition settles.
       window.setTimeout(() => startResourceEnrichment(cleaned, { force: true }), 1500);
     },
-    [fireToast, startResourceEnrichment],
+    [fireToast, goTo, startResourceEnrichment],
   );
 
   // Catch up resource enrichment after the builder closes (deferred while open).
@@ -593,18 +628,8 @@ export default function DualTrackConsole() {
   // Unsigned users stay on the landing page — no guest dashboard/kit.
   useEffect(() => {
     if (sessionStatus === "loading") return;
-    if (!cloudUserId && (page === "dashboard" || page === "kit")) {
-      setPage("home");
-    }
-  }, [sessionStatus, cloudUserId, page]);
-
-  // Migrate legacy in-dashboard Learned/Bookmarks tabs → Field Kit page.
-  useEffect(() => {
-    if (view !== "learned" && view !== "bookmarks") return;
-    const tab = view;
-    setView("console");
-    openKit(tab);
-  }, [view, openKit]);
+    if (!cloudUserId) router.replace("/");
+  }, [sessionStatus, cloudUserId, router]);
 
   // Neon is the source of truth — load/save account snapshots from Postgres only.
   useEffect(() => {
@@ -632,11 +657,6 @@ export default function DualTrackConsole() {
         const nextPlans = applyCloudSnapshot(result.snapshot);
         cloudBaseUpdatedAt.current = result.updatedAt;
         fireToast("Synced from your account");
-        // Returning operators land on their dashboard, not the cold-start picker —
-        // unless this session was already restored to a specific page (e.g. Field Kit).
-        if (restoredPageRef.current !== "kit" && Object.values(nextPlans).some((p) => !p.hidden)) {
-          setPage("dashboard");
-        }
         // Defer enrichment so the first cloud save / UI settle isn't raced.
         window.setTimeout(() => enrichPlansMap(nextPlans), 2500);
       } else if (result.ok) {
@@ -953,11 +973,10 @@ export default function DualTrackConsole() {
         date: dateKey(),
         tags: ["tip"],
       });
-      setKitTab("learned");
-      setPage("kit");
+      goTo({ page: "kit", kitTab: "learned" });
       fireToast("Opened Field Kit · edit & pin", "day");
     },
-    [notes, setKitTab, setPage, fireToast],
+    [notes, goTo, fireToast],
   );
 
   const handleReset = useCallback(async () => {
@@ -1006,7 +1025,7 @@ export default function DualTrackConsole() {
       }));
       if (activePlanId === planId) {
         const next = Object.values(plans).find((p) => p.id !== planId && !p.hidden);
-        setActivePlanId(next?.id || BUILTIN_365_ID);
+        goTo({ page: "dashboard", planId: next?.id || BUILTIN_365_ID, plan: next, view: "console" });
       }
       setConfirmDeletePlanId(null);
       fireToast("Built-in plan hidden", "xp");
@@ -1033,11 +1052,11 @@ export default function DualTrackConsole() {
     }
     if (activePlanId === planId) {
       const remaining = Object.values(plans).filter((p) => p.id !== planId && !p.hidden);
-      setActivePlanId(remaining[0]?.id || BUILTIN_365_ID);
+      goTo({ page: "dashboard", planId: remaining[0]?.id || BUILTIN_365_ID, plan: remaining[0], view: "console" });
     }
     setConfirmDeletePlanId(null);
     fireToast("Plan deleted", "xp");
-  }, [plans, activePlanId, progress, notes, refs, srs, log, learned, bookmarks, fireToast, cloudUserId]);
+  }, [plans, activePlanId, progress, notes, refs, srs, log, learned, bookmarks, fireToast, cloudUserId, goTo]);
 
   // Curated example curricula — opt-in starters (tech + non-tech), not auto-assigned.
   const examplePlans = useMemo(
@@ -1070,16 +1089,14 @@ export default function DualTrackConsole() {
       added = plan;
       return { ...prev, [plan.id]: plan };
     });
-    setActivePlanId(planId);
     setScope("all");
-    setView("console");
-    setPage("dashboard");
+    goTo({ page: "dashboard", planId, plan: added, view: "console" });
     fireToast("Plan added", "day");
     // Defer enrichment so the home→dashboard transition isn't fighting sync writes.
     if (added) {
       window.setTimeout(() => startResourceEnrichment(added, { force: true }), 1500);
     }
-  }, [fireToast, setPage, startResourceEnrichment]);
+  }, [fireToast, goTo, startResourceEnrichment]);
 
   const setTopicDone = useCallback((dayId, topicIdx, done) => {
     setProgress((prev) => {
@@ -1424,7 +1441,7 @@ export default function DualTrackConsole() {
     learnedCount,
     bookmarkCount,
     onOpenKit: openKit,
-    onOpenCampaign: campaign ? () => setPage("dashboard") : undefined,
+    onOpenCampaign: campaign ? () => goTo({ page: "dashboard" }) : undefined,
   };
 
   if (!onDashboard && !onKit) {
@@ -1469,7 +1486,7 @@ export default function DualTrackConsole() {
           accountLabel={session?.user?.email || null}
           onRequireAuth={requireAuth}
           onStartWithAccount={startWithAccount}
-          onGoDashboard={() => requireAuth(() => setPage("dashboard"))}
+          onGoDashboard={() => requireAuth(() => goTo({ page: "dashboard" }))}
           onOpenKit={openKit}
           learnedCount={learnedCount}
           bookmarkCount={bookmarkCount}
@@ -1524,7 +1541,7 @@ export default function DualTrackConsole() {
             learnedCount={learnedCount}
             bookmarkCount={bookmarkCount}
             hasCampaign={!!campaign}
-            onBackToCampaign={() => setPage("dashboard")}
+            onBackToCampaign={() => goTo({ page: "dashboard" })}
             accent={kitAccent}
             lensQuery={kitQuery}
             setLensQuery={setKitQuery}
@@ -1607,7 +1624,7 @@ export default function DualTrackConsole() {
         <TopBar {...topBarShared} />
         <PlanSwitcher
           active={activePlanId}
-          setActive={setActivePlanId}
+          setActive={selectPlan}
           campaignStats={campaignStats}
           campaigns={themedPlans}
           confirmDeletePlanId={confirmDeletePlanId}
@@ -1745,8 +1762,8 @@ export default function DualTrackConsole() {
             topicsDoneCount={topicsDoneCount}
             notes={notes}
             onOpenDay={(d) => {
+              goTo({ page: "dashboard", view: "console" });
               setExpandedDay(d.id);
-              setView("console");
             }}
           />
         )}
@@ -1759,10 +1776,9 @@ export default function DualTrackConsole() {
             onGrade={gradeReview}
             onOpenDay={(d) => {
               const planId = String(d.id).split(":")[0];
-              if (themedPlans[planId]) setActivePlanId(planId);
               setExpandedDay(d.id);
               setScope("all");
-              setView("console");
+              goTo({ page: "dashboard", planId: themedPlans[planId] ? planId : activePlanId, view: "console" });
             }}
           />
         )}
@@ -1777,7 +1793,7 @@ export default function DualTrackConsole() {
             onOpenDay={(d) => {
               setExpandedDay(d.id);
               setScope("all");
-              setView("console");
+              goTo({ page: "dashboard", view: "console" });
             }}
             onExport={() => setModal({ kind: "export" })}
           />
