@@ -532,7 +532,9 @@ export default function DualTrackConsole() {
   /** Plans we've already kicked off enrichment for this session (avoids conflict spirals). */
   const enrichAttemptedRef = useRef(new Set());
   const builderOpenRef = useRef(false);
-  builderOpenRef.current = modal?.kind === "builder";
+  useEffect(() => {
+    builderOpenRef.current = modal?.kind === "builder";
+  }, [modal?.kind]);
 
   const [generatingTopicKey, setGeneratingTopicKey] = useState(null);
 
@@ -747,6 +749,11 @@ export default function DualTrackConsole() {
         return true;
       }
       if (result.conflict) {
+        if (result.reason === "schema-version") {
+          fireToast("App updated on another device — refreshing page...", "warn");
+          window.setTimeout(() => window.location.reload(), 1200);
+          return true;
+        }
         if (result.snapshot) {
           const recoveryPayload = exportAll({
             plans: localSnapshot.plans,

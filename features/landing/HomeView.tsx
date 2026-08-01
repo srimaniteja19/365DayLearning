@@ -1,10 +1,10 @@
-// @ts-nocheck
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { classNames } from "@/lib/classNames";
 import { SUBSCRIPTION_TIERS, TIER_ORDER } from "@/lib/subscriptions";
+import type { Plan } from "@/lib/types";
 
 const CAMPAIGN_STEPS = [
   {
@@ -57,10 +57,54 @@ const CLAIMS = [
   },
 ];
 
-function scrollToId(id) {
+const FAQS = [
+  {
+    q: "Do I need to pay for an AI subscription?",
+    a: "No. The free Recruit tier includes full multi-plan campaigns, spaced repetition, day notes, bookmarks, and BYOK AI (paste your OpenRouter API key in Settings). Paid tiers (Operator and Architect) add managed server-side AI quotas if you don't use your own key.",
+  },
+  {
+    q: "How does cloud sync work?",
+    a: "Sign in with Google or email/password. Refrainly saves your snapshot (plans, progress, notes, SRS, journal) in Neon Postgres and keeps all your devices in step.",
+  },
+  {
+    q: "Where is my API key stored?",
+    a: "Keys stay in tab memory by default. If you enable 'Remember key on this device', it is saved in browser localStorage only — never to Neon or backups.",
+  },
+  {
+    q: "Can I export my learning history?",
+    a: "Yes. Export markdown study notes, export a full JSON backup snapshot, or share individual plans.",
+  },
+];
+
+function scrollToId(id: string) {
   if (typeof document === "undefined") return;
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
+
+export type HomeViewProps = {
+  hasCampaign?: boolean;
+  summary?: {
+    name: string;
+    streak: number;
+    xp: number;
+    level: number;
+    rank: string;
+    daysComplete: number;
+    totalDays: number;
+  } | null;
+  examples?: Plan[];
+  onAddExample?: (plan: Plan) => void;
+  onOpenBuilder?: () => void;
+  onOpenAccount?: () => void;
+  accountLabel?: string;
+  onRequireAuth?: (onAuthenticated?: () => void) => void;
+  onStartWithAccount?: (onAuthenticated?: () => void) => void;
+  onGoDashboard?: () => void;
+  onOpenPricing?: () => void;
+  onOpenKit?: (tab?: string) => void;
+  learnedCount?: number;
+  bookmarkCount?: number;
+};
 
 /**
  * Marketing landing + cold-start plan picker.
@@ -81,9 +125,9 @@ export function HomeView({
   onOpenKit,
   learnedCount = 0,
   bookmarkCount = 0,
-}) {
+}: HomeViewProps) {
   const [started, setStarted] = useState(false);
-  const pickerRef = useRef(null);
+  const pickerRef = useRef<HTMLDivElement | null>(null);
   const reduceMotion = useReducedMotion();
 
   useEffect(() => {
@@ -169,8 +213,8 @@ export function HomeView({
                 Pick up where you left off
               </h1>
               <p className="landing-hero-lead">
-                Continue <strong>{summary.name}</strong> — {summary.daysComplete} of{" "}
-                {summary.totalDays} days done.
+                Continue <strong>{summary?.name || "Campaign"}</strong> — {summary?.daysComplete ?? 0} of{" "}
+                {summary?.totalDays ?? 0} days done.
               </p>
               <div className="landing-hero-actions">
                 <button type="button" className="landing-cta" onClick={onGoDashboard}>
@@ -248,7 +292,7 @@ export function HomeView({
 
       <section className="landing-stats" aria-label={hasCampaign ? "Your progress" : "Sample progress"}>
         {proofTiles.map((tile, i) => (
-          <div key={tile.label} className="landing-stat" style={{ "--i": i }}>
+          <div key={tile.label} className="landing-stat" style={{ "--i": i } as React.CSSProperties}>
             <span className="landing-stat-val">{tile.val}</span>
             <span className="landing-stat-label">{tile.label}</span>
           </div>
@@ -569,8 +613,10 @@ export function HomeView({
                 <div className="landing-plan-meta">{p.totalDays} days · example</div>
                 <h3 className="landing-plan-name">{p.name}</h3>
                 <p className="landing-plan-sub">{p.subtitle}</p>
-                {p.blurb && <p className="landing-plan-blurb">{p.blurb}</p>}
-                <button type="button" className="landing-plan-btn" onClick={() => onAddExample(p.id)}>
+                {(p as unknown as { blurb?: string }).blurb && (
+                  <p className="landing-plan-blurb">{(p as unknown as { blurb?: string }).blurb}</p>
+                )}
+                <button type="button" className="landing-plan-btn" onClick={() => onAddExample?.(p)}>
                   Add plan
                 </button>
               </article>

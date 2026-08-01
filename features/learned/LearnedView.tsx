@@ -1002,7 +1002,6 @@ export function LearnedView({
                   <button
                     key={y.year}
                     type="button"
-                    role="listitem"
                     className={classNames("learned-year-stamp", on && "is-on")}
                     aria-pressed={on}
                     onClick={() => setChronoYear(y.year)}
@@ -1028,7 +1027,6 @@ export function LearnedView({
                 <button
                   key={m.month}
                   type="button"
-                  role="listitem"
                   className={classNames(
                     "learned-month-ticket",
                     on && "is-on",
@@ -1064,7 +1062,6 @@ export function LearnedView({
                     <button
                       key={d.date}
                       type="button"
-                      role="listitem"
                       className={classNames("learned-day-punch", on && "is-on")}
                       aria-pressed={on}
                       onClick={() => setChronoDay(d.day, d.date)}

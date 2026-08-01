@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -19,6 +18,7 @@ import {
   youtubeEmbedUrl,
   vimeoEmbedUrl,
 } from "@/lib/bookmarks";
+import type { BookmarkItem } from "@/lib/types";
 
 const CATEGORIES = [
   { key: "youtube", label: "Video", kinds: ["youtube", "vimeo"], tone: "coral" },
@@ -30,21 +30,17 @@ const CATEGORIES = [
 
 const STICKY_TONES = ["lemon", "coral", "mint", "sky", "blush", "butter", "lilac", "seafoam"];
 
-function hashStr(s) {
+function hashStr(s: string): number {
   let h = 0;
   for (let i = 0; i < String(s).length; i++) h = (h * 31 + String(s).charCodeAt(i)) | 0;
   return Math.abs(h);
 }
 
-function slipTilt(id) {
-  return `${[-1.8, -0.9, 0, 0.8, 1.6][hashStr(id) % 5]}deg`;
-}
-
-function toneFor(item, index) {
+function toneFor(item: BookmarkItem, index: number): string {
   return STICKY_TONES[hashStr(item.id || String(index)) % STICKY_TONES.length];
 }
 
-function resolveEmbed(item) {
+function resolveEmbed(item: BookmarkItem): { id: string; provider: "youtube" | "vimeo"; src: string } | null {
   const fromPreview = item.preview?.embedId;
   const provider = item.preview?.embedProvider;
   if (fromPreview && provider === "vimeo") {
@@ -60,7 +56,7 @@ function resolveEmbed(item) {
   return null;
 }
 
-async function fetchPreview(url) {
+async function fetchPreview(url: string) {
   const res = await fetch("/api/bookmarks/preview", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -71,7 +67,7 @@ async function fetchPreview(url) {
   return data;
 }
 
-function StickyThumb({ src }) {
+function StickyThumb({ src }: { src?: string | null }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) return null;
   return (
@@ -87,6 +83,20 @@ function StickyThumb({ src }) {
   );
 }
 
+export type BookmarksViewProps = {
+  bookmarks: BookmarkItem[];
+  onAdd: (item: BookmarkItem) => void;
+  onUpdate: (item: BookmarkItem) => void;
+  onRemove: (id: string) => void;
+  accent?: string;
+  fireToast?: (msg: string, icon?: string) => void;
+  onOpenNotes?: () => void;
+  lensQuery?: string;
+  onLensQueryChange?: (q: string) => void;
+  focusId?: string | null;
+  onFocusIdConsumed?: () => void;
+};
+
 export function BookmarksView({
   bookmarks,
   onAdd,
@@ -99,7 +109,7 @@ export function BookmarksView({
   onLensQueryChange,
   focusId = null,
   onFocusIdConsumed,
-}) {
+}: BookmarksViewProps) {
   const [urlInput, setUrlInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -107,22 +117,22 @@ export function BookmarksView({
   const query = typeof lensQuery === "string" ? lensQuery : localQuery;
   const setQuery = typeof onLensQueryChange === "function" ? onLensQueryChange : setLocalQuery;
   const kitLens = typeof onLensQueryChange === "function";
-  const [enrichBusy, setEnrichBusy] = useState(null);
-  const [noteEditId, setNoteEditId] = useState(null);
+  const [enrichBusy, setEnrichBusy] = useState<string | null>(null);
+  const [noteEditId, setNoteEditId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
-  const [tagEditId, setTagEditId] = useState(null);
+  const [tagEditId, setTagEditId] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState("");
-  const [flashId, setFlashId] = useState(null);
-  const flashTimer = useRef(null);
+  const [flashId, setFlashId] = useState<string | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const flashExisting = (id) => {
+  const flashExisting = (id: string) => {
     document.getElementById(`bm-card-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
     setFlashId(id);
     if (flashTimer.current) clearTimeout(flashTimer.current);
     flashTimer.current = setTimeout(() => setFlashId(null), 1600);
   };
 
-  const pendingFocusRef = useRef(null);
+  const pendingFocusRef = useRef<string | null>(null);
 
   // Constellation (or other deep-links) → clear any filter hiding the target, then scroll + flash it.
   useEffect(() => {
@@ -210,11 +220,11 @@ export function BookmarksView({
     }
   };
 
-  const toggleFavorite = (item) => {
+  const toggleFavorite = (item: BookmarkItem) => {
     onUpdate({ ...item, favorite: !item.favorite });
   };
 
-  const reEnrich = async (item) => {
+  const reEnrich = async (item: BookmarkItem) => {
     setEnrichBusy(item.id);
     try {
       const data = await fetchPreview(item.url);
@@ -223,14 +233,14 @@ export function BookmarksView({
         fireToast?.("Preview updated", "xp");
       }
     } catch (e) {
-      fireToast?.(e?.message || "Could not refresh preview", "xp");
+      fireToast?.((e as Error)?.message || "Could not refresh preview", "xp");
     } finally {
       setEnrichBusy(null);
     }
   };
 
   return (
-    <div className="bm-view" style={{ "--accent": accent }}>
+    <div className="bm-view" style={{ "--accent": accent } as React.CSSProperties}>
       <header className="bm-head">
         <div className="bm-head-copy">
           <div className="bm-kicker">
@@ -371,7 +381,7 @@ export function BookmarksView({
                       embed && "bm-sticky-video",
                       flashId === item.id && "bm-sticky-flash",
                     )}
-                    style={{ "--slip-tilt": embed ? "0deg" : index % 2 === 0 ? "-1.8deg" : "1.8deg" }}
+                    style={{ "--slip-tilt": embed ? "0deg" : index % 2 === 0 ? "-1.8deg" : "1.8deg" } as React.CSSProperties}
                   >
                     <span className="bm-sticky-backing" aria-hidden="true" />
                     <span className="bm-sticky-tape" aria-hidden="true" />

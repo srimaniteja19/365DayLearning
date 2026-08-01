@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import React, { useMemo, useRef, useState, useEffect } from "react";
@@ -6,6 +5,7 @@ import { Icon } from "@/components/Icon";
 import { classNames } from "@/lib/classNames";
 import { formatLearnedDate, stripLinkMarkup } from "@/lib/learned";
 import { hostnameOf } from "@/lib/bookmarks";
+import type { BookmarkItem, LearnedItem, LearnedMap } from "@/lib/types";
 
 const FILTERS = [
   { key: "all", label: "All" },
@@ -13,16 +13,32 @@ const FILTERS = [
   { key: "bookmark", label: "Bookmarks" },
 ];
 
-function snippet(text, max = 130) {
+function snippet(text: string | null | undefined, max = 130): string {
   const t = String(text || "").replace(/\s+/g, " ").trim();
   if (!t) return "";
   if (t.length <= max) return t;
   return t.slice(0, max).replace(/\s+\S*$/, "") + "…";
 }
 
-function entryKey(entry) {
+type FavEntry =
+  | { type: "note"; date: string; item: LearnedItem }
+  | { type: "bookmark"; item: BookmarkItem };
+
+function entryKey(entry: FavEntry): string {
   return `${entry.type}:${entry.item.id}`;
 }
+
+export type FavoritesViewProps = {
+  learned: LearnedMap;
+  bookmarks: BookmarkItem[];
+  onUpdateLearned?: (date: string, item: LearnedItem) => void;
+  onUpdateBookmark?: (item: BookmarkItem) => void;
+  onJumpToDate?: (date: string) => void;
+  accent?: string;
+  fireToast?: (msg: string, icon?: string) => void;
+  lensQuery?: string;
+  onLensQueryChange?: (q: string) => void;
+};
 
 export function FavoritesView({
   learned,
@@ -34,22 +50,22 @@ export function FavoritesView({
   fireToast,
   lensQuery,
   onLensQueryChange,
-}) {
+}: FavoritesViewProps) {
   const [filter, setFilter] = useState("all");
   const [localQuery, setLocalQuery] = useState("");
   const query = typeof lensQuery === "string" ? lensQuery : localQuery;
   const setQuery = typeof onLensQueryChange === "function" ? onLensQueryChange : setLocalQuery;
   const kitLens = typeof onLensQueryChange === "function";
-  const [exitingKeys, setExitingKeys] = useState(() => new Set());
-  const timers = useRef({});
+  const [exitingKeys, setExitingKeys] = useState<Set<string>>(() => new Set());
+  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
     const t = timers.current;
-    return () => Object.values(t).forEach(clearTimeout);
+    return () => Object.values(t).forEach((timerId) => clearTimeout(timerId));
   }, []);
 
   const noteFavorites = useMemo(() => {
-    const out = [];
+    const out: FavEntry[] = [];
     Object.entries(learned || {}).forEach(([date, items]) => {
       (items || []).forEach((item) => {
         if (item.favorite) out.push({ type: "note", date, item });
@@ -59,7 +75,7 @@ export function FavoritesView({
   }, [learned]);
 
   const bookmarkFavorites = useMemo(
-    () => (bookmarks || []).filter((b) => b.favorite).map((item) => ({ type: "bookmark", item })),
+    () => (bookmarks || []).filter((b) => b.favorite).map((item): FavEntry => ({ type: "bookmark", item })),
     [bookmarks],
   );
 
@@ -74,16 +90,15 @@ export function FavoritesView({
     return combined.filter((entry) => {
       if (filter !== "all" && entry.type !== filter) return false;
       if (!q) return true;
-      const it = entry.item;
       const hay =
         entry.type === "note"
-          ? [it.title, it.body, it.insight, ...(it.tags || [])]
-          : [it.title, it.url, it.note, it.preview?.description, it.preview?.siteName, ...(it.tags || [])];
+          ? [entry.item.title, entry.item.body, entry.item.insight, ...(entry.item.tags || [])]
+          : [entry.item.title, entry.item.url, entry.item.note, entry.item.preview?.description, entry.item.preview?.siteName, ...(entry.item.tags || [])];
       return hay.filter(Boolean).join(" ").toLowerCase().includes(q);
     });
   }, [combined, filter, query]);
 
-  const unfavorite = (entry) => {
+  const unfavorite = (entry: FavEntry) => {
     const key = entryKey(entry);
     setExitingKeys((prev) => {
       const next = new Set(prev);
@@ -101,7 +116,7 @@ export function FavoritesView({
   };
 
   return (
-    <div className="fav-view" style={{ "--accent": accent }}>
+    <div className="fav-view" style={{ "--accent": accent } as React.CSSProperties}>
       <header className="fav-head">
         <div className="fav-head-copy">
           <div className="fav-kicker">
@@ -204,8 +219,8 @@ export function FavoritesView({
           {filtered.map((entry) => {
             const key = entryKey(entry);
             const exiting = exitingKeys.has(key);
-            const it = entry.item;
             if (entry.type === "note") {
+              const it = entry.item;
               const noteText = stripLinkMarkup(it.body || "");
               const snip = noteText ? snippet(noteText) : it.insight ? snippet(it.insight) : "";
               return (
@@ -222,7 +237,7 @@ export function FavoritesView({
                   {snip && <p className="fav-card-snippet">{snip}</p>}
                   {(it.tags || []).length > 0 && (
                     <div className="fav-card-tags">
-                      {it.tags.map((t) => (
+                      {it.tags?.map((t: string) => (
                         <span key={t} className="fav-tag-chip">
                           {t}
                         </span>
@@ -250,6 +265,7 @@ export function FavoritesView({
               );
             }
 
+            const it = entry.item;
             const host = it.preview?.siteName || hostnameOf(it.url);
             const desc = it.preview?.description || it.note;
             return (
@@ -266,7 +282,7 @@ export function FavoritesView({
                 {desc && <p className="fav-card-snippet">{snippet(desc)}</p>}
                 {(it.tags || []).length > 0 && (
                   <div className="fav-card-tags">
-                    {it.tags.map((t) => (
+                    {it.tags?.map((t: string) => (
                       <span key={t} className="fav-tag-chip">
                         {t}
                       </span>

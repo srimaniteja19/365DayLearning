@@ -8956,16 +8956,15 @@ select.settings-input { cursor: pointer; }
 .bm-sticky .bm-sticky-backing {
   position: absolute;
   inset: 0;
-  transform: translate(6px, 6px);
+  transform: translate(5px, 5px);
   background: var(--bm-backing-bg);
-  border: 1.5px solid var(--bm-backing-border);
-  border-radius: 2px;
-  clip-path: var(--bm-wobble-clip);
+  border: 2px solid var(--sticky-edge);
+  border-radius: 0px;
   z-index: 0;
   pointer-events: none;
 }
 
-/* Paper Card Face with Wobbly Top Edge */
+/* Paper Card Face */
 .bm-sticky .bm-sticky-face {
   position: relative;
   z-index: 1;
@@ -8973,30 +8972,27 @@ select.settings-input { cursor: pointer; }
   flex-direction: column;
   gap: 8px;
   padding: 16px 12px 14px;
-  background:
-    linear-gradient(135deg, color-mix(in srgb, #fff 30%, transparent), transparent 50%),
-    var(--sticky-base);
-  border: 1.5px solid var(--sticky-edge);
-  border-radius: 2px;
-  clip-path: var(--bm-wobble-clip);
-  box-shadow: 2px 3px 0 color-mix(in srgb, var(--text) 15%, transparent);
+  background: var(--sticky-base);
+  border: 2px solid var(--sticky-edge);
+  border-radius: 0px;
+  box-shadow: 3px 3px 0px var(--sticky-edge);
 }
 
 /* Dark Theme Adjustments */
 .app-root:not(.is-light) .bm-sticky {
   --sticky-ink: var(--text);
   --sticky-muted: var(--text-dim);
-  --sticky-base: color-mix(in srgb, #f6ecce 22%, var(--bg-panel));
-  --sticky-edge: color-mix(in srgb, var(--text) 50%, var(--border));
+  --sticky-base: color-mix(in srgb, #f6ecce 15%, var(--bg-panel));
+  --sticky-edge: var(--border);
   --bm-backing-bg: color-mix(in srgb, var(--bm-kind-color) 40%, var(--bg-panel-2));
-  --bm-backing-border: color-mix(in srgb, var(--bm-kind-color) 65%, var(--border));
+  --bm-backing-border: var(--border);
   --bm-btn-bg: color-mix(in srgb, var(--bg-panel) 85%, var(--text));
-  --bm-btn-border: color-mix(in srgb, var(--text) 30%, transparent);
+  --bm-btn-border: var(--border);
 }
 
 .app-root:not(.is-light) .bm-sticky .bm-sticky-face {
   background: color-mix(in srgb, var(--sticky-base) 90%, var(--bg-panel));
-  box-shadow: 2px 3px 0 color-mix(in srgb, var(--accent) 25%, transparent);
+  box-shadow: 3px 3px 0px var(--border);
 }
 
 /* Hide old scotch tape */

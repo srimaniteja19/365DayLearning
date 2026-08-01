@@ -10,11 +10,12 @@ export type CloudPushResult =
       ok: false;
       error: string;
       conflict?: boolean;
+      reason?: string;
       snapshot?: AppSnapshot | null;
       updatedAt?: string | null;
     };
 
-/** Session-only — last successful pull/push from this browser tab. */
+/* Session-only — last successful pull/push from this browser tab. */
 let lastSyncedAt: number | null = null;
 
 export async function pullCloudSnapshot(): Promise<CloudPullResult> {
@@ -48,6 +49,7 @@ export async function pushCloudSnapshot(
     const data = (await res.json().catch(() => null)) as {
       ok?: boolean;
       error?: string;
+      reason?: string;
       message?: string;
       updatedAt?: string;
       snapshot?: AppSnapshot | null;
@@ -57,6 +59,7 @@ export async function pushCloudSnapshot(
       return {
         ok: false,
         conflict: true,
+        reason: data?.reason,
         error: data?.message || data?.error || "Cloud data changed on another device.",
         snapshot: data?.snapshot ?? null,
         updatedAt: data?.updatedAt ?? null,

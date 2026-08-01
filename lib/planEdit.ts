@@ -165,7 +165,7 @@ export function updateTopic(
       const topics = [...d.topics];
       topics[topicIndex] = text;
       // Topic text changed — drop stale suggested resource for this slot.
-      let resources = d.resources ? [...d.resources] : undefined;
+      const resources = d.resources ? [...d.resources] : undefined;
       if (resources) {
         while (resources.length < topics.length) resources.push(null);
         resources[topicIndex] = null;

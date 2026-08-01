@@ -1008,7 +1008,7 @@ function PricingPanel({ onClose, onOpenAccount, refreshToken = 0 }) {
     const result = await requestUpgrade(tierId);
     setPendingTier(null);
     if (result.ok && result.url) {
-      window.location.href = result.url;
+      window.location.assign(result.url);
       return;
     }
     setNotice(result.error || "Could not start checkout.");
@@ -1018,7 +1018,7 @@ function PricingPanel({ onClose, onOpenAccount, refreshToken = 0 }) {
     setNotice(null);
     const result = await openBillingPortal();
     if (result.ok && result.url) {
-      window.location.href = result.url;
+      window.location.assign(result.url);
       return;
     }
     setNotice(result.error || "Could not open billing portal.");
@@ -3173,7 +3173,9 @@ export function ModalHost({ modal, onClose, notes, refs, setRef, appendNote, pro
   const dialogRef = useRef(null);
   const previousFocusRef = useRef(null);
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   const titles = {
     quiz: "Recall check",
