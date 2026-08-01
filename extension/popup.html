@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Refrainly</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="brand-badge">R⚡</div>
+        <div class="brand-info">
+          <h1 class="brand-title">Refrainly</h1>
+          <span class="brand-sub" id="host-label">http://localhost:3000</span>
+        </div>
+      </div>
+      <button type="button" class="icon-btn" id="settings-toggle-btn" title="Settings">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+    </header>
+
+    <!-- Settings Overlay -->
+    <div id="settings-view" class="view hidden">
+      <div class="view-header">
+        <span class="view-title">Extension Settings</span>
+        <button type="button" class="close-btn" id="settings-close-btn">&times;</button>
+      </div>
+      <div class="field">
+        <label for="api-base-input">App Base URL</label>
+        <input type="url" id="api-base-input" placeholder="http://localhost:3000" />
+        <span class="field-hint">Point this to your running Refrainly instance.</span>
+      </div>
+      <button type="button" class="btn btn-primary" id="save-settings-btn">Save Settings</button>
+    </div>
+
+    <!-- Auth Required State -->
+    <div id="auth-view" class="view hidden">
+      <div class="auth-card">
+        <div class="auth-icon">🔒</div>
+        <h2>Sign in Required</h2>
+        <p>You need to be signed in to Refrainly in Chrome to save bookmarks and journal entries.</p>
+        <button type="button" class="btn btn-primary" id="signin-btn">Sign in to Refrainly</button>
+      </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div id="main-view" class="view">
+      <!-- Tabs -->
+      <nav class="nav-tabs">
+        <button type="button" class="tab-btn active" data-tab="bookmark">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+          Bookmark
+        </button>
+        <button type="button" class="tab-btn" data-tab="learned">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+          Learned
+        </button>
+      </nav>
+
+      <!-- Bookmark Form -->
+      <form id="bookmark-form" class="tab-pane active">
+        <div class="field">
+          <div class="field-header">
+            <label for="bm-url">URL</label>
+            <span id="bm-kind-badge" class="badge badge-link">link</span>
+          </div>
+          <input type="url" id="bm-url" required readonly />
+        </div>
+
+        <div class="field">
+          <label for="bm-title">Title</label>
+          <input type="text" id="bm-title" placeholder="Loading page title..." required />
+        </div>
+
+        <div class="field">
+          <label for="bm-note">Note / Quote (optional)</label>
+          <textarea id="bm-note" rows="3" placeholder="Add key takeaway or personal note..."></textarea>
+        </div>
+
+        <div class="field">
+          <label for="bm-tags">Tags (optional, comma-separated)</label>
+          <input type="text" id="bm-tags" placeholder="e.g. react, design, ai" />
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="bm-submit-btn">
+          <span>Save to Bookmarks</span>
+        </button>
+      </form>
+
+      <!-- Learned Form -->
+      <form id="learned-form" class="tab-pane hidden">
+        <div class="field">
+          <label for="ln-title">What did you learn today?</label>
+          <input type="text" id="ln-title" placeholder="Title or core takeaway" required />
+        </div>
+
+        <div class="field">
+          <label for="ln-url">Source URL (optional)</label>
+          <input type="url" id="ln-url" placeholder="https://..." />
+        </div>
+
+        <div class="field">
+          <label for="ln-notes">Notes & Key Details</label>
+          <textarea id="ln-notes" rows="3" placeholder="Explain the concept in your own words..."></textarea>
+        </div>
+
+        <div class="field">
+          <label>Category Tag</label>
+          <div class="tag-selector" id="ln-tag-selector">
+            <button type="button" class="tag-chip active" data-tag="tip">tip</button>
+            <button type="button" class="tag-chip" data-tag="tool">tool</button>
+            <button type="button" class="tag-chip" data-tag="article">article</button>
+            <button type="button" class="tag-chip" data-tag="talk">talk</button>
+            <button type="button" class="tag-chip" data-tag="paper">paper</button>
+            <button type="button" class="tag-chip" data-tag="course">course</button>
+            <button type="button" class="tag-chip" data-tag="other">other</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="ln-date">Date</label>
+          <input type="date" id="ln-date" required />
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="ln-submit-btn">
+          <span>Save to Learned</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden">
+      <span id="toast-icon">✓</span>
+      <span id="toast-message">Saved successfully!</span>
+    </div>
+  </div>
+
+  <script src="lib/bookmarks.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

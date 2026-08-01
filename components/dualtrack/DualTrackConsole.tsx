@@ -717,6 +717,50 @@ export default function DualTrackConsole() {
     };
   }, [sessionStatus, cloudUserId, resetWorkspace, applyCloudSnapshot, enrichPlansMap, fireToast]);
 
+  const refetchCloudState = useCallback(async () => {
+    if (!cloudReady || !cloudUserId) return;
+    const result = await pullCloudSnapshot();
+    if (result.ok && result.snapshot) {
+      applyCloudSnapshot(result.snapshot);
+      cloudBaseUpdatedAt.current = result.updatedAt;
+    }
+  }, [cloudReady, cloudUserId, applyCloudSnapshot]);
+
+  useEffect(() => {
+    if (!cloudReady || !cloudUserId) return;
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel("refrainly-sync");
+      channel.onmessage = (event) => {
+        if (event.data?.type === "REFRAINLY_ITEM_SAVED") {
+          refetchCloudState();
+        }
+      };
+    } catch {
+      /* ignore */
+    }
+
+    const handleFocus = () => {
+      refetchCloudState();
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        refetchCloudState();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      channel?.close();
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [cloudReady, cloudUserId, refetchCloudState]);
+
   const flushCloudSnapshot = useCallback(
     async (opts) => {
       if (!cloudReady || !cloudUserId) return false;

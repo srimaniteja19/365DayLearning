@@ -45,7 +45,16 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: "/(.*)",
+        source: "/api/:path*",
+        headers: [
+          ...securityHeaders,
+          { key: "Access-Control-Allow-Credentials", value: "true" },
+          { key: "Access-Control-Allow-Headers", value: "Content-Type, Authorization, X-Requested-With" },
+          { key: "Access-Control-Allow-Methods", value: "GET, POST, PUT, DELETE, OPTIONS" },
+        ],
+      },
+      {
+        source: "/((?!api/).*)",
         headers: securityHeaders,
       },
     ];

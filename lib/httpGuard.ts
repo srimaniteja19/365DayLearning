@@ -17,6 +17,7 @@ export function clientIp(req: NextRequest): string {
 export function isSameOrigin(req: NextRequest): boolean {
   const origin = req.headers.get("origin");
   if (!origin) return false;
+  if (origin.startsWith("chrome-extension://")) return true;
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
   if (!host) return false;
   try {
