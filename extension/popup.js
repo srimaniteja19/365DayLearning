@@ -97,7 +97,7 @@ async function loadConfig() {
     }
   }
 
-  state.apiBase = LOCAL_API_BASE;
+  state.apiBase = PRODUCTION_API_BASE;
   return state.apiBase;
 }
 
