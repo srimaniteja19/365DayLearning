@@ -16,32 +16,73 @@ import {
 } from "@/theme/fonts";
 import type { ThemeKey } from "@/lib/types";
 
-const REQUIRED_THEME_VARS = [
+const ALL_THEME_VARS = [
   "--bg",
   "--bg-panel",
+  "--bg-panel-2",
+  "--bg-blur",
   "--text",
-  "--accent",
-  "--accent-main",
-  "--on-accent",
-  "--overlay",
+  "--text-dim",
+  "--text-faint",
   "--border",
+  "--border-soft",
+  "--border-hover",
+  "--track",
+  "--on-accent",
+  "--on-accent-soft",
+  "--ok",
+  "--warn",
   "--err",
+  "--info",
+  "--accent-main",
+  "--accent-sprint",
+  "--accent",
+  "--glow",
+  "--overlay",
+  "--r-card",
+  "--r-ctl",
+  "--r-pill",
+  "--r-bar",
+  "--grid-color",
+  "--grid-size",
+  "--scan-op",
 ] as const;
 
 describe("theme tokens", () => {
   it("ships eleven themes in THEME_ORDER", () => {
     expect(THEME_ORDER).toHaveLength(11);
     for (const key of THEME_ORDER) {
-      expect(THEMES[key]).toBeTruthy();
+      expect(THEMES[key], `Theme ${key} missing from THEMES`).toBeTruthy();
     }
   });
 
-  it("themeVars exposes accent + overlay for every theme", () => {
-    for (const key of Object.keys(THEMES) as ThemeKey[]) {
+  it("themeVars exposes all 29 required CSS custom properties for every theme", () => {
+    for (const key of THEME_ORDER) {
       const vars = themeVars(THEMES[key]) as Record<string, string>;
-      for (const name of REQUIRED_THEME_VARS) {
+      for (const name of ALL_THEME_VARS) {
         expect(vars[name], `${key} missing ${name}`).toBeTruthy();
       }
+    }
+  });
+
+  it("verifies structure and non-empty color values for all themes", () => {
+    for (const key of THEME_ORDER) {
+      const t = THEMES[key];
+      expect(t.name, `${key} missing name`).toBeTruthy();
+      expect(["light", "dark"]).toContain(t.mode);
+      expect(["light", "dark", "muted"]).toContain(t.palette);
+      expect(t.swatch).toHaveLength(3);
+      expect(t.accents.main).toBeTruthy();
+      expect(t.accents.sprint).toBeTruthy();
+      expect(t.radius.card).toBeTruthy();
+      expect(t.radius.ctl).toBeTruthy();
+      expect(t.radius.pill).toBeTruthy();
+      expect(t.radius.bar).toBeTruthy();
+      expect(t.c.bg).toBeTruthy();
+      expect(t.c.panel).toBeTruthy();
+      expect(t.c.text).toBeTruthy();
+      expect(t.c.border).toBeTruthy();
+      expect(t.c.onAccent).toBeTruthy();
     }
   });
 
