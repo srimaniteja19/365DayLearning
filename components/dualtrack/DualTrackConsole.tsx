@@ -527,9 +527,12 @@ export default function DualTrackConsole() {
   }, []);
 
   const flushCloudSnapshot = useCallback(
-    async (opts) => {
+    async (opts?: { keepalive?: boolean; plans?: Record<string, any> }) => {
       if (!cloudReady || !cloudUserId) return false;
-      const localSnapshot = buildSnapshot();
+      const baseSnapshot = buildSnapshot();
+      const localSnapshot = opts?.plans
+        ? { ...baseSnapshot, plans: opts.plans }
+        : baseSnapshot;
       // log/learned/bookmarks are synced via their own per-record
       // endpoints now (see handleToggleTopic/addLearned/addBookmark
       // etc. below) — emptied here (not omitted) so AppSnapshot's type
@@ -701,13 +704,17 @@ export default function DualTrackConsole() {
   const handlePlanCreated = useCallback(
     (plan) => {
       const cleaned = sanitizePlanDays(plan);
-      setPlans((prev) => ({ ...prev, [cleaned.id]: cleaned }));
+      let nextPlans: Record<string, any> = {};
+      setPlans((prev) => {
+        nextPlans = { ...prev, [cleaned.id]: cleaned };
+        return nextPlans;
+      });
       setActivePlanId(cleaned.id);
       setScope("all");
       goTo({ page: "dashboard", planId: cleaned.id, plan: cleaned, view: "console" });
       fireToast(`Plan ready · ${cleaned.totalDays} days`, "day");
-      // Explicitly trigger immediate cloud sync on plan creation so it saves on the first save
-      void flushCloudSnapshot();
+      // Explicitly trigger immediate cloud sync passing the new plan payload so it saves on Neon DB immediately
+      void flushCloudSnapshot({ plans: nextPlans });
       // Defer enrichment until after the page transition settles.
       window.setTimeout(() => startResourceEnrichment(cleaned), 1500);
     },
