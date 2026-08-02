@@ -123,8 +123,9 @@ export function validateOutlineTiles(
   totalDays: number,
 ): string[] {
   const errors: string[] = [];
-  if (!periods.length) return ["Outline has no periods."];
-  const sorted = [...periods].sort((a, b) => a.start - b.start);
+  const safePeriods = Array.isArray(periods) ? periods : [];
+  if (!safePeriods.length) return ["Outline has no periods."];
+  const sorted = [...safePeriods].sort((a, b) => a.start - b.start);
   if (sorted[0].start !== 1) errors.push(`First period must start at 1 (got ${sorted[0].start}).`);
   if (sorted[sorted.length - 1].end !== totalDays) {
     errors.push(`Last period must end at ${totalDays} (got ${sorted[sorted.length - 1].end}).`);
@@ -167,20 +168,22 @@ export function skeletonOutlinePeriods(
  * overlap; never requires a second LLM call for bad boundaries.
  */
 export function snapOutlineToSkeleton(
-  outline: OutlinePeriod[],
-  skeleton: OutlinePeriod[],
+  rawOutline: OutlinePeriod[],
+  rawSkeleton: OutlinePeriod[],
 ): OutlinePeriod[] {
+  const outline = Array.isArray(rawOutline) ? rawOutline : [];
+  const skeleton = Array.isArray(rawSkeleton) ? rawSkeleton : [];
   if (!skeleton.length) return outline;
-  if (validateOutlineTiles(outline, skeleton[skeleton.length - 1].end).length === 0) {
+  if (outline.length > 0 && validateOutlineTiles(outline, skeleton[skeleton.length - 1].end).length === 0) {
     return [...outline].sort((a, b) => a.start - b.start);
   }
   return skeleton.map((sk, i) => {
     const overlap =
-      outline.find((o) => o.start <= sk.end && o.end >= sk.start) ||
+      outline.find((o) => o && typeof o === "object" && o.start <= sk.end && o.end >= sk.start) ||
       outline[Math.min(i, Math.max(0, outline.length - 1))];
     return {
       label: sk.label,
-      theme: (overlap?.theme || sk.theme).trim() || sk.theme,
+      theme: (overlap?.theme || sk.theme || "").trim() || sk.theme,
       start: sk.start,
       end: sk.end,
       domainMix: overlap?.domainMix,
@@ -282,9 +285,12 @@ type RawGenDay = { day: number; topics: string[]; domains?: string[] };
  * days 15–21. Remap relative sequences onto the absolute period range.
  */
 function alignDaysToPeriod(
-  days: RawGenDay[],
+  rawDays: RawGenDay[],
   period: OutlinePeriod,
 ): RawGenDay[] {
+  const days = Array.isArray(rawDays)
+    ? rawDays.filter((d) => d && typeof d === "object" && typeof d.day === "number" && Array.isArray(d.topics))
+    : [];
   const expected = period.end - period.start + 1;
   if (!days.length) return [];
 
@@ -1136,7 +1142,7 @@ ${bad.slice(0, 6000)}
 Return corrected JSON only.`,
     telemetry,
   });
-  return parsed.periods;
+  return Array.isArray(parsed?.periods) ? parsed.periods : Array.isArray(parsed) ? parsed : [];
 }
 
 async function fetchPeriodDays(opts: {
@@ -1232,7 +1238,7 @@ ${bad.slice(0, 8000)}
 Return corrected JSON only.`,
     telemetry,
   });
-  return parsed.days;
+  return Array.isArray(parsed?.days) ? parsed.days : Array.isArray(parsed) ? parsed : [];
 }
 
 /** Persist/resume helpers for draft generation state. */
