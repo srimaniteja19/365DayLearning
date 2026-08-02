@@ -832,12 +832,13 @@ const INDEX_STOPWORDS = new Set([
  * collapsed to a keyword index. Validation rejects duplicates against every
  * topic generated so far, so the model has to see something for all of them.
  */
-export function topicIndex(topics: string[], recentMax = 35): string {
-  if (!topics.length) return "(none yet — this is the first period)";
-  const recent = topics.slice(-recentMax);
-  const older = topics.slice(0, Math.max(0, topics.length - recentMax));
+export function topicIndex(topics: string[], recentMax = 18): string {
+  const safeTopics = Array.isArray(topics) ? topics : [];
+  if (!safeTopics.length) return "(none yet — this is the first period)";
+  const recent = safeTopics.slice(-recentMax);
+  const older = safeTopics.slice(0, Math.max(0, safeTopics.length - recentMax));
   const parts = [
-    `Most recent ${recent.length} topics, verbatim — do not repeat or rephrase any of these:`,
+    `Recent ${recent.length} topics (do not repeat):`,
     ...recent.map((t) => `- ${t}`),
   ];
   if (older.length) {
@@ -845,12 +846,10 @@ export function topicIndex(topics: string[], recentMax = 35): string {
       new Set(
         older.flatMap((t) => t.toLowerCase().match(/[a-z][a-z0-9+.#-]{2,}/g) || []),
       ),
-    ).filter((w) => !INDEX_STOPWORDS.has(w));
-    parts.push(
-      "",
-      `The earlier ${older.length} topics already covered these subjects — do not revisit them:`,
-      keywords.join(", "),
-    );
+    )
+      .filter((w) => !INDEX_STOPWORDS.has(w))
+      .slice(0, 20);
+    parts.push(`The earlier ${older.length} topics covered: ${keywords.join(", ")}`);
   }
   return parts.join("\n");
 }
@@ -1205,7 +1204,7 @@ ${pending.length ? `\nStill unplaced must-include topics — work these in if th
 ${meta.exclusions?.length ? `\nNever cover:\n${meta.exclusions.map((e) => `- ${e}`).join("\n")}` : ""}
 
 Already covered (do not repeat):
-${topicIndex(topicsSoFar, 40)}
+${topicIndex(topicsSoFar, 18)}
 
 Example specificity (do not reuse):
 day 8: Raft leader election and terms; Write-ahead log fsync tradeoffs
