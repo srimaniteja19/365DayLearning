@@ -756,6 +756,14 @@ export function coercePlanAiPayload(data: unknown): unknown {
     obj = { days: [obj] };
   }
 
+  if (obj.days && typeof obj.days === "object" && !Array.isArray(obj.days)) {
+    obj.days = Object.values(obj.days);
+  }
+
+  if (obj.periods && typeof obj.periods === "object" && !Array.isArray(obj.periods)) {
+    obj.periods = Object.values(obj.periods);
+  }
+
   if (Array.isArray(obj.days)) {
     obj.days = obj.days.map((item, i) => coerceGeneratedDay(item, i));
   }

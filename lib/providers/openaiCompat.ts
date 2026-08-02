@@ -63,7 +63,14 @@ export async function openAiCompatibleChat(
   }
 
   let data: {
-    choices?: Array<{ message?: { content?: string | Array<{ type?: string; text?: string }> } }>;
+    choices?: Array<{
+      message?: {
+        content?: string | Array<{ type?: string; text?: string }> | Record<string, unknown>;
+        tool_calls?: Array<{ function?: { arguments?: string } }>;
+        function_call?: { arguments?: string };
+      };
+      text?: string;
+    }>;
   };
   try {
     data = JSON.parse(raw);
@@ -71,14 +78,25 @@ export async function openAiCompatibleChat(
     throw new ContentError("Response was not valid JSON.");
   }
 
-  const content = data.choices?.[0]?.message?.content;
+  const choice = Array.isArray(data.choices) ? data.choices[0] : undefined;
+  const msg = choice?.message;
   let text = "";
-  if (typeof content === "string") text = content.trim();
-  else if (Array.isArray(content)) {
-    text = content
-      .map((c) => (typeof c === "string" ? c : c.text || ""))
+
+  if (typeof msg?.content === "string") {
+    text = msg.content.trim();
+  } else if (Array.isArray(msg?.content)) {
+    text = msg.content
+      .map((c) => (typeof c === "string" ? c : (c as { text?: string }).text || ""))
       .join("")
       .trim();
+  } else if (msg?.content && typeof msg.content === "object") {
+    text = JSON.stringify(msg.content);
+  } else if (Array.isArray(msg?.tool_calls) && msg.tool_calls[0]?.function?.arguments) {
+    text = msg.tool_calls[0].function.arguments.trim();
+  } else if (msg?.function_call?.arguments) {
+    text = msg.function_call.arguments.trim();
+  } else if (typeof choice?.text === "string") {
+    text = choice.text.trim();
   }
 
   if (!text) throw new ContentError("Empty response from model.");
