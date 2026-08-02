@@ -36,7 +36,7 @@ export {
   cacheKeyForKind,
 } from "@/lib/topicResourceShared";
 
-const SEARCH_CONCURRENCY = 2;
+const SEARCH_CONCURRENCY = 5;
 const CACHE_LOOKUP_BATCH = 40;
 
 const VIDEO_DOMAINS = [
@@ -179,24 +179,30 @@ export type TopicSlot = {
 };
 
 /** Collect topic slots that still need resources (no article and no video). */
-export function collectPendingTopicSlots(plan: Plan): TopicSlot[] {
+export function collectPendingTopicSlots(plan: Plan, maxSlots?: number): TopicSlot[] {
   const slots: TopicSlot[] = [];
-  plan.days.forEach((day, dayIndex) => {
-    day.topics.forEach((title, topicIndex) => {
-      if (isPlaceholderTopic(title)) return;
+  const limit = maxSlots ?? 15;
+  if (!plan?.days || !Array.isArray(plan.days)) return slots;
+  for (let dayIndex = 0; dayIndex < plan.days.length; dayIndex++) {
+    const day = plan.days[dayIndex];
+    if (!day || !Array.isArray(day.topics)) continue;
+    for (let topicIndex = 0; topicIndex < day.topics.length; topicIndex++) {
+      const title = day.topics[topicIndex];
+      if (isPlaceholderTopic(title)) continue;
       const slot = day.resources?.[topicIndex];
-      if (slot !== undefined) return;
+      if (slot !== undefined) continue;
       const topicKey = normalizeTopicResourceKey(title);
-      if (!topicKey) return;
+      if (!topicKey) continue;
       slots.push({
         dayIndex,
         topicIndex,
         title,
-        domain: day.domains[topicIndex],
+        domain: day.domains?.[topicIndex] || "",
         topicKey,
       });
-    });
-  });
+      if (limit > 0 && slots.length >= limit) return slots;
+    }
+  }
   return slots;
 }
 
@@ -314,7 +320,7 @@ export async function enrichPlanResources(opts: EnrichResourcesOpts): Promise<Pl
   const pending = collectPendingTopicSlots(plan);
   if (!pending.length) return plan;
 
-  const UPDATE_BATCH_MS = 2500;
+  const UPDATE_BATCH_MS = 600;
   let flushTimer: ReturnType<typeof setTimeout> | null = null;
   let dirty = false;
 
