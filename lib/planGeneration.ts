@@ -811,11 +811,12 @@ export function coercePlanAiPayload(data: unknown): unknown {
   return obj;
 }
 
-const PLAN_SYSTEM = `You are a senior curriculum designer who builds daily learning plans for motivated adult self-learners in any subject — psychology, economics, history, languages, sciences, arts, trades, technology, or interdisciplinary goals.
-Every topic you write names one specific, teachable concept that someone can study in a single sitting and be quizzed on afterward.
-Match the learner's stated goal and level; do not default to software engineering unless the goal is clearly technical.
-Never put double-quote characters inside label, theme, or topic text — use plain words only (write RPC not "RPC").
-When a structured tool is available, call it. Otherwise reply with a single strict JSON object and nothing else.`;
+const PLAN_SYSTEM = `You are a master instructional designer and cognitive science expert specializing in adult learning, deliberate practice, Bloom's Taxonomy, and active recall.
+Your daily learning plans build mastery through structured progression:
+1. Cognitive Progression: Early periods establish mental models and core mechanisms (Understand & Remember); middle periods analyze trade-offs and edge cases (Analyze & Evaluate); final periods synthesize hands-on projects and failure recovery (Create & Apply).
+2. Active Recall Specificity: Write every topic name as a testable concept (something the learner can answer a quiz question about). Never write generic lecture titles.
+3. Universal Scope: Adapt precisely to the user's domain — tech, economics, languages, health, trades, or history. Do not default to software engineering unless requested.
+4. Clean JSON: Never use double-quote characters inside string values. Write plain words or parentheses.`;
 
 function domainCatalog(draft: BuilderDraft): string {
   return draft.domains
@@ -1112,10 +1113,10 @@ Use EXACTLY these period boundaries (same labels, start, and end — do not chan
 ${bounds}
 
 Rules
-- Return one period object per row above, with the same label/start/end.
-- Themes must show progression — foundations first, then dependent topics, then applied work.
-- Add a "capstone" field describing a hands-on project for completing this period.
-- domainMix lists domain ids for that period, ordered by emphasis.
+- Return one period object per boundary row, keeping exact labels, start, and end days.
+- Pedagogical Arc: Structure themes sequentially (Foundations -> Applied Mechanics -> System Synthesis & Edge Cases).
+- Milestone Capstones: Provide a concrete, hands-on capstone project for each period that tests the period's core objectives.
+- Domain Allocation: Order domainMix IDs by emphasis for that period.
 - Do not use double-quote characters inside label, theme, or capstone text.`;
 
   const parsed = await chatStructured({
