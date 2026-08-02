@@ -1437,6 +1437,12 @@ export function PeriodNav({ scopes, scope, setScope, periods, periodIdx, setPeri
           })}
         </div>
       )}
+      {activePeriod?.capstone && (
+        <div style={{ marginTop: "10px", padding: "8px 12px", borderRadius: "6px", background: "rgba(255,255,255,0.04)", border: "1px dashed rgba(255,255,255,0.15)", fontSize: "13px" }}>
+          <strong style={{ color: "var(--accent, #3FE0D0)", marginRight: "6px" }}>🎯 Period Capstone:</strong>
+          <span>{activePeriod.capstone}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -1530,8 +1536,37 @@ function DayDetailBody({
   onGenerateTopicResources,
   generatingTopicKey,
 }) {
+  const loadBadge =
+    day.cognitiveLoad === "light"
+      ? "🟢 Light Load"
+      : day.cognitiveLoad === "heavy"
+      ? "🔴 Heavy Load"
+      : day.cognitiveLoad === "medium"
+      ? "🟡 Medium Load"
+      : null;
+
   return (
     <>
+      {(day.estimatedMinutes || loadBadge) && (
+        <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px", fontSize: "12px", opacity: 0.85 }}>
+          {day.estimatedMinutes && (
+            <span style={{ padding: "2px 8px", borderRadius: "4px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
+              ⏱️ ~{day.estimatedMinutes} mins
+            </span>
+          )}
+          {loadBadge && (
+            <span style={{ padding: "2px 8px", borderRadius: "4px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
+              {loadBadge}
+            </span>
+          )}
+        </div>
+      )}
+      {day.deliverable && (
+        <div style={{ marginBottom: "10px", padding: "8px 12px", borderRadius: "6px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", fontSize: "13px" }}>
+          <strong style={{ color: "var(--accent, #60A5FA)", marginRight: "6px" }}>🛠️ Actionable Deliverable:</strong>
+          <span>{day.deliverable}</span>
+        </div>
+      )}
       {day.topics.map((t, i) => {
         const isDone = !!(progress[day.id] && progress[day.id][i]);
         return (
@@ -2125,18 +2160,27 @@ function TopicResourceLink({ resource, stamp = "RES", icon = "link" }) {
   const tip = resource.snippet
     ? `${label}\n\n${resource.snippet}`
     : label;
+  const getIcon = () => {
+    if (icon === "video") return <Icon.Play size={11} />;
+    if (icon === "doc") return <Icon.Book size={11} />;
+    if (icon === "repo") return <Icon.Code size={11} />;
+    if (icon === "interactive") return <Icon.Terminal size={11} />;
+    if (icon === "audio") return <Icon.Mic size={11} />;
+    return <Icon.Link size={11} />;
+  };
+
   return (
     <Tip content={tip} stamp={stamp} tone="sky" side="top">
       <a
-        className={classNames("topic-resource-link", icon === "video" && "topic-resource-link-video")}
+        className={classNames("topic-resource-link", (icon === "video" || icon === "interactive") && "topic-resource-link-video")}
         href={href}
         target="_blank"
         rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.preventDefault()}
-        aria-label={`Open ${icon === "video" ? "video" : "article"}: ${label}`}
+        aria-label={`Open ${icon}: ${label}`}
       >
-        {icon === "video" ? <Icon.Play size={11} /> : <Icon.Link size={11} />}
+        {getIcon()}
       </a>
     </Tip>
   );
@@ -2151,27 +2195,33 @@ function TopicResourceControls({
   const pair = (() => {
     if (!resourceSlot || typeof resourceSlot !== "object") return null;
     if ("url" in resourceSlot && !("article" in resourceSlot) && !("video" in resourceSlot)) {
-      return { article: resourceSlot, video: null };
+      return { article: resourceSlot };
     }
     return resourceSlot;
   })();
+
   const hasArticle = !!pair?.article?.url;
   const hasVideo = !!pair?.video?.url;
+  const hasDoc = !!pair?.doc?.url;
+  const hasInteractive = !!pair?.interactive?.url;
+  const hasAudio = !!pair?.audio?.url;
+  const hasRepo = !!pair?.repo?.url;
+  const hasAny = hasArticle || hasVideo || hasDoc || hasInteractive || hasAudio || hasRepo;
 
   return (
     <span className={classNames("topic-resource-controls", compact && "topic-resource-controls-compact")}>
-      {hasArticle && (
-        <TopicResourceLink resource={pair.article} stamp="DOC" icon="link" />
-      )}
-      {hasVideo && (
-        <TopicResourceLink resource={pair.video} stamp="VID" icon="video" />
-      )}
+      {hasDoc && <TopicResourceLink resource={pair.doc} stamp="DOC" icon="doc" />}
+      {hasRepo && <TopicResourceLink resource={pair.repo} stamp="REPO" icon="repo" />}
+      {hasInteractive && <TopicResourceLink resource={pair.interactive} stamp="KATA" icon="interactive" />}
+      {hasArticle && <TopicResourceLink resource={pair.article} stamp="READ" icon="link" />}
+      {hasVideo && <TopicResourceLink resource={pair.video} stamp="VID" icon="video" />}
+      {hasAudio && <TopicResourceLink resource={pair.audio} stamp="AUDIO" icon="audio" />}
       {onGenerate && (
         <Tip
           content={
-            hasArticle || hasVideo
-              ? "Find a fresh article + video for this topic"
-              : "Generate 1 article and 1 video for this topic"
+            hasAny
+              ? "Find multi-format learning resources for this topic"
+              : "Generate docs, katas, videos, & articles for this topic"
           }
           stamp="GEN"
           tone="mint"
@@ -2181,7 +2231,7 @@ function TopicResourceControls({
             type="button"
             className="topic-resource-gen"
             disabled={generating}
-            aria-label="Generate article and video resources"
+            aria-label="Generate topic resources"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();

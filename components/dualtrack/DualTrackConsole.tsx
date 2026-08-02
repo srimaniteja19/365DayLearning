@@ -527,6 +527,79 @@ export default function DualTrackConsole() {
     return nextPlans;
   }, []);
 
+  const flushCloudSnapshot = useCallback(
+    async (opts) => {
+      if (!cloudReady || !cloudUserId) return false;
+      const localSnapshot = buildSnapshot();
+      // log/learned/bookmarks are synced via their own per-record
+      // endpoints now (see handleToggleTopic/addLearned/addBookmark
+      // etc. below) — emptied here (not omitted) so AppSnapshot's type
+      // stays unchanged everywhere, including localSnapshot itself,
+      // which the conflict-recovery-stash export below still uses in
+      // full.
+      const syncPayload = {
+        ...localSnapshot,
+        userdata: { ...localSnapshot.userdata, log: [], learned: {}, bookmarks: [] },
+      };
+      const payloadSize = JSON.stringify(syncPayload).length;
+      if (payloadSize >= MAX_SNAPSHOT_CHARS * 0.6 && !warnedSnapshotSizeRef.current) {
+        warnedSnapshotSizeRef.current = true;
+        fireToast(
+          "Your account data is getting large — export a backup or trim old notes soon.",
+          "warn",
+        );
+      }
+      const result = await pushCloudSnapshot(
+        syncPayload,
+        cloudBaseUpdatedAt.current,
+        opts,
+      );
+      if (result.ok) {
+        cloudBaseUpdatedAt.current = result.updatedAt;
+        return true;
+      }
+      if (result.conflict) {
+        if (result.reason === "schema-version") {
+          fireToast("App updated on another device — refreshing page...", "warn");
+          window.setTimeout(() => window.location.reload(), 1200);
+          return true;
+        }
+        if (result.snapshot) {
+          const recoveryPayload = exportAll({
+            plans: localSnapshot.plans,
+            userdata: localSnapshot.userdata,
+            themeKey: localSnapshot.meta.themeKey,
+            activePlanId: localSnapshot.meta.activePlanId,
+          });
+          const recoveryJson = serializeExport(recoveryPayload);
+          const recoveryFilename = `refrainly-recovery-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+          const downloaded = downloadText(recoveryFilename, recoveryJson, "application/json");
+          if (!downloaded) {
+            try {
+              window.localStorage.setItem("refrainly:conflict-recovery", recoveryJson);
+            } catch {
+              /* best-effort; nothing more we can do if storage is unavailable */
+            }
+          }
+          applyCloudSnapshot(result.snapshot);
+          // Do not re-kick enrichment here — that races with in-flight saves.
+          fireToast(
+            downloaded
+              ? "Your recent changes were saved to a recovery file."
+              : "Your recent changes were saved locally for recovery.",
+            "warn",
+          );
+        } else {
+          fireToast(result.error || "Cloud data changed elsewhere — reloaded.", "warn");
+        }
+        cloudBaseUpdatedAt.current = result.updatedAt ?? cloudBaseUpdatedAt.current;
+        return true;
+      }
+      return false;
+    },
+    [cloudReady, cloudUserId, buildSnapshot, applyCloudSnapshot, fireToast],
+  );
+
   const enrichAbortRef = useRef(new Map());
   const enrichingRef = useRef(new Set());
   /** Plans we've already kicked off enrichment for this session (avoids conflict spirals). */
@@ -640,13 +713,16 @@ export default function DualTrackConsole() {
     (plan) => {
       const cleaned = sanitizePlanDays(plan);
       setPlans((prev) => ({ ...prev, [cleaned.id]: cleaned }));
+      setActivePlanId(cleaned.id);
       setScope("all");
       goTo({ page: "dashboard", planId: cleaned.id, plan: cleaned, view: "console" });
       fireToast(`Plan ready · ${cleaned.totalDays} days`, "day");
+      // Explicitly trigger immediate cloud sync on plan creation so it saves on the first save
+      void flushCloudSnapshot();
       // Defer enrichment until after the page transition settles.
       window.setTimeout(() => startResourceEnrichment(cleaned), 1500);
     },
-    [fireToast, goTo, startResourceEnrichment],
+    [fireToast, goTo, startResourceEnrichment, flushCloudSnapshot],
   );
 
   // Catch up resource enrichment after the builder closes (deferred while open).
@@ -761,78 +837,7 @@ export default function DualTrackConsole() {
     };
   }, [cloudReady, cloudUserId, refetchCloudState]);
 
-  const flushCloudSnapshot = useCallback(
-    async (opts) => {
-      if (!cloudReady || !cloudUserId) return false;
-      const localSnapshot = buildSnapshot();
-      // log/learned/bookmarks are synced via their own per-record
-      // endpoints now (see handleToggleTopic/addLearned/addBookmark
-      // etc. below) — emptied here (not omitted) so AppSnapshot's type
-      // stays unchanged everywhere, including localSnapshot itself,
-      // which the conflict-recovery-stash export below still uses in
-      // full.
-      const syncPayload = {
-        ...localSnapshot,
-        userdata: { ...localSnapshot.userdata, log: [], learned: {}, bookmarks: [] },
-      };
-      const payloadSize = JSON.stringify(syncPayload).length;
-      if (payloadSize >= MAX_SNAPSHOT_CHARS * 0.6 && !warnedSnapshotSizeRef.current) {
-        warnedSnapshotSizeRef.current = true;
-        fireToast(
-          "Your account data is getting large — export a backup or trim old notes soon.",
-          "warn",
-        );
-      }
-      const result = await pushCloudSnapshot(
-        syncPayload,
-        cloudBaseUpdatedAt.current,
-        opts,
-      );
-      if (result.ok) {
-        cloudBaseUpdatedAt.current = result.updatedAt;
-        return true;
-      }
-      if (result.conflict) {
-        if (result.reason === "schema-version") {
-          fireToast("App updated on another device — refreshing page...", "warn");
-          window.setTimeout(() => window.location.reload(), 1200);
-          return true;
-        }
-        if (result.snapshot) {
-          const recoveryPayload = exportAll({
-            plans: localSnapshot.plans,
-            userdata: localSnapshot.userdata,
-            themeKey: localSnapshot.meta.themeKey,
-            activePlanId: localSnapshot.meta.activePlanId,
-          });
-          const recoveryJson = serializeExport(recoveryPayload);
-          const recoveryFilename = `refrainly-recovery-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
-          const downloaded = downloadText(recoveryFilename, recoveryJson, "application/json");
-          if (!downloaded) {
-            try {
-              window.localStorage.setItem("refrainly:conflict-recovery", recoveryJson);
-            } catch {
-              /* best-effort; nothing more we can do if storage is unavailable */
-            }
-          }
-          applyCloudSnapshot(result.snapshot);
-          // Do not re-kick enrichment here — that races with in-flight saves.
-          fireToast(
-            downloaded
-              ? "Your recent changes were saved to a recovery file."
-              : "Your recent changes were saved locally for recovery.",
-            "warn",
-          );
-        } else {
-          fireToast(result.error || "Cloud data changed elsewhere — reloaded.", "warn");
-        }
-        cloudBaseUpdatedAt.current = result.updatedAt ?? cloudBaseUpdatedAt.current;
-        return true;
-      }
-      return false;
-    },
-    [cloudReady, cloudUserId, buildSnapshot, applyCloudSnapshot, fireToast],
-  );
+
 
   useEffect(() => {
     if (!cloudReady || !cloudUserId) return;

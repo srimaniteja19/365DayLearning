@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
+import { isAdminEmail } from "@/lib/admin";
 import {
   isPeriodExpired,
   periodResetsAt,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/subscriptions";
 
 type UsageRow = {
+  email: string;
   subscriptionTier: string;
   subscriptionStatus: string;
   stripeCustomerId: string | null;
@@ -23,6 +25,7 @@ async function loadUsageRow(userId: string): Promise<UsageRow | null> {
   const db = getDb();
   const [row] = await db
     .select({
+      email: users.email,
       subscriptionTier: users.subscriptionTier,
       subscriptionStatus: users.subscriptionStatus,
       stripeCustomerId: users.stripeCustomerId,
@@ -35,22 +38,33 @@ async function loadUsageRow(userId: string): Promise<UsageRow | null> {
     .from(users)
     .where(eq(users.id, userId))
     .limit(1);
-  return row || null;
+  if (!row) return null;
+
+  if (isAdminEmail(row.email) && row.subscriptionTier !== "architect") {
+    try {
+      await db.update(users).set({ subscriptionTier: "architect", subscriptionStatus: "active" }).where(eq(users.id, userId));
+      row.subscriptionTier = "architect";
+      row.subscriptionStatus = "active";
+    } catch { /* ignore */ }
+  }
+
+  return row;
 }
 
 function toSubscriptionUsage(row: UsageRow): SubscriptionUsage {
-  const tier = tierDef(row.subscriptionTier);
-  const isLifetime = tier.managedAllowanceWindow === "lifetime";
+  const isAdmin = isAdminEmail(row.email);
+  const tier = tierDef(isAdmin ? "architect" : row.subscriptionTier);
+  const isLifetime = !isAdmin && tier.managedAllowanceWindow === "lifetime";
   const expired = isPeriodExpired(row.usagePeriodStart);
   return {
     tier: tier.id,
-    status: row.subscriptionStatus || "inactive",
+    status: isAdmin ? "active" : row.subscriptionStatus || "inactive",
     hasBillingAccount: Boolean(row.stripeCustomerId),
-    planGenerationsUsed: isLifetime ? row.freePlanGenerationsUsed : expired ? 0 : row.planGenerationsUsed,
-    planGenerationsLimit: tier.planGenerationsPerPeriod,
-    aiActionsUsed: isLifetime ? row.freeAiActionsUsed : expired ? 0 : row.aiActionsUsed,
-    aiActionsLimit: tier.aiActionsPerPeriod,
-    managedAllowanceWindow: tier.managedAllowanceWindow,
+    planGenerationsUsed: isAdmin ? 0 : isLifetime ? row.freePlanGenerationsUsed : expired ? 0 : row.planGenerationsUsed,
+    planGenerationsLimit: isAdmin ? null : tier.planGenerationsPerPeriod,
+    aiActionsUsed: isAdmin ? 0 : isLifetime ? row.freeAiActionsUsed : expired ? 0 : row.aiActionsUsed,
+    aiActionsLimit: isAdmin ? null : tier.aiActionsPerPeriod,
+    managedAllowanceWindow: isAdmin ? "rolling" : tier.managedAllowanceWindow,
     periodResetAt: isLifetime
       ? null
       : (expired ? new Date() : periodResetsAt(row.usagePeriodStart)).toISOString(),
@@ -67,12 +81,6 @@ export type ReserveResult =
   | { ok: true }
   | { ok: false; reason: "not_found" | "tier" | "quota"; message: string; status: number };
 
-/**
- * Reserves one unit of `kind` usage against the account's managed quota,
- * incrementing atomically-ish (read-then-conditional-update — acceptable
- * given a single user isn't realistically firing concurrent generations).
- * Lazily rolls the usage period over if it has expired.
- */
 async function reserve(
   userId: string,
   kind: "plan" | "action",
@@ -80,6 +88,10 @@ async function reserve(
 ): Promise<ReserveResult> {
   const row = await loadUsageRow(userId);
   if (!row) return { ok: false, reason: "not_found", message: "Account not found.", status: 404 };
+
+  if (isAdminEmail(row.email)) {
+    return { ok: true };
+  }
 
   const tier = tierDef(row.subscriptionTier);
   if (!tier.managedAi) {
@@ -150,15 +162,10 @@ export function reserveAiActionQuota(userId: string): Promise<ReserveResult> {
   return reserve(userId, "action");
 }
 
-/**
- * Read-only check used by the managed-AI proxy for calls that were already
- * accounted for elsewhere (e.g. the individual chat() calls inside a single
- * `generatePlan()` run, which were already counted once via
- * `reservePlanGenerationQuota` before generation started).
- */
 export async function requireManagedAiAccess(userId: string): Promise<ReserveResult> {
   const row = await loadUsageRow(userId);
   if (!row) return { ok: false, reason: "not_found", message: "Account not found.", status: 404 };
+  if (isAdminEmail(row.email)) return { ok: true };
   const tier = tierDef(row.subscriptionTier);
   if (!tier.managedAi) {
     return {
@@ -172,20 +179,14 @@ export async function requireManagedAiAccess(userId: string): Promise<ReserveRes
   return { ok: true };
 }
 
-/**
- * Read-only check for `/api/ai` plan calls. A plan run reserves its quota
- * first, so Recruit must have exactly its one reservation before its period
- * calls are allowed through the proxy.
- */
 export async function requireManagedAiQuota(userId: string): Promise<ReserveResult> {
   const access = await requireManagedAiAccess(userId);
   if (!access.ok) return access;
   const row = await loadUsageRow(userId);
   if (!row) return { ok: false, reason: "not_found", message: "Account not found.", status: 404 };
+  if (isAdminEmail(row.email)) return { ok: true };
   const tier = tierDef(row.subscriptionTier);
   if (tier.managedAllowanceWindow === "lifetime") {
-    // A plan run reserves its one slot before it makes its individual proxy
-    // calls. Allow that reserved run through, but never permit a second run.
     const limit = tier.planGenerationsPerPeriod || 0;
     if (row.freePlanGenerationsUsed < 1 || row.freePlanGenerationsUsed > limit) {
       return {

@@ -411,6 +411,46 @@ export function PlanBuilder({ onClose, onSaveDraft, onComplete }: Props) {
             />
           </div>
           <div className="gen-field">
+            <label className="gen-label">Pedagogical Tone</label>
+            <div className="seg-row">
+              {[
+                { key: "bootcamp", label: "Bootcamp", hint: "Tactical, direct, practical exercises" },
+                { key: "academic", label: "Academic", hint: "Rigorous, first-principles & specs" },
+                { key: "quest", label: "Quest Master", hint: "Gamified missions & milestone battles" },
+              ].map((p) => (
+                <Tip key={p.key} content={p.hint} stamp="TONE" tone={draft.persona === p.key ? "coral" : "ink"} side="top">
+                  <button
+                    type="button"
+                    className={classNames("seg-btn", draft.persona === p.key && "seg-btn-active")}
+                    onClick={() => patch({ persona: p.key as any })}
+                  >
+                    {p.label}
+                  </button>
+                </Tip>
+              ))}
+            </div>
+          </div>
+          <div className="gen-field">
+            <label className="gen-label">Pacing Profile</label>
+            <div className="seg-row">
+              {[
+                { key: "micro", label: "Micro (15m)", hint: "Light load (~15 mins/day)" },
+                { key: "balanced", label: "Balanced (45m)", hint: "Medium load (~45 mins/day)" },
+                { key: "deep", label: "Deep (90m+)", hint: "Heavy load (~90+ mins/day)" },
+              ].map((pc) => (
+                <Tip key={pc.key} content={pc.hint} stamp="PACE" tone={draft.pacingProfile === pc.key ? "mint" : "ink"} side="top">
+                  <button
+                    type="button"
+                    className={classNames("seg-btn", draft.pacingProfile === pc.key && "seg-btn-active")}
+                    onClick={() => patch({ pacingProfile: pc.key as any })}
+                  >
+                    {pc.label}
+                  </button>
+                </Tip>
+              ))}
+            </div>
+          </div>
+          <div className="gen-field">
             <label className="gen-label">Exclusions (one per line)</label>
             <textarea
               className="settings-input builder-textarea"

@@ -199,6 +199,52 @@ export function PlanEditor({ plan, onChange, onSave, onBack }: Props) {
                         </select>
                       </div>
                     ))}
+                    <div className="editor-deliverable-row" style={{ marginTop: "6px", display: "flex", gap: "8px", alignItems: "center", fontSize: "12px" }}>
+                      <span style={{ opacity: 0.7 }}>Deliverable:</span>
+                      <input
+                        className="settings-input"
+                        style={{ flex: 1, padding: "2px 6px", fontSize: "12px" }}
+                        placeholder="Hands-on task or exercise"
+                        value={d.deliverable || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const nextDays = plan.days.map((dayItem) =>
+                            dayItem.day === d.day ? { ...dayItem, deliverable: val } : dayItem,
+                          );
+                          onChange({ ...plan, days: nextDays });
+                        }}
+                      />
+                      <input
+                        type="number"
+                        className="settings-input"
+                        style={{ width: "60px", padding: "2px 6px", fontSize: "12px" }}
+                        placeholder="Mins"
+                        value={d.estimatedMinutes || ""}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10) || undefined;
+                          const nextDays = plan.days.map((dayItem) =>
+                            dayItem.day === d.day ? { ...dayItem, estimatedMinutes: val } : dayItem,
+                          );
+                          onChange({ ...plan, days: nextDays });
+                        }}
+                      />
+                      <select
+                        className="settings-input"
+                        style={{ padding: "2px 6px", fontSize: "12px" }}
+                        value={d.cognitiveLoad || "medium"}
+                        onChange={(e) => {
+                          const val = e.target.value as "light" | "medium" | "heavy";
+                          const nextDays = plan.days.map((dayItem) =>
+                            dayItem.day === d.day ? { ...dayItem, cognitiveLoad: val } : dayItem,
+                          );
+                          onChange({ ...plan, days: nextDays });
+                        }}
+                      >
+                        <option value="light">🟢 Light</option>
+                        <option value="medium">🟡 Medium</option>
+                        <option value="heavy">🔴 Heavy</option>
+                      </select>
+                    </div>
                   </div>
                   {regenDay === d.day && (
                     <div className="editor-regen">

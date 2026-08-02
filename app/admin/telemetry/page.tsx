@@ -4,6 +4,7 @@ import { gte } from "drizzle-orm";
 import { auth } from "@/auth";
 import { getDb, hasDatabase } from "@/lib/db/client";
 import { generationRuns } from "@/lib/db/schema";
+import { isAdminEmail } from "@/lib/admin";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -19,22 +20,13 @@ function since(windowMs: number): Date {
   return new Date(Date.now() - windowMs);
 }
 
-function isAllowed(email: string | null | undefined): boolean {
-  if (!email) return false;
-  const allowed = (process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  return allowed.includes(email.toLowerCase());
-}
-
 export default async function AdminTelemetryPage({
   searchParams,
 }: {
   searchParams: Promise<{ window?: string }>;
 }) {
   const session = await auth();
-  if (!isAllowed(session?.user?.email)) notFound();
+  if (!isAdminEmail(session?.user?.email)) notFound();
   if (!hasDatabase()) notFound();
 
   const { window: windowParam } = await searchParams;

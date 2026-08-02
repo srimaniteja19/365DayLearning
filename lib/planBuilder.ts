@@ -1,4 +1,4 @@
-import type { PlanGrouping, PlanPeriod, PlanRequest } from "@/lib/types";
+import type { PlanGrouping, PlanPacingProfile, PlanPersona, PlanPeriod, PlanRequest } from "@/lib/types";
 import { buildWeeks, MONTHS_365, QUARTERS_365 } from "@/data/builtinPlans";
 
 export type BuilderStep = 1 | 2 | 3 | 4;
@@ -23,6 +23,8 @@ export type BuilderDraft = {
   exclusionsText: string;
   domains: BuilderDomain[];
   mustIncludeText: string;
+  persona: PlanPersona;
+  pacingProfile: PlanPacingProfile;
 };
 
 export const BUILDER_DOMAIN_COLORS = [
@@ -46,6 +48,8 @@ export function defaultBuilderDraft(): BuilderDraft {
     exclusionsText: "",
     domains: [],
     mustIncludeText: "",
+    persona: "bootcamp",
+    pacingProfile: "balanced",
   };
 }
 
@@ -144,6 +148,8 @@ export function draftToPlanRequest(draft: BuilderDraft): PlanRequest {
     totalDays: draft.totalDays,
     topicsPerDay: draft.topicsPerDay,
     grouping: draft.grouping,
+    persona: draft.persona || "bootcamp",
+    pacingProfile: draft.pacingProfile || "balanced",
   };
 }
 

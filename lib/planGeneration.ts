@@ -22,6 +22,7 @@ const outlinePeriodSchema = z.object({
   start: z.coerce.number().int().positive(),
   end: z.coerce.number().int().positive(),
   domainMix: z.array(z.coerce.string()).optional(),
+  capstone: z.coerce.string().optional(),
 });
 
 const outlineSchema = z.object({
@@ -38,6 +39,9 @@ const generatedDaySchema = z.object({
   day: z.coerce.number().int().positive(),
   topics: z.array(topicStringSchema).default([]),
   domains: z.array(topicStringSchema).optional(),
+  deliverable: z.coerce.string().optional(),
+  estimatedMinutes: z.coerce.number().int().positive().optional(),
+  cognitiveLoad: z.enum(["light", "medium", "heavy"]).optional(),
 });
 
 export const periodDaysSchema = z.object({
@@ -62,6 +66,7 @@ const OUTLINE_JSON_SCHEMA = {
           start: { type: "integer", minimum: 1 },
           end: { type: "integer", minimum: 1 },
           domainMix: { type: "array", items: { type: "string" } },
+          capstone: { type: "string" },
         },
       },
     },
@@ -84,6 +89,9 @@ const PERIOD_DAYS_JSON_SCHEMA = {
           day: { type: "integer", minimum: 1 },
           topics: { type: "array", minItems: 1, items: { type: "string" } },
           domains: { type: "array", items: { type: "string" } },
+          deliverable: { type: "string" },
+          estimatedMinutes: { type: "integer", minimum: 5 },
+          cognitiveLoad: { type: "string", enum: ["light", "medium", "heavy"] },
         },
       },
     },
@@ -585,11 +593,7 @@ function coerceStringList(value: unknown): string[] {
   return single ? [single] : [];
 }
 
-function coerceGeneratedDay(item: unknown, index: number): {
-  day: number;
-  topics: string[];
-  domains?: string[];
-} {
+function coerceGeneratedDay(item: unknown, index: number): Record<string, unknown> {
   if (!item || typeof item !== "object" || Array.isArray(item)) {
     return { day: index + 1, topics: [] };
   }
@@ -602,10 +606,19 @@ function coerceGeneratedDay(item: unknown, index: number): {
     const singular = coerceStringList(d.domain);
     if (singular.length) domains.push(...singular);
   }
+  const deliverable = typeof d.deliverable === "string" ? d.deliverable.trim() : undefined;
+  const est = Number(d.estimatedMinutes ?? d.estimated_minutes);
+  const estimatedMinutes = Number.isFinite(est) && est > 0 ? Math.trunc(est) : undefined;
+  const rawCog = String(d.cognitiveLoad ?? d.cognitive_load ?? "").toLowerCase();
+  const cognitiveLoad = rawCog === "light" || rawCog === "heavy" || rawCog === "medium" ? rawCog : undefined;
+
   return {
     day: Number.isFinite(dayNum) && dayNum > 0 ? Math.trunc(dayNum) : index + 1,
     topics,
     ...(domains.length ? { domains } : {}),
+    ...(deliverable ? { deliverable } : {}),
+    ...(estimatedMinutes ? { estimatedMinutes } : {}),
+    ...(cognitiveLoad ? { cognitiveLoad } : {}),
   };
 }
 
@@ -629,12 +642,14 @@ function coerceOutlinePeriod(item: unknown, index: number): Record<string, unkno
     end = swap;
   }
   const domainMix = coerceStringList(d.domainMix ?? d.domains);
+  const capstone = typeof d.capstone === "string" ? d.capstone.trim() : undefined;
   return {
     label: String(d.label ?? "").trim() || `Period ${index + 1}`,
     theme: String(d.theme ?? "").trim() || "Core topics",
     start,
     end,
     ...(domainMix.length ? { domainMix } : {}),
+    ...(capstone ? { capstone } : {}),
   };
 }
 
@@ -708,7 +723,7 @@ const INDEX_STOPWORDS = new Set([
  * collapsed to a keyword index. Validation rejects duplicates against every
  * topic generated so far, so the model has to see something for all of them.
  */
-export function topicIndex(topics: string[], recentMax = 150): string {
+export function topicIndex(topics: string[], recentMax = 35): string {
   if (!topics.length) return "(none yet — this is the first period)";
   const recent = topics.slice(-recentMax);
   const older = topics.slice(0, Math.max(0, topics.length - recentMax));
@@ -955,7 +970,21 @@ async function fetchOutline(
     .map((p) => `- ${p.label}: days ${p.start}-${p.end}`)
     .join("\n");
 
-  const prompt = `Produce a learning-plan OUTLINE only — themes and domain mix for fixed periods. No day topics.
+  const personaInstruction =
+    meta.persona === "academic"
+      ? "Pedagogical Tone: Academic & First-Principles (rigorous foundations, formal concepts, paper/spec depth)."
+      : meta.persona === "quest"
+      ? "Pedagogical Tone: Quest Master (immersive mission titles, milestone challenges, gamified progression)."
+      : "Pedagogical Tone: Tactical Bootcamp (concise, high-intensity, practical application).";
+
+  const pacingInstruction =
+    meta.pacingProfile === "micro"
+      ? "Target daily time: ~15 mins per day (light cognitive load)."
+      : meta.pacingProfile === "deep"
+      ? "Target daily time: ~90 mins per day (heavy cognitive load)."
+      : "Target daily time: ~45 mins per day (medium cognitive load).";
+
+  const prompt = `Produce a learning-plan OUTLINE only — themes, capstone project, and domain mix for fixed periods. No day topics.
 
 Plan
 - Name: ${draft.name}
@@ -963,6 +992,8 @@ Plan
 - Grouping preference: ${draft.grouping}
 - Goal: ${meta.goal}
 - Learner level: ${meta.level || "unspecified"}
+- ${personaInstruction}
+- ${pacingInstruction}
 
 Domains (use these exact ids in domainMix)
 ${domainCatalog(draft)}
@@ -975,8 +1006,9 @@ ${bounds}
 Rules
 - Return one period object per row above, with the same label/start/end.
 - Themes must show progression — foundations first, then dependent topics, then applied work.
+- Add a "capstone" field describing a hands-on project for completing this period.
 - domainMix lists domain ids for that period, ordered by emphasis.
-- Do not use double-quote characters inside label or theme text.`;
+- Do not use double-quote characters inside label, theme, or capstone text.`;
 
   const parsed = await chatStructured({
     system: PLAN_SYSTEM,
@@ -993,8 +1025,8 @@ Rules
     },
     parse: parseJsonWithRepair,
     repairPrompt: (error, bad) =>
-      `Fix this into valid JSON matching {"periods":[{"label":"string","theme":"string","start":1,"end":7,"domainMix":["id"]}]}.
-domainMix is optional. Use double quotes only for JSON syntax — never inside string values. No trailing commas. No markdown.
+      `Fix this into valid JSON matching {"periods":[{"label":"string","theme":"string","start":1,"end":7,"capstone":"string","domainMix":["id"]}]}.
+domainMix and capstone are optional. Use double quotes only for JSON syntax — never inside string values. No trailing commas. No markdown.
 Parser error: ${error}
 Broken input:
 ${bad.slice(0, 6000)}
@@ -1012,14 +1044,28 @@ async function fetchPeriodDays(opts: {
   violations?: PeriodValidationIssue[];
   signal?: AbortSignal;
   telemetry?: GenerationTelemetry;
-}): Promise<Array<{ day: number; topics: string[]; domains?: string[] }>> {
+}): Promise<Array<{ day: number; topics: string[]; domains?: string[]; deliverable?: string; estimatedMinutes?: number; cognitiveLoad?: "light" | "medium" | "heavy" }>> {
   const { draft, meta, period, topicsSoFar, violations, signal, telemetry } = opts;
   const dayCount = period.end - period.start + 1;
-  // Keep caps modest — large max_tokens slows many OpenRouter models.
-  const maxTokens = Math.min(3500, Math.max(900, 350 + dayCount * draft.topicsPerDay * 55));
+  // Tight cap to reduce latency and output token overhead on OpenRouter models.
+  const maxTokens = Math.min(1800, Math.max(500, 200 + dayCount * draft.topicsPerDay * 45));
   const pending = (meta.mustInclude || []).filter(
     (m) => !topicsSoFar.some((t) => normalizeTopic(t).includes(normalizeTopic(m))),
   );
+
+  const personaInstruction =
+    meta.persona === "academic"
+      ? "Pedagogical Tone: Academic & First-Principles (rigorous foundations, formal concepts)."
+      : meta.persona === "quest"
+      ? "Pedagogical Tone: Quest Master (immersive mission titles, gamified objective)."
+      : "Pedagogical Tone: Tactical Bootcamp (concise, high-intensity, practical).";
+
+  const pacingTarget =
+    meta.pacingProfile === "micro"
+      ? "15 mins (light load)"
+      : meta.pacingProfile === "deep"
+      ? "90 mins (heavy load)"
+      : "45 mins (medium load)";
 
   const prompt = `Generate the daily topics for one period of an existing plan.
 
@@ -1027,6 +1073,8 @@ Period: ${period.label}, days ${period.start}-${period.end} (${dayCount} days)
 Theme: ${period.theme}
 Plan goal: ${meta.goal}
 Learner level: ${meta.level || "unspecified"}
+${personaInstruction}
+Pacing Profile Target: ${pacingTarget}
 
 Domains — tag every topic with exactly one of these ids
 ${domainCatalog(draft)}
@@ -1035,13 +1083,15 @@ ${period.domainMix?.length ? `\nThis period should draw mainly from, in order of
 Topic rules
 - Exactly ${dayCount} day objects, numbered with ABSOLUTE day numbers ${period.start} through ${period.end} (not 1..${dayCount}).
 - Exactly ${draft.topicsPerDay} topics per day, each 2–10 words.
+- Include a "deliverable" string per day (a specific hands-on task/exercise for applying the topics).
+- Include "estimatedMinutes" (number, e.g. 15, 30, 45, 60, 90) and "cognitiveLoad" ("light" | "medium" | "heavy").
 - Each topic names one specific mechanism, technique, or concept — something you could write a quiz question about.
 - No filler: never Review, Recap, Catch-up, Rest day, Practice session, Introduction to X, Overview of X, Deep dive into X, or X basics.
 - Never use placeholder labels like Topic A, Topic B, Example topic, or Sample topic.
 - Never include HTML, XML, or markup characters (< > /) inside topic text.
 - No duplicates of already-covered topics (rephrasing counts).
 - Prerequisites before dependents within the period.
-- Do not use double-quote characters inside topic text. Prefer parentheses for acronyms, e.g. Remote Procedure Call (RPC).
+- Do not use double-quote characters inside topic or deliverable text. Prefer parentheses for acronyms, e.g. Remote Procedure Call (RPC).
 ${pending.length ? `\nStill unplaced must-include topics — work these in if this period fits:\n${pending.map((m) => `- ${m}`).join("\n")}` : ""}
 ${meta.exclusions?.length ? `\nNever cover:\n${meta.exclusions.map((e) => `- ${e}`).join("\n")}` : ""}
 
@@ -1050,14 +1100,16 @@ ${topicIndex(topicsSoFar, 40)}
 
 Example specificity (do not reuse):
 day 8: Raft leader election and terms; Write-ahead log fsync tradeoffs
-day 9: Quorum reads during network partition; Hinted handoff recovery
+deliverable: Implement leader lease expiration timer in state machine
+estimatedMinutes: 45
+cognitiveLoad: medium
 ${violations?.length ? `\nPrevious attempt rejected — fix every issue:\n${violations.map((v) => v.message).join("\n")}` : ""}`;
 
   const parsed = await chatStructured({
     system: PLAN_SYSTEM,
     prompt,
     maxTokens,
-    temperature: 0.3,
+    temperature: 0.15,
     signal,
     kind: "plan",
     schema: periodDaysSchema,
@@ -1068,9 +1120,9 @@ ${violations?.length ? `\nPrevious attempt rejected — fix every issue:\n${viol
     },
     parse: parseJsonWithRepair,
     repairPrompt: (error, bad) =>
-      `Fix this into valid JSON matching {"days":[{"day":15,"topics":["Working memory capacity limits","Cognitive load theory basics"],"domains":["cognitive-sci"]}]}.
+      `Fix this into valid JSON matching {"days":[{"day":15,"topics":["Working memory capacity limits","Cognitive load theory basics"],"deliverable":"Map cognitive load drivers","estimatedMinutes":45,"cognitiveLoad":"medium","domains":["cognitive-sci"]}]}.
 Use real, specific topic phrases — never placeholders like "Topic A" or "Topic B". Never include HTML or markup characters (< > /).
-domains is optional. Use double quotes only for JSON syntax — never inside topic strings. No trailing commas. No markdown.
+domains, deliverable, estimatedMinutes, cognitiveLoad are optional. Use double quotes only for JSON syntax — never inside strings. No trailing commas. No markdown.
 Parser error: ${error}
 Broken input:
 ${bad.slice(0, 8000)}

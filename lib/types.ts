@@ -1,6 +1,6 @@
 export type Domain = string;
 
-export type TopicResourceKind = "article" | "video";
+export type TopicResourceKind = "article" | "video" | "doc" | "interactive" | "audio" | "repo";
 
 /** Suggested learning resource for one topic. */
 export type TopicResource = {
@@ -10,10 +10,14 @@ export type TopicResource = {
   kind?: TopicResourceKind;
 };
 
-/** Per-topic pair: one article + one video (index-aligned with `topics`). */
+/** Per-topic multi-format resources (index-aligned with `topics`). */
 export type TopicResourcePair = {
   article?: TopicResource | null;
   video?: TopicResource | null;
+  doc?: TopicResource | null;
+  interactive?: TopicResource | null;
+  audio?: TopicResource | null;
+  repo?: TopicResource | null;
 };
 
 export type PlanDay = {
@@ -21,6 +25,12 @@ export type PlanDay = {
   id: string;
   topics: string[];
   domains: Domain[];
+  /** Optional actionable deliverable or exercise for hands-on application. */
+  deliverable?: string;
+  /** Estimated completion time in minutes. */
+  estimatedMinutes?: number;
+  /** Relative cognitive load requirement. */
+  cognitiveLoad?: "light" | "medium" | "heavy";
   /**
    * Optional suggested resources, index-aligned with `topics`.
    * - missing / `undefined` slot = not searched yet
@@ -36,6 +46,8 @@ export type PlanPeriod = {
   sub: string;
   start: number;
   end: number;
+  /** Optional capstone project for this milestone period. */
+  capstone?: string;
 };
 
 /** Builder inputs that produced a plan. */
@@ -50,6 +62,9 @@ export type PlanDomainSpec = {
 
 export type PlanGrouping = "none" | "weekly" | "monthly" | "quarterly-monthly";
 
+export type PlanPersona = "bootcamp" | "academic" | "quest";
+export type PlanPacingProfile = "micro" | "balanced" | "deep";
+
 export type PlanRequest = {
   name?: string;
   subtitle?: string;
@@ -61,6 +76,8 @@ export type PlanRequest = {
   totalDays?: number;
   topicsPerDay?: number;
   grouping?: PlanGrouping;
+  persona?: PlanPersona;
+  pacingProfile?: PlanPacingProfile;
 };
 
 export type PlanStatus = "draft" | "ready";
