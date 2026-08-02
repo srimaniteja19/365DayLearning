@@ -102,6 +102,7 @@ export async function POST(req: NextRequest) {
       ? Math.floor(body.maxTokens)
       : 1000;
   const maxTokens = Math.min(Math.max(requested, 64), tokenCap);
+  const structured = readStructured(body.structured);
   const primaryModel = process.env.OPENROUTER_MODEL?.trim() || OPENROUTER_DEFAULT_MODEL;
   const fallbackModels = [
     primaryModel,
