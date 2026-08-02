@@ -19,7 +19,40 @@ import { getCachedSubscriptionTier, tierDef } from "@/lib/subscriptions";
 import type { GenerationTelemetry } from "@/lib/generationTelemetry";
 import type { ZodType } from "zod";
 
+import { generateObject } from "ai";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+
 export type ChatKind = "plan" | "action";
+
+/**
+ * Use Vercel AI SDK generateObject with Zod schemas & OpenRouter provider.
+ */
+export async function generateObjectWithAiSdk<T>(opts: {
+  schema: ZodType<T>;
+  prompt: string;
+  system?: string;
+  modelName?: string;
+  maxTokens?: number;
+  temperature?: number;
+}): Promise<T> {
+  const creds = getCredentials();
+  const apiKey = creds.apiKey?.trim();
+  const providerKey = apiKey || process.env.OPENROUTER_API_KEY;
+  if (!providerKey) {
+    throw new AuthError("OpenRouter API key missing in Settings or environment.");
+  }
+  const openrouter = createOpenRouter({ apiKey: providerKey });
+  const modelId = opts.modelName || creds.model || "deepseek/deepseek-v4-flash";
+  const { object } = await generateObject({
+    model: openrouter(modelId),
+    schema: opts.schema,
+    prompt: opts.prompt,
+    system: opts.system,
+    maxTokens: opts.maxTokens,
+    temperature: opts.temperature,
+  });
+  return object;
+}
 
 /**
  * True when the next `chat()` call would use server-managed AI

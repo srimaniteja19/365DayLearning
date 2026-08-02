@@ -1,3 +1,5 @@
+import { jsonrepair } from "jsonrepair";
+
 /** Strip markdown code fences wrapping a model response. */
 export function stripFences(t: string): string {
   let s = t.trim();
@@ -574,7 +576,16 @@ export function sanitizeJsonText(t: string): string {
 
 /** Parse after local healing. Throws SyntaxError/Zod-irrelevant JSON errors. */
 export function parseJsonText(t: string): unknown {
-  return JSON.parse(sanitizeJsonText(t));
+  const sanitized = sanitizeJsonText(t);
+  try {
+    return JSON.parse(sanitized);
+  } catch {
+    try {
+      return JSON.parse(jsonrepair(sanitized));
+    } catch {
+      return JSON.parse(jsonrepair(extractJsonBlob(t)));
+    }
+  }
 }
 
 /**
