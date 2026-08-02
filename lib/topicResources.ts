@@ -1,5 +1,5 @@
 import { getCredentials } from "@/lib/providers/credentials";
-import { willUseManagedAi } from "@/lib/claude-client";
+import { willUseManagedAi } from "@/lib/aiClient";
 import { openrouterProvider } from "@/lib/providers/openrouter";
 import { openRouterWebSearch } from "@/lib/openrouterWebSearch";
 import {

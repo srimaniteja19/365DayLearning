@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { willUseManagedAi } from "@/lib/claude-client";
+import { willUseManagedAi } from "@/lib/aiClient";
 import { forgetCredentials, setCredentials } from "@/lib/providers/credentials";
 import { setCachedSubscriptionTier } from "@/lib/subscriptions";
 

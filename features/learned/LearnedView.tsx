@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { classNames } from "@/lib/classNames";
-import { callClaude } from "@/lib/claude-client";
+import { callClaude } from "@/lib/aiClient";
 import { formatAiError } from "@/lib/providers/errors";
 import {
   buildLearnedChronoIndex,

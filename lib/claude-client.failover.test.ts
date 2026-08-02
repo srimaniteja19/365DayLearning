@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { AuthError, RateLimitError } from "@/lib/providers/errors";
-import { chat, clearSessionPreferredModel } from "@/lib/claude-client";
+import { chat, clearSessionPreferredModel } from "@/lib/aiClient";
 import { setCredentials, forgetCredentials } from "@/lib/providers/credentials";
 import { newTelemetry } from "@/lib/generationTelemetry";
 

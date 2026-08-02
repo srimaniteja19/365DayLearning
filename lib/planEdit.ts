@@ -5,7 +5,7 @@ import {
   parseJsonWithRepair,
   scrubTopicText,
 } from "@/lib/planGeneration";
-import { chatStructured } from "@/lib/claude-client";
+import { chatStructured } from "@/lib/aiClient";
 import { z } from "zod";
 
 export type PlanEditIssue = {

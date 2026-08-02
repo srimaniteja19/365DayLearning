@@ -1,6 +1,6 @@
 import { z } from "zod";
 import DOMAIN_META from "@/data/domains.json";
-import { chatStructured } from "@/lib/claude-client";
+import { chatStructured } from "@/lib/aiClient";
 import {
   type BuilderDomain,
   type BuilderDomainWeight,

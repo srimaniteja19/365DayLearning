@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { parseJsonText, sanitizeJsonText } from "@/lib/stripFences";
-import { chatStructured, willUseManagedAi } from "@/lib/claude-client";
+import { chatStructured, willUseManagedAi } from "@/lib/aiClient";
 import { newTelemetry, type GenerationTelemetry } from "@/lib/generationTelemetry";
 import { getCachedSubscriptionTier, reservePlanGeneration, tierDef } from "@/lib/subscriptions";
 import {

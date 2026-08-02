@@ -20,7 +20,7 @@ import {
   setCredentials,
   subscribeCredentials,
 } from "@/lib/providers/credentials";
-import { testConnection } from "@/lib/claude-client";
+import { testConnection } from "@/lib/aiClient";
 import { classNames } from "@/lib/classNames";
 import { Tip } from "@/components/Tip";
 

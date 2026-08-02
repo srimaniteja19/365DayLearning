@@ -16,7 +16,7 @@ import {
   FONT_PACKS,
   resolveFontKey,
 } from "@/theme/fonts";
-import { callClaude } from "@/lib/claude-client";
+import { callClaude } from "@/lib/aiClient";
 import { safeHref } from "@/lib/safeHref";
 import {
   SUBSCRIPTION_TIERS,

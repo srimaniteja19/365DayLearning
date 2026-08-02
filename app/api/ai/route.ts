@@ -102,73 +102,67 @@ export async function POST(req: NextRequest) {
       ? Math.floor(body.maxTokens)
       : 1000;
   const maxTokens = Math.min(Math.max(requested, 64), tokenCap);
-  const model = process.env.OPENROUTER_MODEL?.trim() || OPENROUTER_DEFAULT_MODEL;
-  const structured = readStructured(body.structured);
+  const primaryModel = process.env.OPENROUTER_MODEL?.trim() || OPENROUTER_DEFAULT_MODEL;
+  const fallbackModels = [
+    primaryModel,
+    "google/gemini-3.5-flash-lite",
+    "stepfun/step-3.7-flash",
+    "minimax/minimax-m3",
+  ];
+  const models = Array.from(new Set(fallbackModels));
 
-  if (hasDatabase()) {
-    const session = await auth();
-    const userId = session?.user?.id;
-    if (!userId) {
-      return NextResponse.json(
+  let lastError: unknown;
+  for (const m of models) {
+    try {
+      const chatReq: ChatRequest = {
+        prompt,
+        system,
+        maxTokens,
+        temperature,
+        signal: AbortSignal.timeout(25_000),
+        structured: structured || undefined,
+      };
+
+      const text = await openAiCompatibleChat(
+        `${OPENROUTER_BASE}/v1/chat/completions`,
+        chatReq,
+        { apiKey, model: m, baseUrl: OPENROUTER_BASE },
         {
-          error:
-            "Sign in required for managed AI. Add your own OpenRouter key instead, or sign in and upgrade.",
+          "HTTP-Referer": process.env.AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "https://refrainly.dev",
+          "X-Title": "Refrainly",
         },
-        { status: 401 },
+        { preferJsonSchema: false },
       );
-    }
-    const result =
-      kind === "plan" ? await requireManagedAiQuota(userId) : await reserveAiActionQuota(userId);
-    if (!result.ok) {
-      return NextResponse.json({ error: result.message }, { status: result.status });
+      return NextResponse.json({ text });
+    } catch (err) {
+      lastError = err;
+      logError("api/ai", `Model ${m} failed/timed out, trying fallback...`, err);
     }
   }
 
-  const chatReq: ChatRequest = {
-    prompt,
-    system,
-    maxTokens,
-    temperature,
-    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-    structured: structured || undefined,
-  };
-
-  try {
-    const text = await openAiCompatibleChat(
-      `${OPENROUTER_BASE}/v1/chat/completions`,
-      chatReq,
-      { apiKey, model, baseUrl: OPENROUTER_BASE },
-      {
-        "HTTP-Referer": process.env.AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "https://refrainly.dev",
-        "X-Title": "Refrainly",
-      },
-      { preferJsonSchema: false },
+  const err = lastError;
+  const timedOut = err instanceof DOMException && err.name === "TimeoutError";
+  const status =
+    err && typeof err === "object" && "status" in err && typeof (err as { status: unknown }).status === "number"
+      ? (err as { status: number }).status
+      : undefined;
+  logError("api/ai", timedOut ? "all models timed out" : "all models failed", err, { status });
+  if (timedOut) {
+    return NextResponse.json({ error: "The AI request timed out. Please retry." }, { status: 504 });
+  }
+  if (status === 429) {
+    return NextResponse.json(
+      { error: "The AI service is rate limited right now. Try again shortly." },
+      { status: 429 },
     );
-    return NextResponse.json({ text });
-  } catch (err) {
-    const timedOut = err instanceof DOMException && err.name === "TimeoutError";
-    const status =
-      err && typeof err === "object" && "status" in err && typeof (err as { status: unknown }).status === "number"
-        ? (err as { status: number }).status
-        : undefined;
-    logError("api/ai", timedOut ? "upstream timeout" : "upstream error", err, { status });
-    if (timedOut) {
-      return NextResponse.json({ error: "The AI request timed out." }, { status: 504 });
-    }
-    if (status === 429) {
-      return NextResponse.json(
-        { error: "The AI service is rate limited right now. Try again shortly." },
-        { status: 429 },
-      );
-    }
-    if (status === 401 || status === 403) {
-      return NextResponse.json(
-        { error: "The server's OpenRouter credentials were rejected." },
-        { status: 502 },
-      );
-    }
-    const message =
-      err instanceof Error && err.message ? err.message : "Upstream request failed.";
-    return NextResponse.json({ error: message }, { status: 502 });
   }
+  if (status === 401 || status === 403) {
+    return NextResponse.json(
+      { error: "The server's OpenRouter credentials were rejected." },
+      { status: 502 },
+    );
+  }
+  const message =
+    err instanceof Error && err.message ? err.message : "Upstream request failed.";
+  return NextResponse.json({ error: message }, { status: 502 });
 }
