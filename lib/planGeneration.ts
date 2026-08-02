@@ -521,32 +521,51 @@ export async function parseJsonWithRepair<T>(
   schema: z.ZodType<T>,
   repair: (error: string, raw: string) => Promise<string>,
 ): Promise<T> {
-  const tryParse = (text: string): T => {
-    const data = coercePlanAiPayload(parseJsonText(text));
-    return schema.parse(data);
+  const tryParse = (text: string): T | null => {
+    try {
+      const data = coercePlanAiPayload(parseJsonText(text));
+      return schema.parse(data);
+    } catch {
+      return null;
+    }
   };
 
+  const first = tryParse(raw);
+  if (first !== null) return first;
+
+  const msg = formatParseError(raw);
+  const seed = sanitizeJsonText(raw);
+  let repaired: string = "";
   try {
-    return tryParse(raw);
-  } catch (first) {
-    const msg = formatParseError(first);
-    const seed = sanitizeJsonText(raw);
-    let repaired: string;
-    try {
-      repaired = await repair(msg, seed || raw);
-    } catch {
-      throw new ContentError(
-        "The AI returned malformed plan data that could not be repaired. Try again.",
-      );
-    }
-    try {
-      return tryParse(repaired);
-    } catch {
-      throw new ContentError(
-        "The AI returned malformed plan data that could not be repaired. Try again.",
-      );
-    }
+    repaired = await repair(msg, seed || raw);
+    const second = tryParse(repaired);
+    if (second !== null) return second;
+  } catch {
+    /* proceed to soft recovery */
   }
+
+  try {
+    const rawCoerced = coercePlanAiPayload(parseJsonText(repaired || seed || raw));
+    const fallbackParsed = schema.safeParse(rawCoerced);
+    if (fallbackParsed.success) {
+      return fallbackParsed.data;
+    }
+    if (rawCoerced && typeof rawCoerced === "object") {
+      const rec = rawCoerced as Record<string, unknown>;
+      if (Array.isArray(rec.days) && rec.days.length > 0) {
+        return { days: rec.days } as unknown as T;
+      }
+      if (Array.isArray(rec.periods) && rec.periods.length > 0) {
+        return { periods: rec.periods } as unknown as T;
+      }
+    }
+  } catch {
+    /* proceed to final error */
+  }
+
+  throw new ContentError(
+    "The AI returned malformed plan data that could not be repaired. Try again.",
+  );
 }
 
 /** Human-readable Zod / JSON errors for repair prompts and toasts. */
@@ -589,6 +608,19 @@ function coerceStringList(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value.map((x) => scrubTopicText(x)).filter(Boolean);
   }
+  if (typeof value === "string") {
+    const lines = value
+      .split(/[\n;\r]+/)
+      .map((s) => s.replace(/^[-*•\d.\s]+/, "").trim())
+      .map((s) => scrubTopicText(s))
+      .filter(Boolean);
+    if (lines.length > 1) return lines;
+    const comma = value
+      .split(/,\s+/)
+      .map((s) => scrubTopicText(s))
+      .filter(Boolean);
+    if (comma.length > 1) return comma;
+  }
   const single = scrubTopicText(value);
   return single ? [single] : [];
 }
@@ -598,19 +630,41 @@ function coerceGeneratedDay(item: unknown, index: number): Record<string, unknow
     return { day: index + 1, topics: [] };
   }
   const d = item as Record<string, unknown>;
-  const dayNum = Number(d.day);
+  let dayNum = Number(d.day);
+  if (!Number.isFinite(dayNum)) {
+    const m = String(d.day ?? "").match(/\d+/);
+    if (m) dayNum = parseInt(m[0], 10);
+  }
+
   let topics = coerceStringList(d.topics);
   if (!topics.length) topics = coerceStringList(d.topic);
+  if (!topics.length) topics = coerceStringList(d.title);
+  if (!topics.length) topics = coerceStringList(d.concepts);
+
   const domains = coerceStringList(d.domains);
   if (!domains.length) {
     const singular = coerceStringList(d.domain);
     if (singular.length) domains.push(...singular);
   }
+
   const deliverable = typeof d.deliverable === "string" ? d.deliverable.trim() : undefined;
-  const est = Number(d.estimatedMinutes ?? d.estimated_minutes);
+
+  let est = Number(d.estimatedMinutes ?? d.estimated_minutes ?? d.estimatedTime ?? d.duration);
+  if (!Number.isFinite(est)) {
+    const m = String(d.estimatedMinutes ?? d.estimated_minutes ?? d.duration ?? "").match(/\d+/);
+    if (m) est = parseInt(m[0], 10);
+  }
   const estimatedMinutes = Number.isFinite(est) && est > 0 ? Math.trunc(est) : undefined;
-  const rawCog = String(d.cognitiveLoad ?? d.cognitive_load ?? "").toLowerCase();
-  const cognitiveLoad = rawCog === "light" || rawCog === "heavy" || rawCog === "medium" ? rawCog : undefined;
+
+  const rawCog = String(d.cognitiveLoad ?? d.cognitive_load ?? d.load ?? "").toLowerCase();
+  const cognitiveLoad =
+    rawCog.includes("light")
+      ? "light"
+      : rawCog.includes("heavy")
+      ? "heavy"
+      : rawCog.includes("medium")
+      ? "medium"
+      : undefined;
 
   return {
     day: Number.isFinite(dayNum) && dayNum > 0 ? Math.trunc(dayNum) : index + 1,
@@ -632,8 +686,19 @@ function coerceOutlinePeriod(item: unknown, index: number): Record<string, unkno
     };
   }
   const d = item as Record<string, unknown>;
-  let start = Math.trunc(Number(d.start));
-  let end = Math.trunc(Number(d.end));
+  let start = Number(d.start);
+  if (!Number.isFinite(start)) {
+    const m = String(d.start ?? "").match(/\d+/);
+    if (m) start = parseInt(m[0], 10);
+  }
+  let end = Number(d.end);
+  if (!Number.isFinite(end)) {
+    const m = String(d.end ?? "").match(/\d+/);
+    if (m) end = parseInt(m[0], 10);
+  }
+
+  start = Math.trunc(start);
+  end = Math.trunc(end);
   if (!Number.isFinite(start) || start < 1) start = index + 1;
   if (!Number.isFinite(end) || end < 1) end = start;
   if (end < start) {
@@ -644,8 +709,8 @@ function coerceOutlinePeriod(item: unknown, index: number): Record<string, unkno
   const domainMix = coerceStringList(d.domainMix ?? d.domains);
   const capstone = typeof d.capstone === "string" ? d.capstone.trim() : undefined;
   return {
-    label: String(d.label ?? "").trim() || `Period ${index + 1}`,
-    theme: String(d.theme ?? "").trim() || "Core topics",
+    label: String(d.label ?? d.name ?? d.title ?? "").trim() || `Period ${index + 1}`,
+    theme: String(d.theme ?? d.description ?? d.overview ?? "").trim() || "Core topics",
     start,
     end,
     ...(domainMix.length ? { domainMix } : {}),
@@ -658,8 +723,38 @@ function coerceOutlinePeriod(item: unknown, index: number): Record<string, unkno
  * Empty topics stay empty — validatePeriodDays pads placeholders later.
  */
 export function coercePlanAiPayload(data: unknown): unknown {
-  if (!data || typeof data !== "object" || Array.isArray(data)) return data;
-  const obj = { ...(data as Record<string, unknown>) };
+  if (!data) return data;
+
+  if (Array.isArray(data)) {
+    if (!data.length) return { days: [] };
+    const first = data[0];
+    if (first && typeof first === "object" && !Array.isArray(first)) {
+      if ("start" in first || "theme" in first || "label" in first) {
+        return { periods: data.map((item, i) => coerceOutlinePeriod(item, i)) };
+      }
+    }
+    return { days: data.map((item, i) => coerceGeneratedDay(item, i)) };
+  }
+
+  if (typeof data !== "object") return data;
+  let obj = { ...(data as Record<string, unknown>) };
+
+  for (const key of ["data", "result", "payload", "plan", "output", "response", "periodDays", "outline", "period"]) {
+    if (obj[key] && typeof obj[key] === "object") {
+      const inner = obj[key];
+      if (Array.isArray(inner) || "days" in inner || "periods" in inner || "topics" in inner || "day" in inner) {
+        return coercePlanAiPayload(inner);
+      }
+    }
+  }
+
+  if (!("periods" in obj) && !("days" in obj) && ("start" in obj || "theme" in obj)) {
+    obj = { periods: [obj] };
+  }
+
+  if (!("days" in obj) && !("periods" in obj) && ("day" in obj || "topics" in obj || "topic" in obj)) {
+    obj = { days: [obj] };
+  }
 
   if (Array.isArray(obj.days)) {
     obj.days = obj.days.map((item, i) => coerceGeneratedDay(item, i));
