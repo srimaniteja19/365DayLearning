@@ -526,8 +526,11 @@ export default function DualTrackConsole() {
     return nextPlans;
   }, []);
 
-  const flushCloudSnapshot = useCallback(
-    async (opts?: { keepalive?: boolean; plans?: Record<string, any> }) => {
+  const isFlushingRef = useRef<boolean>(false);
+  const pendingFlushRef = useRef<{ opts?: { keepalive?: boolean; plans?: Record<string, any> } } | null>(null);
+
+  const performFlush = useCallback(
+    async (opts?: { keepalive?: boolean; plans?: Record<string, any> }): Promise<boolean> => {
       if (!cloudReady || !cloudUserId) return false;
       const baseSnapshot = buildSnapshot();
       const localSnapshot = opts?.plans
@@ -581,15 +584,38 @@ export default function DualTrackConsole() {
             ...mergedSnapshot,
             userdata: { ...mergedSnapshot.userdata, log: [], learned: {}, bookmarks: [] },
           };
-          void pushCloudSnapshot(syncMerged, cloudBaseUpdatedAt.current).then((res) => {
-            if (res.ok) cloudBaseUpdatedAt.current = res.updatedAt;
-          });
-          return true;
+          const res = await pushCloudSnapshot(syncMerged, cloudBaseUpdatedAt.current);
+          if (res.ok) {
+            cloudBaseUpdatedAt.current = res.updatedAt;
+            return true;
+          }
         }
       }
       return false;
     },
     [cloudReady, cloudUserId, buildSnapshot, applyCloudSnapshot, fireToast],
+  );
+
+  const flushCloudSnapshot = useCallback(
+    async (opts?: { keepalive?: boolean; plans?: Record<string, any> }): Promise<boolean> => {
+      if (isFlushingRef.current) {
+        pendingFlushRef.current = { opts };
+        return true;
+      }
+      isFlushingRef.current = true;
+      try {
+        let result = await performFlush(opts);
+        while (pendingFlushRef.current) {
+          const nextOpts = pendingFlushRef.current.opts;
+          pendingFlushRef.current = null;
+          result = await performFlush(nextOpts);
+        }
+        return result;
+      } finally {
+        isFlushingRef.current = false;
+      }
+    },
+    [performFlush],
   );
 
   const enrichAbortRef = useRef(new Map());

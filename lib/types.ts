@@ -105,16 +105,22 @@ export type DayEntry = PlanDay;
 
 export type ThemeKey =
   | "doodle"
+  | "popart"
+  | "voltaic"
+  | "synthwave"
+  | "cyberpunk"
+  | "sakura"
+  | "nordic"
   | "signal"
   | "folio"
-  | "afterburn"
   | "chlorophyll"
   | "oxide"
   | "ion"
   | "cinnabar"
   | "halide"
-  | "voltaic"
-  | "marina";
+  | "marina"
+  | "midnight"
+  | "afterburn";
 
 export type FontKey =
   | "space"

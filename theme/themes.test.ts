@@ -46,11 +46,16 @@ const ALL_THEME_VARS = [
   "--grid-color",
   "--grid-size",
   "--scan-op",
+  "--shadow-card",
+  "--shadow-pop",
+  "--shadow-btn-hover",
+  "--border-width",
+  "--style-category",
 ] as const;
 
 describe("theme tokens", () => {
-  it("ships eleven themes in THEME_ORDER", () => {
-    expect(THEME_ORDER).toHaveLength(11);
+  it("ships seventeen themes in THEME_ORDER", () => {
+    expect(THEME_ORDER).toHaveLength(17);
     for (const key of THEME_ORDER) {
       expect(THEMES[key], `Theme ${key} missing from THEMES`).toBeTruthy();
     }

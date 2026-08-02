@@ -117,6 +117,12 @@ function SaveIndicator({ status, compact = false, onRetry }) {
   );
 }
 
+const THEME_GROUPS: Array<{ label: string; keys: ThemeKey[] }> = [
+  { label: "⚡ NEOBRUTALISM", keys: ["doodle", "popart", "voltaic", "synthwave", "cyberpunk"] },
+  { label: "✦ MINIMAL LIGHT", keys: ["sakura", "nordic", "signal", "folio", "chlorophyll", "halide", "cinnabar", "marina"] },
+  { label: "🌙 MINIMAL DARK", keys: ["midnight", "afterburn", "ion", "oxide"] },
+];
+
 function ThemePicker({ themeKey, setThemeKey }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
@@ -144,7 +150,7 @@ function ThemePicker({ themeKey, setThemeKey }) {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label="Swap Field Ops colorway"
+        aria-label="Swap theme palette"
       >
         <span className="theme-swatches">
           {current.swatch.map((col, i) => (
@@ -156,27 +162,35 @@ function ThemePicker({ themeKey, setThemeKey }) {
       </button>
       {open && (
         <div className="theme-menu" role="listbox">
-          {THEME_ORDER.map((k) => {
-            const t = THEMES[k];
-            const isOn = k === resolved;
-            return (
-              <button
-                key={k}
-                role="option"
-                aria-selected={isOn}
-                className={classNames("theme-item", isOn && "theme-item-active")}
-                onClick={() => { setThemeKey(k); setOpen(false); }}
-              >
-                <span className="theme-swatches">
-                  {t.swatch.map((col, i) => (
-                    <span key={i} className="theme-sw" style={{ background: col }} />
-                  ))}
-                </span>
-                <span className="theme-item-name">{t.name}</span>
-                {isOn && <Icon.Check size={12} />}
-              </button>
-            );
-          })}
+          {THEME_GROUPS.map((group) => (
+            <div key={group.label} className="theme-group">
+              <div className="theme-group-header">{group.label}</div>
+              {group.keys.map((k) => {
+                const t = THEMES[k];
+                if (!t) return null;
+                const isOn = k === resolved;
+                const categoryBadge = t.styleCategory === "neobrutalism" ? "NEO" : t.mode === "dark" ? "DARK" : "MINIMAL";
+                return (
+                  <button
+                    key={k}
+                    role="option"
+                    aria-selected={isOn}
+                    className={classNames("theme-item", isOn && "theme-item-active")}
+                    onClick={() => { setThemeKey(k); setOpen(false); }}
+                  >
+                    <span className="theme-swatches">
+                      {t.swatch.map((col, i) => (
+                        <span key={i} className="theme-sw" style={{ background: col }} />
+                      ))}
+                    </span>
+                    <span className="theme-item-name">{t.name}</span>
+                    <span className="theme-badge">{categoryBadge}</span>
+                    {isOn && <Icon.Check size={12} className="theme-check-icon" />}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
       )}
     </div>
