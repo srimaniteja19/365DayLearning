@@ -82,11 +82,6 @@ export function PlanEditor({ plan, onChange, onSave, onBack }: Props) {
       status: "ready",
       totalDays: plan.days.length,
     });
-    const remaining = validateEditablePlan(cleaned);
-    if (remaining.length) {
-      if (cleaned !== plan) onChange(cleaned);
-      return;
-    }
     onSave(cleaned);
   };
 

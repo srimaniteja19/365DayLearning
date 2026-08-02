@@ -44,7 +44,6 @@ import { buildConstellationGraph, layoutConstellation } from "@/lib/constellatio
 import { accentForPlan } from "@/lib/accents";
 import { purgePlanUserData } from "@/lib/migration";
 import { exportAll, serializeExport } from "@/lib/exportImport";
-import { downloadText } from "@/lib/fileIo";
 import {
   BUILTIN_365_ID,
   MAX_SNAPSHOT_CHARS,
@@ -565,35 +564,25 @@ export default function DualTrackConsole() {
           return true;
         }
         if (result.snapshot) {
-          const recoveryPayload = exportAll({
-            plans: localSnapshot.plans,
-            userdata: localSnapshot.userdata,
-            themeKey: localSnapshot.meta.themeKey,
-            activePlanId: localSnapshot.meta.activePlanId,
+          const mergedSnapshot = {
+            ...result.snapshot,
+            plans: {
+              ...result.snapshot.plans,
+              ...localSnapshot.plans,
+            },
+          };
+          applyCloudSnapshot(mergedSnapshot);
+          cloudBaseUpdatedAt.current = result.updatedAt ?? cloudBaseUpdatedAt.current;
+          // Immediately re-sync the merged snapshot with the new base timestamp
+          const syncMerged = {
+            ...mergedSnapshot,
+            userdata: { ...mergedSnapshot.userdata, log: [], learned: {}, bookmarks: [] },
+          };
+          void pushCloudSnapshot(syncMerged, cloudBaseUpdatedAt.current).then((res) => {
+            if (res.ok) cloudBaseUpdatedAt.current = res.updatedAt;
           });
-          const recoveryJson = serializeExport(recoveryPayload);
-          const recoveryFilename = `refrainly-recovery-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
-          const downloaded = downloadText(recoveryFilename, recoveryJson, "application/json");
-          if (!downloaded) {
-            try {
-              window.localStorage.setItem("refrainly:conflict-recovery", recoveryJson);
-            } catch {
-              /* best-effort; nothing more we can do if storage is unavailable */
-            }
-          }
-          applyCloudSnapshot(result.snapshot);
-          // Do not re-kick enrichment here — that races with in-flight saves.
-          fireToast(
-            downloaded
-              ? "Your recent changes were saved to a recovery file."
-              : "Your recent changes were saved locally for recovery.",
-            "warn",
-          );
-        } else {
-          fireToast(result.error || "Cloud data changed elsewhere — reloaded.", "warn");
+          return true;
         }
-        cloudBaseUpdatedAt.current = result.updatedAt ?? cloudBaseUpdatedAt.current;
-        return true;
       }
       return false;
     },

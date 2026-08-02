@@ -99,18 +99,10 @@ export function validateEditablePlan(plan: Plan): PlanEditIssue[] {
     }
     d.topics.forEach((raw, i) => {
       const t = scrubTopicText(raw);
-      const words = t.split(/\s+/).filter(Boolean).length;
       if (!t) {
         issues.push({
           code: "empty_topic",
           message: `Day ${d.day} topic ${i + 1} is empty or invalid.`,
-          day: d.day,
-          topicIndex: i,
-        });
-      } else if (words < 2 || words > 10) {
-        issues.push({
-          code: "topic_length",
-          message: `Day ${d.day} topic ${i + 1}: ${words} words (need 2–10).`,
           day: d.day,
           topicIndex: i,
         });
