@@ -730,11 +730,8 @@ export default function DualTrackConsole() {
   const handlePlanCreated = useCallback(
     (plan) => {
       const cleaned = sanitizePlanDays(plan);
-      let nextPlans: Record<string, any> = {};
-      setPlans((prev) => {
-        nextPlans = { ...prev, [cleaned.id]: cleaned };
-        return nextPlans;
-      });
+      const nextPlans: Record<string, any> = { ...plans, [cleaned.id]: cleaned };
+      setPlans(nextPlans);
       setActivePlanId(cleaned.id);
       setScope("all");
       goTo({ page: "dashboard", planId: cleaned.id, plan: cleaned, view: "console" });
@@ -744,7 +741,7 @@ export default function DualTrackConsole() {
       // Defer enrichment until after the page transition settles.
       window.setTimeout(() => startResourceEnrichment(cleaned), 1500);
     },
-    [fireToast, goTo, startResourceEnrichment, flushCloudSnapshot],
+    [plans, fireToast, goTo, startResourceEnrichment, flushCloudSnapshot],
   );
 
   // Catch up resource enrichment after the builder closes (deferred while open).
@@ -1136,24 +1133,22 @@ export default function DualTrackConsole() {
   const handleDeletePlan = useCallback((planId) => {
     const plan = plans[planId];
     if (!plan) return;
+    let nextPlans: Record<string, any>;
     if (plan.builtin) {
-      setPlans((prev) => ({
-        ...prev,
-        [planId]: { ...prev[planId], hidden: true },
-      }));
+      nextPlans = { ...plans, [planId]: { ...plan, hidden: true } };
+      setPlans(nextPlans);
       if (activePlanId === planId) {
-        const next = Object.values(plans).find((p) => p.id !== planId && !p.hidden);
+        const next = Object.values(nextPlans).find((p) => p.id !== planId && !p.hidden);
         goTo({ page: "dashboard", planId: next?.id || BUILTIN_365_ID, plan: next, view: "console" });
       }
       setConfirmDeletePlanId(null);
       fireToast("Built-in plan hidden", "xp");
+      void flushCloudSnapshot({ plans: nextPlans });
       return;
     }
-    setPlans((prev) => {
-      const next = { ...prev };
-      delete next[planId];
-      return next;
-    });
+    nextPlans = { ...plans };
+    delete nextPlans[planId];
+    setPlans(nextPlans);
     const purged = purgePlanUserData(
       { progress, notes, refs, srs, log, learned, bookmarks },
       planId,
@@ -1169,12 +1164,13 @@ export default function DualTrackConsole() {
       fetch(`/api/log?planId=${encodeURIComponent(planId)}`, { method: "DELETE" }).catch(() => {});
     }
     if (activePlanId === planId) {
-      const remaining = Object.values(plans).filter((p) => p.id !== planId && !p.hidden);
+      const remaining = Object.values(nextPlans).filter((p) => p.id !== planId && !p.hidden);
       goTo({ page: "dashboard", planId: remaining[0]?.id || BUILTIN_365_ID, plan: remaining[0], view: "console" });
     }
     setConfirmDeletePlanId(null);
     fireToast("Plan deleted", "xp");
-  }, [plans, activePlanId, progress, notes, refs, srs, log, learned, bookmarks, fireToast, cloudUserId, goTo]);
+    void flushCloudSnapshot({ plans: nextPlans });
+  }, [plans, activePlanId, progress, notes, refs, srs, log, learned, bookmarks, fireToast, cloudUserId, goTo, flushCloudSnapshot]);
 
   // Curated example curricula — opt-in starters (tech + non-tech), not auto-assigned.
   const examplePlans = useMemo(
@@ -1208,25 +1204,15 @@ export default function DualTrackConsole() {
       fireToast(`${subscription.rankLabel} supports ${subscription.activeCampaignLimit} active campaign${subscription.activeCampaignLimit === 1 ? "" : "s"}. Upgrade to add another.`, "warn");
       return;
     }
-    let added = null;
-    setPlans((prev) => {
-      if (prev[planId]) {
-        added = { ...prev[planId], hidden: false };
-        return { ...prev, [planId]: added };
-      }
-      const plan = createBuiltinById(planId);
-      if (!plan) return prev;
-      added = plan;
-      return { ...prev, [plan.id]: plan };
-    });
+    const added = existing ? { ...existing, hidden: false } : candidate;
+    const nextPlans = { ...plans, [added.id]: added };
+    setPlans(nextPlans);
     setScope("all");
-    goTo({ page: "dashboard", planId, plan: added, view: "console" });
+    goTo({ page: "dashboard", planId: added.id, plan: added, view: "console" });
     fireToast("Plan added", "day");
-    // Defer enrichment so the home→dashboard transition isn't fighting sync writes.
-    if (added) {
-      window.setTimeout(() => startResourceEnrichment(added), 1500);
-    }
-  }, [fireToast, goTo, plans, startResourceEnrichment, subscription, visiblePlans.length]);
+    void flushCloudSnapshot({ plans: nextPlans });
+    window.setTimeout(() => startResourceEnrichment(added), 1500);
+  }, [fireToast, goTo, plans, startResourceEnrichment, subscription, visiblePlans.length, flushCloudSnapshot]);
 
   const setTopicDone = useCallback((dayId, topicIdx, done) => {
     setProgress((prev) => {
