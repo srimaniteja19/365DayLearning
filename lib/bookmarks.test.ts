@@ -30,16 +30,17 @@ describe("bookmarks helpers", () => {
     expect(detectBookmarkKind("https://docs.google.com/document/d/abc")).toBe("doc");
   });
 
-  it("sanitizeBookmarks drops junk and keeps valid clips", () => {
+  it("sanitizeBookmarks drops junk and keeps valid clips and note slips", () => {
     const out = sanitizeBookmarks([
       { id: "b1", url: "https://example.com/x", title: "Hello", createdAt: 1 },
+      { id: "b2", url: "", kind: "note", title: "Key insight", note: "Remember React Server Components", createdAt: 2 },
       { url: "not-valid", title: "Nope" },
       { id: "b1", url: "https://example.com/dup", title: "Dup" },
       null,
     ]);
-    expect(out).toHaveLength(1);
-    expect(out[0].id).toBe("b1");
-    expect(out[0].title).toBe("Hello");
+    expect(out).toHaveLength(2);
+    expect(out.find((b) => b.id === "b2")?.kind).toBe("note");
+    expect(out.find((b) => b.id === "b2")?.title).toBe("Key insight");
   });
 
   it("mergeBookmarks dedupes by id", () => {

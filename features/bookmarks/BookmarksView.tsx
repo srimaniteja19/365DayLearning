@@ -21,6 +21,7 @@ import {
 import type { BookmarkItem } from "@/lib/types";
 
 const CATEGORIES = [
+  { key: "note", label: "Notes", kinds: ["note"], tone: "butter" },
   { key: "youtube", label: "Video", kinds: ["youtube", "vimeo"], tone: "coral" },
   { key: "article", label: "Articles", kinds: ["article"], tone: "lemon" },
   { key: "repo", label: "Repos", kinds: ["repo"], tone: "mint" },
@@ -180,11 +181,30 @@ export function BookmarksView({
   }, [filtered, favoritesOnly]);
 
   const submit = async () => {
-    const url = normalizeBookmarkUrl(urlInput);
+    const rawInput = urlInput.trim();
+    if (!rawInput) return;
+    const url = normalizeBookmarkUrl(rawInput);
     if (!url) {
-      setErr("Paste a valid URL");
+      setSaving(true);
+      setErr("");
+      const lines = rawInput.split("\n").map((l) => l.trim()).filter(Boolean);
+      const firstLine = lines[0] || "Note";
+      const title = firstLine.length > 60 ? `${firstLine.slice(0, 60)}…` : firstLine;
+      const item: BookmarkItem = {
+        id: createBookmarkId(),
+        url: "",
+        kind: "note",
+        title,
+        note: rawInput,
+        createdAt: Date.now(),
+      };
+      onAdd(item);
+      setUrlInput("");
+      setSaving(false);
+      fireToast?.("Note pinned", "day");
       return;
     }
+
     const dup = (bookmarks || []).find((b) => b.url === url);
     if (dup) {
       setUrlInput("");
@@ -250,7 +270,7 @@ export function BookmarksView({
           <h2 className="bm-title">
             Book<span className="bm-title-accent">marks</span>
           </h2>
-          <p className="bm-lead">Sticky slips grouped by type — YouTube embeds right on the card.</p>
+          <p className="bm-lead">Sticky slips grouped by type — links, notes, and video embeds right on the card.</p>
         </div>
         <div className="bm-head-meta">
           <span className="bm-live-stamp">Live</span>
@@ -271,7 +291,7 @@ export function BookmarksView({
                 submit();
               }
             }}
-            placeholder="Paste a URL and press Enter"
+            placeholder="Paste a URL or type a note & press Enter"
             spellCheck="false"
             autoComplete="url"
             inputMode="url"
@@ -364,7 +384,8 @@ export function BookmarksView({
 
             <div className={classNames("bm-sticky-board", group.key === "youtube" && "bm-sticky-board-video")}>
               {group.items.map((item, index) => {
-                const host = item.preview?.siteName || hostnameOf(item.url);
+                const isNoteKind = item.kind === "note" || !item.url;
+                const host = isNoteKind ? "Note" : item.preview?.siteName || hostnameOf(item.url);
                 const desc = item.preview?.description;
                 const image = item.preview?.image;
                 const embed = resolveEmbed(item);
@@ -399,37 +420,46 @@ export function BookmarksView({
 
                     <div className="bm-sticky-face">
                       <span className="bm-sticky-ribbon" aria-hidden="true" />
-                      <a
-                        className="bm-sticky-meta"
-                        href={item.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <span className="bm-sticky-host">{host}</span>
-                        <span className="bm-sticky-title">{item.title}</span>
-                        {!embed && desc && <span className="bm-sticky-desc">{desc}</span>}
-                      </a>
-
-                      {embed ? (
-                        <div className="bm-sticky-embed">
-                          <iframe
-                            title={item.title}
-                            src={embed.src}
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                            allowFullScreen
-                            loading="lazy"
-                            referrerPolicy="strict-origin-when-cross-origin"
-                          />
+                      {isNoteKind ? (
+                        <div className="bm-sticky-meta">
+                          <span className="bm-sticky-host">Note</span>
+                          <span className="bm-sticky-title">{item.title}</span>
                         </div>
                       ) : (
                         <a
-                          className="bm-sticky-media"
+                          className="bm-sticky-meta"
                           href={item.url}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
-                          <StickyThumb src={image} />
+                          <span className="bm-sticky-host">{host}</span>
+                          <span className="bm-sticky-title">{item.title}</span>
+                          {!embed && desc && <span className="bm-sticky-desc">{desc}</span>}
                         </a>
+                      )}
+
+                      {!isNoteKind && (
+                        embed ? (
+                          <div className="bm-sticky-embed">
+                            <iframe
+                              title={item.title}
+                              src={embed.src}
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                              allowFullScreen
+                              loading="lazy"
+                              referrerPolicy="strict-origin-when-cross-origin"
+                            />
+                          </div>
+                        ) : (
+                          <a
+                            className="bm-sticky-media"
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <StickyThumb src={image} />
+                          </a>
+                        )
                       )}
 
                       {noteEditId === item.id ? (
@@ -438,9 +468,9 @@ export function BookmarksView({
                             className="bm-note-input"
                             value={noteDraft}
                             onChange={(e) => setNoteDraft(e.target.value)}
-                            placeholder="Personal note — why this matters…"
+                            placeholder="Note text…"
                             rows={3}
-                            maxLength={500}
+                            maxLength={1000}
                           />
                           <div className="bm-note-actions">
                             <button
@@ -450,6 +480,7 @@ export function BookmarksView({
                                 const note = noteDraft.trim();
                                 onUpdate({
                                   ...item,
+                                  title: isNoteKind && note ? (note.split("\n")[0].slice(0, 60) || item.title) : item.title,
                                   note: note || undefined,
                                 });
                                 setNoteEditId(null);
@@ -535,14 +566,16 @@ export function BookmarksView({
                         </div>
                       ) : null}
                       <div className="bm-sticky-actions">
-                        <a
-                          className="bm-sticky-action"
-                          href={item.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Open
-                        </a>
+                        {!isNoteKind && (
+                          <a
+                            className="bm-sticky-action"
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Open
+                          </a>
+                        )}
                         <button
                           type="button"
                           className="bm-sticky-action"
@@ -563,14 +596,16 @@ export function BookmarksView({
                         >
                           {item.tags?.length ? "Edit tags" : "+ Tag"}
                         </button>
-                        <button
-                          type="button"
-                          className="bm-sticky-action"
-                          disabled={enrichBusy === item.id}
-                          onClick={() => reEnrich(item)}
-                        >
-                          {enrichBusy === item.id ? "…" : "Refresh"}
-                        </button>
+                        {!isNoteKind && (
+                          <button
+                            type="button"
+                            className="bm-sticky-action"
+                            disabled={enrichBusy === item.id}
+                            onClick={() => reEnrich(item)}
+                          >
+                            {enrichBusy === item.id ? "…" : "Refresh"}
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="bm-sticky-action bm-sticky-action-mute"

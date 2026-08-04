@@ -74,7 +74,9 @@ export function extractVimeoId(url: string): string | null {
 }
 
 export function detectBookmarkKind(url: string): BookmarkKind {
+  if (!url || typeof url !== "string") return "note";
   const host = hostnameOf(url).toLowerCase();
+  if (!host) return "note";
   if (extractYoutubeId(url)) return "youtube";
   if (extractVimeoId(url)) return "vimeo";
   if (
@@ -174,21 +176,46 @@ export function sanitizeBookmarks(raw: unknown): BookmarksList {
   for (const entry of raw) {
     if (!entry || typeof entry !== "object") continue;
     const e = entry as Record<string, unknown>;
-    const url = normalizeBookmarkUrl(typeof e.url === "string" ? e.url : "");
-    if (!url) continue;
+    const rawUrl = typeof e.url === "string" ? e.url.trim() : "";
+    const normalizedUrl = normalizeBookmarkUrl(rawUrl);
+    const kindRaw =
+      typeof e.kind === "string"
+        ? e.kind
+        : normalizedUrl
+          ? detectBookmarkKind(normalizedUrl)
+          : rawUrl
+            ? "link"
+            : "note";
+
+    // If an explicit non-empty URL string was supplied that fails URL normalization,
+    // and kind is not explicitly "note", skip it (it's a broken URL entry, not a note slip).
+    if (rawUrl && !normalizedUrl && kindRaw !== "note") continue;
+
+    const hasNoteOrTitle = (typeof e.note === "string" && !!e.note.trim()) || (typeof e.title === "string" && !!e.title.trim());
+    const isNoteKind = kindRaw === "note" || (!rawUrl && hasNoteOrTitle);
+
+    if (!normalizedUrl && !isNoteKind) continue;
+
+    const url = normalizedUrl || (typeof e.url === "string" ? e.url.trim() : "");
     const id = typeof e.id === "string" && e.id ? e.id : createBookmarkId();
     if (seen.has(id)) continue;
     seen.add(id);
-    const kindRaw = typeof e.kind === "string" ? e.kind : detectBookmarkKind(url);
+
     const kind: BookmarkKind = (
-      ["youtube", "vimeo", "article", "repo", "doc", "link"] as BookmarkKind[]
+      ["youtube", "vimeo", "article", "repo", "doc", "link", "note"] as BookmarkKind[]
     ).includes(kindRaw as BookmarkKind)
       ? (kindRaw as BookmarkKind)
-      : detectBookmarkKind(url);
+      : isNoteKind
+        ? "note"
+        : detectBookmarkKind(url);
+
     const title =
       typeof e.title === "string" && e.title.trim()
         ? e.title.trim().slice(0, 200)
-        : defaultTitleForUrl(url);
+        : url
+          ? defaultTitleForUrl(url)
+          : (typeof e.note === "string" && e.note.trim() ? e.note.trim().split("\n")[0].slice(0, 60) : "Note");
+
     const note = typeof e.note === "string" && e.note.trim() ? e.note.slice(0, 4000) : undefined;
     const insight =
       typeof e.insight === "string" && e.insight.trim() ? e.insight.slice(0, 4000) : undefined;

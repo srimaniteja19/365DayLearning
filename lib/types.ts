@@ -160,8 +160,8 @@ export type LearnedItem = {
 };
 export type LearnedMap = Record<string, LearnedItem[]>;
 
-/** Saved links — articles, videos, repos — with optional OG / embed preview. */
-export type BookmarkKind = "youtube" | "vimeo" | "article" | "repo" | "doc" | "link";
+/** Saved links and text notes — articles, videos, repos, notes — with optional OG / embed preview. */
+export type BookmarkKind = "youtube" | "vimeo" | "article" | "repo" | "doc" | "link" | "note";
 
 export type BookmarkPreview = {
   title?: string;
