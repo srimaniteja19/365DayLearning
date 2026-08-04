@@ -8,9 +8,11 @@ import {
 import {
   clipSourceText,
   formatSourcesForPrompt,
+  SOURCE_MAX_CHARS,
   SOURCE_MAX_URLS,
   type SourceContent,
   type SourceKind,
+  type SourceProvider,
 } from "@/lib/sourceContentShared";
 import { isPrivateHostname } from "@/lib/urlSafety";
 
@@ -22,7 +24,7 @@ export {
   type SourceContent,
   type SourceKind,
   type SourceProvider,
-} from "@/lib/sourceContentShared";
+};
 
 const FETCH_TIMEOUT_MS = 12_000;
 const MAX_HTML_BYTES = 800_000;

@@ -14,7 +14,6 @@ import {
   fontVars,
   resolveFontKey,
 } from "@/theme/fonts";
-import type { ThemeKey } from "@/lib/types";
 
 const ALL_THEME_VARS = [
   "--bg",

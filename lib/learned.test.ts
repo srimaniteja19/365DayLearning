@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   buildKitWeekDigest,
   buildLearnedChronoIndex,
-  countLearned,
   createLearnedId,
   dateKey,
   extractUrlsFromText,

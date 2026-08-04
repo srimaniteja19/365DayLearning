@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createPlanRouteSlug, findPlanByRouteSegment, planRouteSegment } from "@/lib/planRoute";
+import type { Plan } from "@/lib/types";
 
 describe("plan routes", () => {
   it("creates a stable readable segment", () => {
@@ -12,7 +13,7 @@ describe("plan routes", () => {
     const plans = {
       "plan-1": { id: "plan-1", name: "Renamed", routeSlug: "original-name-1234" },
       legacy: { id: "legacy", name: "Old plan" },
-    } as any;
+    } as unknown as Record<string, Plan>;
     expect(planRouteSegment(plans["plan-1"])).toBe("original-name-1234");
     expect(planRouteSegment(plans.legacy)).toBe("legacy");
     expect(findPlanByRouteSegment(plans, "original-name-1234")?.id).toBe("plan-1");

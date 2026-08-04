@@ -750,8 +750,6 @@ export default function DualTrackConsole() {
     if (modal?.kind === "builder") return;
     const t = window.setTimeout(() => enrichPlansMap(plans), 1200);
     return () => window.clearTimeout(t);
-    // Intentionally omit `plans` / enrichPlansMap identity churn.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cloudReady, modal?.kind]);
 
   useEffect(() => {

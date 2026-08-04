@@ -12,21 +12,23 @@ import {
   openBillingPortal,
   requestUpgrade,
   type SubscriptionTier,
+  type SubscriptionUsage,
 } from "@/lib/subscriptions";
 
-function UsageBar({ label, used, limit }: { label: string; used: number; limit: number }) {
-  const pct = Math.min(100, Math.round((used / limit) * 100));
+function UsageBar({ label, used, limit }: { label: string; used: number; limit: number | null }) {
+  const isUnlimited = limit === null || limit === undefined;
+  const pct = isUnlimited || limit === 0 ? 0 : Math.min(100, Math.round((used / limit) * 100));
   return (
     <div className="pricing-usage-row">
       <div className="pricing-usage-label">
         <span>{label}</span>
         <span>
-          {used}/{limit}
+          {used}/{isUnlimited ? "∞" : limit}
         </span>
       </div>
       <div className="pricing-usage-track">
         <div
-          className={classNames("pricing-usage-fill", pct >= 100 && "pricing-usage-fill-full")}
+          className={classNames("pricing-usage-fill", !isUnlimited && pct >= 100 && "pricing-usage-fill-full")}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -42,17 +44,16 @@ export type PricingPanelProps = {
 
 export function PricingPanel({ onOpenAccount, refreshToken = 0 }: PricingPanelProps) {
   const { data: session } = useSession();
-  const [usage, setUsage] = useState<any>(null);
+  const [usage, setUsage] = useState<SubscriptionUsage | null>(null);
   const [loadingUsage, setLoadingUsage] = useState(false);
   const [pendingTier, setPendingTier] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     if (!session?.user) {
-      setUsage(null);
       return;
     }
-    let cancelled = false;
     setLoadingUsage(true);
     fetchSubscriptionStatus().then((res) => {
       if (cancelled) return;
@@ -64,8 +65,9 @@ export function PricingPanel({ onOpenAccount, refreshToken = 0 }: PricingPanelPr
     };
   }, [session?.user, refreshToken]);
 
-  const currentTier = usage?.tier || (session?.user ? "free" : null);
-  const pastDue = usage?.status === "past_due";
+  const effectiveUsage = session?.user ? usage : null;
+  const currentTier = effectiveUsage?.tier || (session?.user ? "free" : null);
+  const pastDue = effectiveUsage?.status === "past_due";
 
   const handleUpgrade = async (tierId: SubscriptionTier) => {
     if (!session?.user) {

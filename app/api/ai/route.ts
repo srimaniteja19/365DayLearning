@@ -13,7 +13,6 @@ const MAX_TOKENS_CAP = 4096;
 /** Plan generation periods can be large (monthly × 4 topics); allow more headroom. */
 const MAX_TOKENS_CAP_PLAN = 8192;
 const MAX_SYSTEM_CHARS = 8_000;
-const UPSTREAM_TIMEOUT_MS = 90_000;
 const OPENROUTER_BASE = "https://openrouter.ai/api";
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -87,6 +86,23 @@ export async function POST(req: NextRequest) {
   }
 
   const kind = body.kind === "plan" ? "plan" : "action";
+
+  if (hasDatabase()) {
+    const session = await auth();
+    if (session?.user?.id) {
+      if (kind === "action") {
+        const reserved = await reserveAiActionQuota(session.user.id);
+        if (!reserved.ok) {
+          return NextResponse.json({ error: reserved.message }, { status: reserved.status });
+        }
+      } else {
+        const tierOk = await requireManagedAiQuota(session.user.id);
+        if (!tierOk.ok) {
+          return NextResponse.json({ error: tierOk.message }, { status: tierOk.status });
+        }
+      }
+    }
+  }
   const system =
     typeof body.system === "string" && body.system.trim()
       ? body.system.trim().slice(0, MAX_SYSTEM_CHARS)

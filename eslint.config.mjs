@@ -10,6 +10,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    ".cursor/**",
+    ".agents/**",
+    ".claude/**",
+    "extension/**",
+    "demo-output/**",
+    "public/**",
   ]),
   {
     files: [
@@ -18,10 +24,12 @@ const eslintConfig = defineConfig([
       "features/settings/SettingsPanel.tsx",
       "features/planBuilder/PlanBuilder.tsx",
       "features/learned/LearnedView.tsx",
+      "features/modals/PricingPanel.tsx",
     ],
     rules: {
       // Large migrated SPA; typed boundaries are in lib/ and app/api/
       "@typescript-eslint/ban-ts-comment": "off",
+      "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-vars": "off",
       "prefer-const": "off",
       "react-hooks/exhaustive-deps": "off",

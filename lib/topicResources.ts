@@ -3,15 +3,12 @@ import { willUseManagedAi } from "@/lib/aiClient";
 import { openrouterProvider } from "@/lib/providers/openrouter";
 import { openRouterWebSearch } from "@/lib/openrouterWebSearch";
 import {
-  asResourcePair,
   cacheKeyForKind,
   citationToResource,
   domainLabelForSearch,
   isPlaceholderTopic,
   isVideoCitationUrl,
   normalizeTopicResourceKey,
-  pairFromCitations,
-  pairHasAnyResource,
   searchPromptForKind,
   TOPIC_RESOURCE_SEARCH_MODEL,
 } from "@/lib/topicResourceShared";

@@ -631,6 +631,23 @@ export function HomeView({
         </section>
       )}
 
+      <section className="landing-faq" aria-labelledby="landing-faq-title">
+        <div className="landing-section-head">
+          <span className="landing-kicker">Questions & Answers</span>
+          <h2 id="landing-faq-title" className="landing-section-title">
+            Frequently Asked Questions
+          </h2>
+        </div>
+        <div className="landing-faq-grid">
+          {FAQS.map((faq, idx) => (
+            <article key={idx} className="landing-faq-card">
+              <h3 className="landing-faq-q">{faq.q}</h3>
+              <p className="landing-faq-a">{faq.a}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
       {!hasCampaign && (
         <section className="landing-band" aria-labelledby="landing-final-title">
           <div className="landing-band-copy">
