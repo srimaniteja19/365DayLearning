@@ -111,6 +111,7 @@ export const learnedItems = pgTable("learned_items", {
   insight: text("insight"),
   tags: jsonb("tags"),
   favorite: boolean("favorite").notNull().default(false),
+  archived: boolean("archived").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 });
 
@@ -129,6 +130,7 @@ export const bookmarkItems = pgTable("bookmark_items", {
   note: text("note"),
   tags: jsonb("tags"),
   favorite: boolean("favorite").notNull().default(false),
+  archived: boolean("archived").notNull().default(false),
   preview: jsonb("preview"),
   insight: text("insight"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),

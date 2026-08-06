@@ -504,9 +504,18 @@ export function LearnedView({
     });
   };
 
+  const activeLearned = useMemo(() => {
+    const out = {};
+    Object.entries(learned || {}).forEach(([d, items]) => {
+      const unarchived = (items || []).filter((it) => !it.archived);
+      if (unarchived.length) out[d] = unarchived;
+    });
+    return out;
+  }, [learned]);
+
   const chronoIndex = useMemo(
-    () => buildLearnedChronoIndex(learned, chrono.year),
-    [learned, chrono.year],
+    () => buildLearnedChronoIndex(activeLearned, chrono.year),
+    [activeLearned, chrono.year],
   );
 
   const todayParts = useMemo(() => {
@@ -515,7 +524,7 @@ export function LearnedView({
   }, [today]);
 
   const days = useMemo(() => {
-    const all = sortedLearnedDays(learned);
+    const all = sortedLearnedDays(activeLearned);
     const q = query.trim().toLowerCase();
     const filtered = all
       .filter(({ date: d }) => matchesChronoFilter(d, chrono))
@@ -533,7 +542,7 @@ export function LearnedView({
       }))
       .filter((g) => g.items.length > 0);
     return filtered;
-  }, [learned, query, chrono]);
+  }, [activeLearned, query, chrono]);
 
   const visibleSlipCount = useMemo(
     () => days.reduce((n, d) => n + d.items.length, 0),
@@ -1379,6 +1388,18 @@ export function LearnedView({
                                       : item.insight
                                         ? "Regenerate"
                                         : "Summary"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="sticky-action sticky-action-mute"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onUpdate(d, { ...item, archived: true });
+                                      if (expandedId === item.id) setExpandedId(null);
+                                      fireToast?.("Moved to Archive", "xp");
+                                    }}
+                                  >
+                                    <Icon.Box size={11} /> Archive
                                   </button>
                                   <button
                                     type="button"

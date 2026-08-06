@@ -32,13 +32,14 @@ describe("bookmarks helpers", () => {
 
   it("sanitizeBookmarks drops junk and keeps valid clips and note slips", () => {
     const out = sanitizeBookmarks([
-      { id: "b1", url: "https://example.com/x", title: "Hello", createdAt: 1 },
+      { id: "b1", url: "https://example.com/x", title: "Hello", createdAt: 1, archived: true },
       { id: "b2", url: "", kind: "note", title: "Key insight", note: "Remember React Server Components", createdAt: 2 },
       { url: "not-valid", title: "Nope" },
       { id: "b1", url: "https://example.com/dup", title: "Dup" },
       null,
     ]);
     expect(out).toHaveLength(2);
+    expect(out.find((b) => b.id === "b1")?.archived).toBe(true);
     expect(out.find((b) => b.id === "b2")?.kind).toBe("note");
     expect(out.find((b) => b.id === "b2")?.title).toBe("Key insight");
   });

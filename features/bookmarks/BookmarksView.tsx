@@ -150,10 +150,15 @@ export function BookmarksView({
     flashExisting(id);
   }, [query]);
 
+  const activeBookmarks = useMemo(
+    () => (bookmarks || []).filter((b) => !b.archived),
+    [bookmarks],
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return bookmarks || [];
-    return (bookmarks || []).filter((item) => {
+    if (!q) return activeBookmarks;
+    return activeBookmarks.filter((item) => {
       const hay = [
         item.title,
         item.url,
@@ -167,10 +172,10 @@ export function BookmarksView({
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [bookmarks, query]);
+  }, [activeBookmarks, query]);
 
   const [favoritesOnly, setFavoritesOnly] = useState(false);
-  const favoritesCount = useMemo(() => (bookmarks || []).filter((b) => b.favorite).length, [bookmarks]);
+  const favoritesCount = useMemo(() => activeBookmarks.filter((b) => b.favorite).length, [activeBookmarks]);
 
   const groups = useMemo(() => {
     const base = favoritesOnly ? filtered.filter((item) => item.favorite) : filtered;
@@ -274,7 +279,7 @@ export function BookmarksView({
         </div>
         <div className="bm-head-meta">
           <span className="bm-live-stamp">Live</span>
-          <span className="bm-count">{(bookmarks || []).length}</span>
+          <span className="bm-count">{activeBookmarks.length}</span>
         </div>
       </header>
 
@@ -606,6 +611,16 @@ export function BookmarksView({
                             {enrichBusy === item.id ? "…" : "Refresh"}
                           </button>
                         )}
+                        <button
+                          type="button"
+                          className="bm-sticky-action bm-sticky-action-mute"
+                          onClick={() => {
+                            onUpdate({ ...item, archived: true });
+                            fireToast?.("Moved to Archive", "xp");
+                          }}
+                        >
+                          Archive
+                        </button>
                         <button
                           type="button"
                           className="bm-sticky-action bm-sticky-action-mute"

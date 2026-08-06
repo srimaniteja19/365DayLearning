@@ -24,7 +24,7 @@ describe("learned helpers", () => {
   it("sanitizeLearned drops junk and keeps valid items", () => {
     const out = sanitizeLearned({
       "2026-07-27": [
-        { id: "a", title: "Redis", body: "notes", createdAt: 1, insight: "keep" },
+        { id: "a", title: "Redis", body: "notes", createdAt: 1, insight: "keep", archived: true },
         { title: "", body: "", createdAt: 2 },
         null,
       ],
@@ -33,6 +33,7 @@ describe("learned helpers", () => {
     });
     expect(out["2026-07-27"]).toHaveLength(1);
     expect(out["2026-07-27"][0].insight).toBe("keep");
+    expect(out["2026-07-27"][0].archived).toBe(true);
     expect(out.bad).toBeUndefined();
   });
 

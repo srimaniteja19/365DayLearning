@@ -234,6 +234,7 @@ export function sanitizeBookmarks(raw: unknown): BookmarksList {
       note,
       tags: tags?.length ? tags : undefined,
       favorite: e.favorite === true,
+      archived: e.archived === true ? true : undefined,
       preview,
       insight,
       createdAt: typeof e.createdAt === "number" ? e.createdAt : Date.now(),

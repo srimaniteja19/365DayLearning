@@ -93,6 +93,7 @@ import {
 import { LearnedView } from "@/features/learned/LearnedView";
 import { BookmarksView } from "@/features/bookmarks/BookmarksView";
 import { FavoritesView } from "@/features/favorites/FavoritesView";
+import { ArchiveView } from "@/features/archive/ArchiveView";
 import {
   applyPreviewToBookmark,
   createBookmarkId,
@@ -114,7 +115,7 @@ const emptyUserSnapshot = () => ({
 });
 
 const DASHBOARD_VIEWS = ["console", "grid", "review", "weekly", "log", "constellation"];
-const KIT_TABS = ["learned", "bookmarks", "favorites"];
+const KIT_TABS = ["learned", "bookmarks", "favorites", "archive"];
 const normalizeKitTab = (tab) => (KIT_TABS.includes(tab) ? tab : "learned");
 
 function parseDashboardRoute(pathname) {
@@ -1544,11 +1545,31 @@ export default function DualTrackConsole() {
 
   const favoriteCount = useMemo(() => {
     const noteFavs = Object.values(learned || {}).reduce(
-      (n, items) => n + (items || []).filter((it) => it.favorite).length,
+      (n, items) => n + (items || []).filter((it) => it.favorite && !it.archived).length,
       0,
     );
-    const bookmarkFavs = (bookmarks || []).filter((b) => b.favorite).length;
+    const bookmarkFavs = (bookmarks || []).filter((b) => b.favorite && !b.archived).length;
     return noteFavs + bookmarkFavs;
+  }, [learned, bookmarks]);
+
+  const learnedCount = useMemo(() => {
+    return Object.values(learned || {}).reduce(
+      (n, items) => n + (items || []).filter((it) => !it.archived).length,
+      0,
+    );
+  }, [learned]);
+
+  const bookmarkCount = useMemo(() => {
+    return (bookmarks || []).filter((b) => !b.archived).length;
+  }, [bookmarks]);
+
+  const archiveCount = useMemo(() => {
+    const noteArch = Object.values(learned || {}).reduce(
+      (n, items) => n + (items || []).filter((it) => it.archived).length,
+      0,
+    );
+    const bookmarkArch = (bookmarks || []).filter((b) => b.archived).length;
+    return noteArch + bookmarkArch;
   }, [learned, bookmarks]);
 
   if (saveStatus === "loading") {
@@ -1564,8 +1585,6 @@ export default function DualTrackConsole() {
   // Dashboard needs a campaign; Field Kit does not (off-plan side channel).
   const onDashboard = page === "dashboard" && !!campaign;
   const onKit = page === "kit";
-  const learnedCount = countLearned(learned);
-  const bookmarkCount = Array.isArray(bookmarks) ? bookmarks.length : 0;
   const kitAccent = campaign?.accent || theme.accents?.main || "var(--accent)";
 
   const topBarShared = {
@@ -1695,6 +1714,7 @@ export default function DualTrackConsole() {
             learnedCount={learnedCount}
             bookmarkCount={bookmarkCount}
             favoriteCount={favoriteCount}
+            archiveCount={archiveCount}
             hasCampaign={!!campaign}
             onBackToCampaign={() => goTo({ page: "dashboard" })}
             accent={kitAccent}
@@ -1754,6 +1774,22 @@ export default function DualTrackConsole() {
                 onUpdateLearned={updateLearned}
                 onUpdateBookmark={updateBookmark}
                 onJumpToDate={openKitToDate}
+                accent={kitAccent}
+                fireToast={fireToast}
+                lensQuery={kitQuery}
+                onLensQueryChange={setKitQuery}
+              />
+            </div>
+          )}
+          {(kitTab === "archive" || visitedKitTabs.has("archive")) && (
+            <div className={classNames("kit-panel", kitTab !== "archive" && "kit-panel-hidden")}>
+              <ArchiveView
+                learned={learned}
+                bookmarks={bookmarks}
+                onUpdateLearned={updateLearned}
+                onRemoveLearned={removeLearned}
+                onUpdateBookmark={updateBookmark}
+                onRemoveBookmark={removeBookmark}
                 accent={kitAccent}
                 fireToast={fireToast}
                 lensQuery={kitQuery}

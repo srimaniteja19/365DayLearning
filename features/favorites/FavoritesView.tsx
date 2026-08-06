@@ -68,14 +68,14 @@ export function FavoritesView({
     const out: FavEntry[] = [];
     Object.entries(learned || {}).forEach(([date, items]) => {
       (items || []).forEach((item) => {
-        if (item.favorite) out.push({ type: "note", date, item });
+        if (item.favorite && !item.archived) out.push({ type: "note", date, item });
       });
     });
     return out;
   }, [learned]);
 
   const bookmarkFavorites = useMemo(
-    () => (bookmarks || []).filter((b) => b.favorite).map((item): FavEntry => ({ type: "bookmark", item })),
+    () => (bookmarks || []).filter((b) => b.favorite && !b.archived).map((item): FavEntry => ({ type: "bookmark", item })),
     [bookmarks],
   );
 

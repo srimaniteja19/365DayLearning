@@ -125,6 +125,7 @@ export function sanitizeLearned(raw: unknown): LearnedMap {
         insight: typeof e.insight === "string" && e.insight.trim() ? e.insight : undefined,
         ...(tags ? { tags } : {}),
         favorite: e.favorite === true,
+        archived: e.archived === true ? true : undefined,
         createdAt: typeof e.createdAt === "number" ? e.createdAt : Date.now(),
       });
     }

@@ -1198,6 +1198,7 @@ export function FieldKitChrome({
   learnedCount,
   bookmarkCount,
   favoriteCount = 0,
+  archiveCount = 0,
   hasCampaign,
   onBackToCampaign,
   accent,
@@ -1265,6 +1266,17 @@ export function FieldKitChrome({
             <span className="field-kit-tab-stamp">★</span>
             <span className="field-kit-tab-label">Favorites</span>
             <span className="field-kit-tab-count">{favoriteCount}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "archive"}
+            className={classNames("field-kit-tab field-kit-tab-archive", tab === "archive" && "is-on")}
+            onClick={() => setTab("archive")}
+          >
+            <span className="field-kit-tab-stamp">ARCH</span>
+            <span className="field-kit-tab-label">Archive</span>
+            <span className="field-kit-tab-count">{archiveCount}</span>
           </button>
         </div>
         {typeof setLensQuery === "function" && (
