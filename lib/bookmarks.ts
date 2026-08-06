@@ -287,7 +287,7 @@ export function removeBookmarkTag(tags: string[] | undefined, tag: string): stri
   return next.length ? next : undefined;
 }
 
-type PreviewResponse = { url: string; kind: BookmarkKind; preview: BookmarkPreview; warning?: string };
+type PreviewResponse = { url?: string; kind?: BookmarkKind; preview?: BookmarkPreview; warning?: string; error?: string };
 
 const PREVIEW_CONCURRENCY = 4;
 const previewCache = new Map<string, Promise<PreviewResponse>>();
@@ -303,14 +303,21 @@ function runNextPreview() {
 }
 
 async function rawFetchPreview(url: string): Promise<PreviewResponse> {
-  const res = await fetch("/api/bookmarks/preview", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "Preview failed");
-  return data as PreviewResponse;
+  try {
+    const res = await fetch("/api/bookmarks/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    if (res.status === 429) {
+      return {};
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Preview failed");
+    return data as PreviewResponse;
+  } catch {
+    return {};
+  }
 }
 
 /**
