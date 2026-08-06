@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractUrlFromShare } from "@/app/share-target/page";
+import { extractUrlFromShare } from "@/app/share-target/route";
 
 describe("extractUrlFromShare", () => {
   it("extracts clean URL when url parameter is provided directly", () => {

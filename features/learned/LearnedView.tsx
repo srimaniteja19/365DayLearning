@@ -94,6 +94,7 @@ function LearnedLinkEmbed({ url, compact = false }) {
 
   useEffect(() => {
     setPreview(seed);
+    if (yt || vim) return;
     let cancelled = false;
     fetchPreviewQueued(url)
       .then((data) => {
@@ -105,7 +106,7 @@ function LearnedLinkEmbed({ url, compact = false }) {
     return () => {
       cancelled = true;
     };
-  }, [url, seed]);
+  }, [url, seed, yt, vim]);
 
   if (compact) {
     return (

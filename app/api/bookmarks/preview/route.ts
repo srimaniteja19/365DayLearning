@@ -16,7 +16,7 @@ export const runtime = "nodejs";
 const MAX_HTML_BYTES = 512_000;
 const FETCH_TIMEOUT_MS = 8_000;
 const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_MAX = 100;
 
 function decodeEntities(s: string): string {
   return s

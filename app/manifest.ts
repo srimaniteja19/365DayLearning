@@ -16,13 +16,17 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ["education", "productivity"],
     share_target: {
       action: "/share-target",
-      method: "GET",
+      method: "POST",
+      enctype: "application/x-www-form-urlencoded",
+      enc_type: "application/x-www-form-urlencoded",
       params: {
         title: "title",
         text: "text",
         url: "url",
       },
     },
+
+
     icons: [
       {
         src: "/icon-192",
