@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Icon } from "@/components/Icon";
 import {
   createBookmarkId,
@@ -19,7 +19,10 @@ interface ShareTargetModalProps {
   sharedText?: string;
   onClose: () => void;
   onSaveBookmark: (item: any) => void;
+  onUpdateBookmark?: (item: any) => void;
+  onDeleteBookmark?: (id: string) => void;
   onSaveLearned: (date: string, item: any) => void;
+  onDeleteLearned?: (date: string, id: string) => void;
   fireToast: (msg: string, tone?: string) => void;
   openKit: (tab: string) => void;
 }
@@ -30,7 +33,10 @@ export function ShareTargetModal({
   sharedText,
   onClose,
   onSaveBookmark,
+  onUpdateBookmark,
+  onDeleteBookmark,
   onSaveLearned,
+  onDeleteLearned,
   fireToast,
   openKit,
 }: ShareTargetModalProps) {
@@ -39,8 +45,10 @@ export function ShareTargetModal({
   const detectedKind = detectBookmarkKind(normalizedUrl);
 
   const [destination, setDestination] = useState<"bookmarks" | "learned">("bookmarks");
+  const [savedItemId, setSavedItemId] = useState<string | null>(null);
+  const [savedDateKey, setSavedDateKey] = useState<string | null>(null);
+  const [showEditDrawer, setShowEditDrawer] = useState<"none" | "tags" | "note" | "full">("none");
 
-  // Shared metadata states
   const [title, setTitle] = useState(
     sharedTitle || defaultTitleForUrl(normalizedUrl)
   );
@@ -49,13 +57,31 @@ export function ShareTargetModal({
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [preview, setPreview] = useState<any>(() => seedPreviewFromUrl(normalizedUrl));
-  const [loadingPreview, setLoadingPreview] = useState(false);
 
-  // Fetch richer metadata (og:title, og:image, description) in background
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [countdown, setCountdown] = useState(6);
+
+  // Auto-Save on Mount (Pocket Style Instant Save)
   useEffect(() => {
     if (!normalizedUrl) return;
-    let canceled = false;
-    setLoadingPreview(true);
+
+    const bmId = createBookmarkId();
+    const item = {
+      id: bmId,
+      url: normalizedUrl,
+      kind: detectedKind,
+      title: title.trim() || defaultTitleForUrl(normalizedUrl),
+      note: note.trim() || undefined,
+      tags: [],
+      preview,
+      createdAt: Date.now(),
+    };
+
+    onSaveBookmark(item);
+    setSavedItemId(bmId);
+    fireToast("Saved to Bookmarks", "day");
+
+    // Background preview fetch
     fetch("/api/bookmarks/preview", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -63,20 +89,128 @@ export function ShareTargetModal({
     })
       .then((res) => res.json())
       .then((data) => {
-        if (canceled || !data?.preview) return;
+        if (!data?.preview) return;
         setPreview(data.preview);
         if (data.preview.title && !sharedTitle) {
           setTitle(data.preview.title);
         }
+        if (onUpdateBookmark) {
+          onUpdateBookmark({ ...item, preview: data.preview, title: data.preview.title || item.title });
+        }
       })
-      .catch(() => {})
-      .finally(() => {
-        if (!canceled) setLoadingPreview(false);
+      .catch(() => {});
+  }, []);
+
+  // Auto-close countdown (pauses if editing)
+  useEffect(() => {
+    if (showEditDrawer !== "none") {
+      if (timerRef.current) clearInterval(timerRef.current);
+      return;
+    }
+
+    timerRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          onClose();
+          return 0;
+        }
+        return prev - 1;
       });
+    }, 1000);
+
     return () => {
-      canceled = true;
+      if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [normalizedUrl, sharedTitle]);
+  }, [showEditDrawer, onClose]);
+
+  // Toggle Destination (Bookmarks <-> Learned)
+  const handleToggleDestination = () => {
+    if (!normalizedUrl) return;
+
+    if (destination === "bookmarks") {
+      // Move from Bookmarks to Learned
+      if (savedItemId && onDeleteBookmark) {
+        onDeleteBookmark(savedItemId);
+      }
+      const today = dateKey();
+      const newLearnedId = createLearnedId();
+      const learnedItem = {
+        id: newLearnedId,
+        title: title.trim() || defaultTitleForUrl(normalizedUrl),
+        insight: note.trim() || `Saved from ${host || "shared link"}`,
+        sourceUrl: normalizedUrl,
+        tags: tags.length ? tags : [host || "shared"],
+        createdAt: Date.now(),
+      };
+      onSaveLearned(today, learnedItem);
+      setSavedItemId(newLearnedId);
+      setSavedDateKey(today);
+      setDestination("learned");
+      fireToast("Moved to Learned Log", "day");
+    } else {
+      // Move from Learned to Bookmarks
+      if (savedItemId && savedDateKey && onDeleteLearned) {
+        onDeleteLearned(savedDateKey, savedItemId);
+      }
+      const bmId = createBookmarkId();
+      const bmItem = {
+        id: bmId,
+        url: normalizedUrl,
+        kind,
+        title: title.trim() || defaultTitleForUrl(normalizedUrl),
+        note: note.trim() || undefined,
+        tags,
+        preview,
+        createdAt: Date.now(),
+      };
+      onSaveBookmark(bmItem);
+      setSavedItemId(bmId);
+      setSavedDateKey(null);
+      setDestination("bookmarks");
+      fireToast("Moved to Bookmarks", "day");
+    }
+  };
+
+  // Save edits
+  const handleSaveEdits = () => {
+    if (!normalizedUrl) return;
+    if (destination === "bookmarks" && savedItemId && onUpdateBookmark) {
+      onUpdateBookmark({
+        id: savedItemId,
+        url: normalizedUrl,
+        kind,
+        title: title.trim() || defaultTitleForUrl(normalizedUrl),
+        note: note.trim() || undefined,
+        tags,
+        preview,
+        createdAt: Date.now(),
+      });
+      fireToast("Updated Bookmark", "ok");
+    } else if (destination === "learned" && savedItemId && savedDateKey) {
+      onSaveLearned(savedDateKey, {
+        id: savedItemId,
+        title: title.trim() || defaultTitleForUrl(normalizedUrl),
+        insight: note.trim() || `Saved from ${host || "shared link"}`,
+        sourceUrl: normalizedUrl,
+        tags,
+        createdAt: Date.now(),
+      });
+      fireToast("Updated Learned Log", "ok");
+    }
+    setShowEditDrawer("none");
+    onClose();
+  };
+
+  const handleUndo = () => {
+    if (destination === "bookmarks" && savedItemId && onDeleteBookmark) {
+      onDeleteBookmark(savedItemId);
+    } else if (destination === "learned" && savedItemId && savedDateKey && onDeleteLearned) {
+      onDeleteLearned(savedDateKey, savedItemId);
+    }
+    fireToast("Save Undone", "warn");
+    onClose();
+  };
 
   const handleAddTag = () => {
     const trimmed = tagInput.trim().toLowerCase().replace(/^#/, "");
@@ -86,245 +220,175 @@ export function ShareTargetModal({
     }
   };
 
-  const handleRemoveTag = (t: string) => {
-    setTags(tags.filter((x) => x !== t));
-  };
-
-  const handleSave = () => {
-    if (!normalizedUrl) return;
-
-    if (destination === "bookmarks") {
-      const item = {
-        id: createBookmarkId(),
-        url: normalizedUrl,
-        kind,
-        title: title.trim() || defaultTitleForUrl(normalizedUrl),
-        note: note.trim() || undefined,
-        tags,
-        preview,
-        createdAt: Date.now(),
-      };
-      onSaveBookmark(item);
-      fireToast("Saved to Bookmarks", "day");
-      openKit("bookmarks");
-    } else {
-      const today = dateKey();
-      const learnedItem = {
-        id: createLearnedId(),
-        title: title.trim() || defaultTitleForUrl(normalizedUrl),
-        insight: note.trim() || `Saved from ${host || "shared link"}`,
-        sourceUrl: normalizedUrl,
-        tags: tags.length ? tags : [host || "shared"],
-        createdAt: Date.now(),
-      };
-      onSaveLearned(today, learnedItem);
-      fireToast("Saved to Learned", "day");
-      openKit("learned");
-    }
-    onClose();
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
-      <div className="w-full max-w-[480px] bg-[#0C1116] border border-[#26303B] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Header */}
-        <div className="p-4 border-b border-[#26303B] flex items-center justify-between bg-[#161C24]">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400">
-              <Icon.Share size={16} />
+    <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4 pointer-events-none animate-fadeIn">
+      <div className="w-full max-w-[500px] bg-[#0C1116] border-2 border-amber-400/80 rounded-2xl shadow-2xl overflow-hidden pointer-events-auto transition-all duration-300 text-[#EEF2F6]">
+        {/* Main Pocket Card Bar */}
+        <div className="p-3.5 bg-[#161C24] flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-10 h-10 rounded-xl bg-amber-400 text-black flex items-center justify-center font-bold shrink-0 shadow-lg">
+              <Icon.Check size={20} />
             </div>
-            <div>
-              <h2 className="font-semibold text-sm text-[#EEF2F6]">Received Shared Link</h2>
-              <p className="text-xs text-gray-400 truncate max-w-[240px] font-mono">{host || normalizedUrl}</p>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-400">
+                  Saved to {destination === "bookmarks" ? "Bookmarks" : "Learned"}
+                </span>
+                <span className="text-[10px] font-mono text-gray-400 bg-white/5 px-1.5 py-0.5 rounded">
+                  {host || "link"}
+                </span>
+              </div>
+              <p className="text-xs font-semibold truncate text-white mt-0.5">{title}</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition"
-          >
-            <Icon.X size={16} />
-          </button>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => openKit(destination)}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 transition text-xs font-mono"
+              title="Open View"
+            >
+              View →
+            </button>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition"
+              title="Done"
+            >
+              <Icon.X size={16} />
+            </button>
+          </div>
         </div>
 
-        <div className="p-4 overflow-y-auto space-y-4 flex-1">
-          {/* Shared Link Preview Card */}
-          <div className="p-3 bg-[#161C24] border border-[#26303B] rounded-xl flex gap-3 items-center">
-            {preview?.image ? (
-              <img
-                src={preview.image}
-                alt="Preview"
-                className="w-14 h-14 object-cover rounded-lg border border-[#26303B] shrink-0"
-              />
-            ) : (
-              <div className="w-14 h-14 rounded-lg bg-amber-400/5 border border-amber-400/20 flex items-center justify-center text-amber-400 shrink-0">
-                {kind === "youtube" ? <Icon.Youtube size={24} /> : <Icon.Link size={24} />}
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 font-semibold">
-                  {kind}
-                </span>
-                {loadingPreview && (
-                  <span className="text-[10px] font-mono text-gray-400 animate-pulse">Fetching preview...</span>
-                )}
-              </div>
-              <p className="text-xs font-mono text-amber-400/90 truncate">{normalizedUrl}</p>
-            </div>
-          </div>
+        {/* Action Toolbar */}
+        <div className="px-3.5 py-2 bg-[#0C1116] border-t border-[#26303B] flex items-center justify-between gap-1 text-xs font-mono overflow-x-auto">
+          <button
+            onClick={handleToggleDestination}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-amber-400/20 hover:text-amber-300 text-gray-300 transition shrink-0"
+          >
+            {destination === "bookmarks" ? <Icon.Brain size={13} /> : <Icon.Bookmark size={13} />}
+            <span>Move to {destination === "bookmarks" ? "Learned" : "Bookmarks"}</span>
+          </button>
 
-          {/* Save Destination Tabs */}
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wider font-mono">
-              Save Destination
-            </label>
-            <div className="grid grid-cols-2 gap-2 p-1 bg-[#161C24] border border-[#26303B] rounded-xl">
-              <button
-                type="button"
-                onClick={() => setDestination("bookmarks")}
-                className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg font-medium text-xs transition ${
-                  destination === "bookmarks"
-                    ? "bg-amber-400 text-black font-semibold shadow"
-                    : "text-gray-400 hover:text-white"
-                }`}
-              >
-                <Icon.Bookmark size={14} />
-                <span>Bookmarks</span>
-              </button>
+          <button
+            onClick={() => setShowEditDrawer(showEditDrawer === "tags" ? "none" : "tags")}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition shrink-0 ${
+              showEditDrawer === "tags"
+                ? "bg-amber-400 text-black font-semibold"
+                : "bg-white/5 hover:bg-white/10 text-gray-300"
+            }`}
+          >
+            <span>+ Tags</span>
+          </button>
 
-              <button
-                type="button"
-                onClick={() => setDestination("learned")}
-                className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg font-medium text-xs transition ${
-                  destination === "learned"
-                    ? "bg-amber-400 text-black font-semibold shadow"
-                    : "text-gray-400 hover:text-white"
-                }`}
-              >
-                <Icon.Brain size={14} />
-                <span>Learned Log</span>
-              </button>
-            </div>
-          </div>
+          <button
+            onClick={() => setShowEditDrawer(showEditDrawer === "note" ? "none" : "note")}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition shrink-0 ${
+              showEditDrawer === "note"
+                ? "bg-amber-400 text-black font-semibold"
+                : "bg-white/5 hover:bg-white/10 text-gray-300"
+            }`}
+          >
+            <span>+ Note</span>
+          </button>
 
-          {/* Title Field */}
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1 font-mono uppercase tracking-wider">
-              Title
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Title for this link..."
-              className="w-full bg-[#161C24] border border-[#26303B] rounded-xl px-3 py-2 text-xs text-[#EEF2F6] focus:outline-none focus:border-amber-400/60"
-            />
-          </div>
+          <button
+            onClick={handleUndo}
+            className="px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition shrink-0"
+          >
+            Undo
+          </button>
 
-          {/* Destination Specific Fields */}
-          {destination === "bookmarks" ? (
-            <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1 font-mono uppercase tracking-wider">
-                Category Kind
-              </label>
-              <select
-                value={kind}
-                onChange={(e) => setKind(e.target.value as BookmarkKind)}
-                className="w-full bg-[#161C24] border border-[#26303B] rounded-xl px-3 py-2 text-xs text-[#EEF2F6] focus:outline-none focus:border-amber-400/60"
-              >
-                <option value="article">Article</option>
-                <option value="youtube">Video (YouTube / Vimeo)</option>
-                <option value="repo">Code / Repository</option>
-                <option value="doc">Documentation</option>
-                <option value="link">General Link</option>
-                <option value="note">Note</option>
-              </select>
-            </div>
-          ) : null}
+          {showEditDrawer === "none" && (
+            <span className="text-[10px] text-gray-500 font-mono ml-auto shrink-0">
+              Closing in {countdown}s
+            </span>
+          )}
+        </div>
 
-          {/* Notes / Insights Field */}
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1 font-mono uppercase tracking-wider">
-              {destination === "learned" ? "Key Takeaway / Reflection" : "Notes / Comment (Optional)"}
-            </label>
-            <textarea
-              rows={3}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={
-                destination === "learned"
-                  ? "What did you learn from this resource?"
-                  : "Add optional notes or why you saved this link..."
-              }
-              className="w-full bg-[#161C24] border border-[#26303B] rounded-xl px-3 py-2 text-xs text-[#EEF2F6] focus:outline-none focus:border-amber-400/60 resize-none"
-            />
-          </div>
-
-          {/* Tags */}
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1 font-mono uppercase tracking-wider">
-              Tags
-            </label>
-            <div className="flex gap-1.5 mb-2 flex-wrap">
-              {tags.map((t) => (
-                <span
-                  key={t}
-                  className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-md bg-amber-400/10 text-amber-300 border border-amber-400/20"
-                >
-                  #{t}
+        {/* Expandable Quick Edit Drawer */}
+        {showEditDrawer !== "none" && (
+          <div className="p-3.5 bg-[#161C24] border-t border-[#26303B] space-y-3 animate-fadeIn">
+            {showEditDrawer === "tags" && (
+              <div>
+                <label className="block text-[11px] font-mono text-gray-400 mb-1">
+                  Add Tags (Press Enter)
+                </label>
+                <div className="flex gap-1.5 mb-2 flex-wrap">
+                  {tags.map((t) => (
+                    <span
+                      key={t}
+                      className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/30"
+                    >
+                      #{t}
+                      <button
+                        type="button"
+                        onClick={() => setTags(tags.filter((x) => x !== t))}
+                        className="hover:text-red-400"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddTag();
+                      }
+                    }}
+                    placeholder="tag name..."
+                    className="flex-1 bg-[#0C1116] border border-[#26303B] rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:border-amber-400"
+                  />
                   <button
                     type="button"
-                    onClick={() => handleRemoveTag(t)}
-                    className="hover:text-red-400"
+                    onClick={handleAddTag}
+                    className="px-3 py-1 bg-amber-400 text-black font-semibold rounded-lg text-xs"
                   >
-                    ×
+                    Add
                   </button>
-                </span>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleAddTag();
-                  }
-                }}
-                placeholder="Add a tag and press enter..."
-                className="flex-1 bg-[#161C24] border border-[#26303B] rounded-xl px-3 py-1.5 text-xs text-[#EEF2F6] focus:outline-none focus:border-amber-400/60"
-              />
+                </div>
+              </div>
+            )}
+
+            {showEditDrawer === "note" && (
+              <div>
+                <label className="block text-[11px] font-mono text-gray-400 mb-1">
+                  {destination === "learned" ? "Key Reflection" : "Notes"}
+                </label>
+                <textarea
+                  rows={2}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Add quick notes..."
+                  className="w-full bg-[#0C1116] border border-[#26303B] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400 resize-none"
+                />
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-1">
               <button
                 type="button"
-                onClick={handleAddTag}
-                className="px-3 py-1.5 bg-[#161C24] border border-[#26303B] hover:border-amber-400/50 rounded-xl text-xs text-gray-300 font-medium"
+                onClick={() => setShowEditDrawer("none")}
+                className="px-3 py-1 text-xs font-mono text-gray-400 hover:text-white"
               >
-                Add
+                Close Drawer
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEdits}
+                className="px-4 py-1.5 bg-amber-400 text-black font-semibold rounded-lg text-xs font-mono shadow"
+              >
+                Done Editing
               </button>
             </div>
           </div>
-        </div>
-
-        {/* Footer Actions */}
-        <div className="p-4 border-t border-[#26303B] bg-[#161C24] flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-medium text-gray-400 hover:text-white transition"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            className="px-5 py-2 rounded-xl text-xs font-semibold bg-amber-400 hover:bg-amber-300 text-black shadow-lg transition flex items-center gap-1.5"
-          >
-            <Icon.Check size={14} />
-            <span>Save to {destination === "bookmarks" ? "Bookmarks" : "Learned"}</span>
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );

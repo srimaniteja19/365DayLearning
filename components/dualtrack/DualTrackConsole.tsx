@@ -12,7 +12,7 @@ import React, {
   useEffect,
 } from "react";
 import { useSession } from "next-auth/react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   purgeLocalAppData,
 } from "@/lib/storage";
@@ -452,29 +452,33 @@ export default function DualTrackConsole() {
     hydrateCredentialsFromStorage();
   }, []);
 
+  const searchParams = useSearchParams();
+
   /** Handle incoming PWA Web Share Target params (`?shared_url=...&shared_title=...&shared_text=...`). */
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const sharedUrl = params.get("shared_url");
+    if (!searchParams) return;
+    const sharedUrl = searchParams.get("shared_url");
     if (!sharedUrl) return;
 
-    const sharedTitle = params.get("shared_title") || undefined;
-    const sharedText = params.get("shared_text") || undefined;
+    const sharedTitle = searchParams.get("shared_title") || undefined;
+    const sharedText = searchParams.get("shared_text") || undefined;
 
     // Clean URL search parameters from browser history
-    const url = new URL(window.location.href);
-    url.searchParams.delete("shared_url");
-    url.searchParams.delete("shared_title");
-    url.searchParams.delete("shared_text");
-    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("shared_url");
+      url.searchParams.delete("shared_title");
+      url.searchParams.delete("shared_text");
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    }
 
     setActiveShareTarget({
       url: sharedUrl,
       title: sharedTitle,
       text: sharedText,
     });
-  }, []);
+  }, [searchParams]);
+
 
   // Clear legacy guest-mode flag if present.
   useEffect(() => {
@@ -2094,11 +2098,15 @@ export default function DualTrackConsole() {
             sharedText={activeShareTarget.text}
             onClose={() => setActiveShareTarget(null)}
             onSaveBookmark={addBookmark}
+            onUpdateBookmark={updateBookmark}
+            onDeleteBookmark={removeBookmark}
             onSaveLearned={addLearned}
+            onDeleteLearned={removeLearned}
             fireToast={fireToast}
             openKit={(tab) => goTo({ page: "kit", kitTab: tab })}
           />
         )}
+
 
         <ToastLayer toast={toast} />
         {confetti && <ConfettiBurst key={confetti.id} color={confetti.color} />}
