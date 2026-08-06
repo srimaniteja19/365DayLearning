@@ -12,6 +12,15 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#0C1116",
     orientation: "portrait-primary",
     categories: ["education", "productivity"],
+    share_target: {
+      action: "/share-target",
+      method: "GET",
+      params: {
+        title: "title",
+        text: "text",
+        url: "url",
+      },
+    },
     icons: [
       {
         src: "/icon",
@@ -20,5 +29,6 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: "any",
       },
     ],
-  };
+  } as any;
 }
+

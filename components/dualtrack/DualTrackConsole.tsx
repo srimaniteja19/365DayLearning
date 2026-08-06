@@ -94,6 +94,7 @@ import { LearnedView } from "@/features/learned/LearnedView";
 import { BookmarksView } from "@/features/bookmarks/BookmarksView";
 import { FavoritesView } from "@/features/favorites/FavoritesView";
 import { ArchiveView } from "@/features/archive/ArchiveView";
+import { ShareTargetModal } from "@/features/modals/ShareTargetModal";
 import {
   applyPreviewToBookmark,
   createBookmarkId,
@@ -148,6 +149,7 @@ export default function DualTrackConsole() {
   const [srs, setSrs] = useState({});
   const [log, setLog] = useState([]);
   const [modal, setModal] = useState(null);
+  const [activeShareTarget, setActiveShareTarget] = useState(null);
   const [themeKey, setThemeKey] = useState(DEFAULT_THEME_KEY);
   const [fontKey, setFontKey] = useState(DEFAULT_FONT_KEY);
   const [saveStatus, setSaveStatus] = useState("loading");
@@ -448,6 +450,30 @@ export default function DualTrackConsole() {
 
   useEffect(() => {
     hydrateCredentialsFromStorage();
+  }, []);
+
+  /** Handle incoming PWA Web Share Target params (`?shared_url=...&shared_title=...&shared_text=...`). */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const sharedUrl = params.get("shared_url");
+    if (!sharedUrl) return;
+
+    const sharedTitle = params.get("shared_title") || undefined;
+    const sharedText = params.get("shared_text") || undefined;
+
+    // Clean URL search parameters from browser history
+    const url = new URL(window.location.href);
+    url.searchParams.delete("shared_url");
+    url.searchParams.delete("shared_title");
+    url.searchParams.delete("shared_text");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+
+    setActiveShareTarget({
+      url: sharedUrl,
+      title: sharedTitle,
+      text: sharedText,
+    });
   }, []);
 
   // Clear legacy guest-mode flag if present.
@@ -2058,6 +2084,19 @@ export default function DualTrackConsole() {
             onOpenAccount={() => setModal({ kind: "account" })}
             onOpenPricing={() => setModal({ kind: "pricing" })}
             onPlanCreated={handlePlanCreated}
+          />
+        )}
+
+        {activeShareTarget && (
+          <ShareTargetModal
+            sharedUrl={activeShareTarget.url}
+            sharedTitle={activeShareTarget.title}
+            sharedText={activeShareTarget.text}
+            onClose={() => setActiveShareTarget(null)}
+            onSaveBookmark={addBookmark}
+            onSaveLearned={addLearned}
+            fireToast={fireToast}
+            openKit={(tab) => goTo({ page: "kit", kitTab: tab })}
           />
         )}
 
