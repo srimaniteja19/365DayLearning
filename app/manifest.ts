@@ -6,7 +6,9 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Refrainly",
     description:
       "Multi-plan learning campaigns with spaced repetition, notes, and bring-your-own-key AI.",
+    id: "/",
     start_url: "/",
+    scope: "/",
     display: "standalone",
     background_color: "#EEF2F6",
     theme_color: "#0C1116",
@@ -23,6 +25,30 @@ export default function manifest(): MetadataRoute.Manifest {
     },
     icons: [
       {
+        src: "/icon-192",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icon-192",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "maskable",
+      },
+      {
+        src: "/icon-512",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icon-512",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
+      },
+      {
         src: "/icon",
         sizes: "64x64",
         type: "image/png",
@@ -31,4 +57,3 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
   } as any;
 }
-

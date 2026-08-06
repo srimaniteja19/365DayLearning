@@ -138,6 +138,7 @@ export const metadata: Metadata = {
     title: "Refrainly | Daily learning campaigns for any subject",
     description,
   },
+  manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     title: "Refrainly",
@@ -147,6 +148,7 @@ export const metadata: Metadata = {
     telephone: false,
   },
 };
+
 
 export const viewport: Viewport = {
   themeColor: [
