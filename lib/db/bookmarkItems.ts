@@ -22,58 +22,75 @@ function rowValues(userId: string, item: BookmarkItem) {
 
 export async function upsertBookmarkItem(userId: string, item: BookmarkItem): Promise<void> {
   if (!hasDatabase()) return;
-  const db = getDb();
-  const values = rowValues(userId, item);
-  await db
-    .insert(bookmarkItems)
-    .values(values)
-    .onConflictDoUpdate({
-      target: bookmarkItems.id,
-      set: {
-        url: values.url,
-        kind: values.kind,
-        title: values.title,
-        note: values.note,
-        tags: values.tags,
-        favorite: values.favorite,
-        archived: values.archived,
-        preview: values.preview,
-        insight: values.insight,
-      },
-    });
+  try {
+    const db = getDb();
+    const values = rowValues(userId, item);
+    await db
+      .insert(bookmarkItems)
+      .values(values)
+      .onConflictDoUpdate({
+        target: bookmarkItems.id,
+        set: {
+          url: values.url,
+          kind: values.kind,
+          title: values.title,
+          note: values.note,
+          tags: values.tags,
+          favorite: values.favorite,
+          archived: values.archived,
+          preview: values.preview,
+          insight: values.insight,
+        },
+      });
+  } catch (err) {
+    console.error("[upsertBookmarkItem] DB error:", err);
+  }
 }
 
 export async function deleteBookmarkItem(userId: string, id: string): Promise<void> {
   if (!hasDatabase()) return;
-  const db = getDb();
-  await db.delete(bookmarkItems).where(and(eq(bookmarkItems.userId, userId), eq(bookmarkItems.id, id)));
+  try {
+    const db = getDb();
+    await db.delete(bookmarkItems).where(and(eq(bookmarkItems.userId, userId), eq(bookmarkItems.id, id)));
+  } catch (err) {
+    console.error("[deleteBookmarkItem] DB error:", err);
+  }
 }
 
 export async function deleteAllBookmarkItems(userId: string): Promise<void> {
   if (!hasDatabase()) return;
-  const db = getDb();
-  await db.delete(bookmarkItems).where(eq(bookmarkItems.userId, userId));
+  try {
+    const db = getDb();
+    await db.delete(bookmarkItems).where(eq(bookmarkItems.userId, userId));
+  } catch (err) {
+    console.error("[deleteAllBookmarkItems] DB error:", err);
+  }
 }
 
 export async function listBookmarkItems(userId: string): Promise<BookmarksList> {
   if (!hasDatabase()) return [];
-  const db = getDb();
-  const rows = await db.select().from(bookmarkItems).where(eq(bookmarkItems.userId, userId));
-  return rows
-    .map((r) => ({
-      id: r.id,
-      url: r.url,
-      kind: r.kind as BookmarkItem["kind"],
-      title: r.title,
-      note: r.note ?? undefined,
-      tags: (r.tags as string[] | null) ?? undefined,
-      favorite: r.favorite === true,
-      archived: r.archived === true ? true : undefined,
-      preview: (r.preview as BookmarkItem["preview"]) ?? undefined,
-      insight: r.insight ?? undefined,
-      createdAt: r.createdAt.getTime(),
-    }))
-    .sort((a, b) => b.createdAt - a.createdAt);
+  try {
+    const db = getDb();
+    const rows = await db.select().from(bookmarkItems).where(eq(bookmarkItems.userId, userId));
+    return rows
+      .map((r) => ({
+        id: r.id,
+        url: r.url,
+        kind: r.kind as BookmarkItem["kind"],
+        title: r.title,
+        note: r.note ?? undefined,
+        tags: (r.tags as string[] | null) ?? undefined,
+        favorite: r.favorite === true,
+        archived: r.archived === true ? true : undefined,
+        preview: (r.preview as BookmarkItem["preview"]) ?? undefined,
+        insight: r.insight ?? undefined,
+        createdAt: r.createdAt ? new Date(r.createdAt).getTime() : Date.now(),
+      }))
+      .sort((a, b) => b.createdAt - a.createdAt);
+  } catch (err) {
+    console.error("[listBookmarkItems] DB error:", err);
+    return [];
+  }
 }
 
 /** Idempotent — safe to call repeatedly (e.g. once per GET while legacy data remains). */

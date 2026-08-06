@@ -63,14 +63,14 @@ export function ArchiveView({
     const out: ArchiveEntry[] = [];
     Object.entries(learned || {}).forEach(([date, items]) => {
       (items || []).forEach((item) => {
-        if (item.archived) out.push({ type: "note", date, item });
+        if (item?.archived) out.push({ type: "note", date, item });
       });
     });
     return out;
   }, [learned]);
 
   const archivedBookmarks = useMemo(
-    () => (bookmarks || []).filter((b) => b.archived).map((item): ArchiveEntry => ({ type: "bookmark", item })),
+    () => (bookmarks || []).filter((b) => b?.archived).map((item): ArchiveEntry => ({ type: "bookmark", item })),
     [bookmarks],
   );
 

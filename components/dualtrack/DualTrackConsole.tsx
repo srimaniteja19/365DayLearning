@@ -1571,30 +1571,30 @@ export default function DualTrackConsole() {
 
   const favoriteCount = useMemo(() => {
     const noteFavs = Object.values(learned || {}).reduce(
-      (n, items) => n + (items || []).filter((it) => it.favorite && !it.archived).length,
+      (n, items) => n + (items || []).filter((it) => it?.favorite && !it?.archived).length,
       0,
     );
-    const bookmarkFavs = (bookmarks || []).filter((b) => b.favorite && !b.archived).length;
+    const bookmarkFavs = (bookmarks || []).filter((b) => b?.favorite && !b?.archived).length;
     return noteFavs + bookmarkFavs;
   }, [learned, bookmarks]);
 
   const learnedCount = useMemo(() => {
     return Object.values(learned || {}).reduce(
-      (n, items) => n + (items || []).filter((it) => !it.archived).length,
+      (n, items) => n + (items || []).filter((it) => it && !it.archived).length,
       0,
     );
   }, [learned]);
 
   const bookmarkCount = useMemo(() => {
-    return (bookmarks || []).filter((b) => !b.archived).length;
+    return (bookmarks || []).filter((b) => b && !b.archived).length;
   }, [bookmarks]);
 
   const archiveCount = useMemo(() => {
     const noteArch = Object.values(learned || {}).reduce(
-      (n, items) => n + (items || []).filter((it) => it.archived).length,
+      (n, items) => n + (items || []).filter((it) => it?.archived).length,
       0,
     );
-    const bookmarkArch = (bookmarks || []).filter((b) => b.archived).length;
+    const bookmarkArch = (bookmarks || []).filter((b) => b?.archived).length;
     return noteArch + bookmarkArch;
   }, [learned, bookmarks]);
 

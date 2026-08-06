@@ -9,24 +9,13 @@ export async function upsertLearnedItem(
   item: LearnedItem,
 ): Promise<void> {
   if (!hasDatabase()) return;
-  const db = getDb();
-  await db
-    .insert(learnedItems)
-    .values({
-      id: item.id,
-      userId,
-      dateKey,
-      title: item.title,
-      body: item.body,
-      insight: item.insight ?? null,
-      tags: item.tags ?? null,
-      favorite: item.favorite === true,
-      archived: item.archived === true,
-      createdAt: new Date(item.createdAt),
-    })
-    .onConflictDoUpdate({
-      target: learnedItems.id,
-      set: {
+  try {
+    const db = getDb();
+    await db
+      .insert(learnedItems)
+      .values({
+        id: item.id,
+        userId,
         dateKey,
         title: item.title,
         body: item.body,
@@ -34,44 +23,72 @@ export async function upsertLearnedItem(
         tags: item.tags ?? null,
         favorite: item.favorite === true,
         archived: item.archived === true,
-      },
-    });
+        createdAt: new Date(item.createdAt),
+      })
+      .onConflictDoUpdate({
+        target: learnedItems.id,
+        set: {
+          dateKey,
+          title: item.title,
+          body: item.body,
+          insight: item.insight ?? null,
+          tags: item.tags ?? null,
+          favorite: item.favorite === true,
+          archived: item.archived === true,
+        },
+      });
+  } catch (err) {
+    console.error("[upsertLearnedItem] DB error:", err);
+  }
 }
 
 export async function deleteLearnedItem(userId: string, id: string): Promise<void> {
   if (!hasDatabase()) return;
-  const db = getDb();
-  await db.delete(learnedItems).where(and(eq(learnedItems.userId, userId), eq(learnedItems.id, id)));
+  try {
+    const db = getDb();
+    await db.delete(learnedItems).where(and(eq(learnedItems.userId, userId), eq(learnedItems.id, id)));
+  } catch (err) {
+    console.error("[deleteLearnedItem] DB error:", err);
+  }
 }
 
 export async function deleteAllLearnedItems(userId: string): Promise<void> {
   if (!hasDatabase()) return;
-  const db = getDb();
-  await db.delete(learnedItems).where(eq(learnedItems.userId, userId));
+  try {
+    const db = getDb();
+    await db.delete(learnedItems).where(eq(learnedItems.userId, userId));
+  } catch (err) {
+    console.error("[deleteAllLearnedItems] DB error:", err);
+  }
 }
 
 export async function listLearnedItems(userId: string): Promise<LearnedMap> {
   if (!hasDatabase()) return {};
-  const db = getDb();
-  const rows = await db.select().from(learnedItems).where(eq(learnedItems.userId, userId));
-  const out: LearnedMap = {};
-  for (const r of rows) {
-    const item: LearnedItem = {
-      id: r.id,
-      title: r.title,
-      body: r.body,
-      insight: r.insight ?? undefined,
-      tags: (r.tags as string[] | null) ?? undefined,
-      favorite: r.favorite === true,
-      archived: r.archived === true ? true : undefined,
-      createdAt: r.createdAt.getTime(),
-    };
-    (out[r.dateKey] ??= []).push(item);
+  try {
+    const db = getDb();
+    const rows = await db.select().from(learnedItems).where(eq(learnedItems.userId, userId));
+    const out: LearnedMap = {};
+    for (const r of rows) {
+      const item: LearnedItem = {
+        id: r.id,
+        title: r.title,
+        body: r.body,
+        insight: r.insight ?? undefined,
+        tags: (r.tags as string[] | null) ?? undefined,
+        favorite: r.favorite === true,
+        archived: r.archived === true ? true : undefined,
+        createdAt: r.createdAt ? new Date(r.createdAt).getTime() : Date.now(),
+      };
+      (out[r.dateKey] ??= []).push(item);
+    }
+    for (const list of Object.values(out)) {
+      list.sort((a, b) => b.createdAt - a.createdAt);
+    }
+    return out;
+  } catch (err) {
+    console.error("[listLearnedItems] DB error:", err);
+    return {};
   }
-  for (const list of Object.values(out)) {
-    list.sort((a, b) => b.createdAt - a.createdAt);
-  }
-  return out;
 }
 
 /** Idempotent — safe to call repeatedly (e.g. once per GET while legacy data remains). */
