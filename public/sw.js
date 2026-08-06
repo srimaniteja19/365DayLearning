@@ -10,10 +10,10 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Pass all network requests through smoothly
+  // Pass network requests through smoothly
   event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request) as any;
+    fetch(event.request).catch(function () {
+      return caches.match(event.request);
     })
   );
 });
